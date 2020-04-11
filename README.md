@@ -1,3 +1,9 @@
+# RCT GCS
+
+## Dependencies
+1.	python3-tk
+
+
 radio_collar_tracker_drone
 ====================
 Airborne Wildlife Radio Collar Tracker - UAS Component
