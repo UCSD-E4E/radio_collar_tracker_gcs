@@ -20,7 +20,8 @@
 #
 # DATE        Name  Description
 # -----------------------------------------------------------------------------
-# 04/14/20    NH    Initial commit
+# 04/14/20    NH    Initial commit, fixed start parameters, added support for
+#                   multiline packet
 #
 ###############################################################################
 import socket
@@ -75,11 +76,14 @@ class MAVReceiver:
             ready = select.select([self.sock], [], [], 1)
             if ready[0]:
                 data, addr = self.sock.recvfrom(1024)
-                packet = json.loads(data.decode('utf-8'))
-                if 'heartbeat' in packet:
-                    self.__log.info("Received heartbeat %s" % (packet))
-                    self.__lastHeartbeat = dt.datetime.now()
-                    return addr, packet
+                strData = data.decode('utf-8')
+                for line in strData.split('\r\n'):
+                    print(line)
+                    packet = json.loads(line)
+                    if 'heartbeat' in packet:
+                        self.__log.info("Received heartbeat %s" % (packet))
+                        self.__lastHeartbeat = dt.datetime.now()
+                        return addr, packet
             if guiTick is not None:
                 guiTick()
         self.__log.error("Failed to receive any heartbeats")
@@ -105,7 +109,7 @@ class MAVReceiver:
                 for callback in self.__packetMap['_nheartbeat']:
                     callback(None)
 
-    def start(self, gui=False):
+    def start(self, gui=None):
         '''
         Starts the receiver.
         '''
