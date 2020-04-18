@@ -27,3 +27,4 @@ callgrind.out.*
 oprofile_data
 doxygen-doc
 **.svg
+Pipfile.lock
