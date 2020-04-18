@@ -18,9 +18,10 @@
 #
 ###############################################################################
 #
-# DATE        Name  Description
+# DATE      WHO Description
 # -----------------------------------------------------------------------------
-# 02/15/20    NH    Initial commit
+# 04/17/20  NH  Updated imports and MAVModel API
+# 02/15/20  NH  Initial commit
 #
 ###############################################################################
 
@@ -32,7 +33,8 @@ import logging
 from tkinter import ttk
 from tkinter import messagebox as tkm
 import sys
-from scripts.rctCore import MAVModel
+import scripts.rctCore as rctCore
+
 
 class GCS(tk.Tk):
     '''
@@ -45,7 +47,7 @@ class GCS(tk.Tk):
         '''
         super().__init__()
         self.__log = logging.getLogger('rctGCS.GCS')
-        self.__mavModel = MAVModel()
+        self.__mavModel = rctCore.MAVModel()
         self.__buttons = []
         self.innerFreqFrame = None
         self.freqElements = []
@@ -53,11 +55,11 @@ class GCS(tk.Tk):
         for button in self.__buttons:
             button.config(state='disabled')
         self.__mavModel.registerCallback(
-            self.__mavModel.CALLBACK_EVENTS.Heartbeat, self.__updateStatus)
+            rctCore.Events.Heartbeat, self.__updateStatus)
         self.__mavModel.registerCallback(
-            self.__mavModel.CALLBACK_EVENTS.Exception, self.__handleRemoteException)
+            rctCore.Events.Exception, self.__handleRemoteException)
         self.__mavModel.registerCallback(
-            self.__mavModel.CALLBACK_EVENTS.GetFreqs, self.__setFreqsFromRemote)
+            rctCore.Events.GetFreqs, self.__setFreqsFromRemote)
 
     def start(self):
         '''
@@ -113,7 +115,7 @@ class GCS(tk.Tk):
         '''
         Internal callback to retrieve the frequencies from the remote
         '''
-        self.__mavModel.getFreqsFromRemote()
+        self.__mavModel.getFreqs()
 
     def __addFreq(self):
         '''
@@ -212,7 +214,8 @@ class GCS(tk.Tk):
             self.__mavModel.GPS_STATES.get_msg: {'text': 'GPS: Waiting for message', 'bg': 'yellow'},
             self.__mavModel.GPS_STATES.wait_recycle: {'text': 'GPS: Recycling', 'bg': 'yellow'},
             self.__mavModel.GPS_STATES.rdy: {'text': 'GPS: Ready', 'bg': 'green'},
-            self.__mavModel.GPS_STATES.fail: {'text': 'GPS: Failed!', 'bg': 'red'}
+            self.__mavModel.GPS_STATES.fail: {
+                'text': 'GPS: Failed!', 'bg': 'red'}
         }
 
         try:
