@@ -18,12 +18,13 @@
 #
 ###############################################################################
 #
-# DATE        Name  Description
+# DATE      WHO Description
 # -----------------------------------------------------------------------------
-# 04/16/20    NH    Added auto enum, moved enums to module scope, updated comms
-#                   eventing, added event for no heartbeat, added start and
-#                   stop mission functions, implemented setFrequencies
-# 04/14/20    NH    Initial commit
+# 04/17/20  NH  Fixed callback map, added timeout to getFreqs
+# 04/16/20  NH  Added auto enum, moved enums to module scope, updated comms
+#               eventing, added event for no heartbeat, added start and
+#               stop mission functions, implemented setFrequencies
+# 04/14/20  NH  Initial commit
 #
 ###############################################################################
 
@@ -152,6 +153,7 @@ class MAVModel:
         self.sysStatus = 0
         self.swStatus = 0
         self.frequencies = []
+        self.__callbacks = {}
         for event in Events:
             self.__callbacks[event] = []
         self.__exceptions = []
@@ -252,9 +254,9 @@ class MAVModel:
         self.__rx.sendCommandPacket(rctComms.COMMANDS.STOP)
         self.__log.info("Sent stop command")
 
-    def getFreqs(self):
+    def getFreqs(self, timeout=None):
         '''
-        Sends the command to retrieve frequencies
+        Retrieves the frequencies from the payload
         '''
         self.__rx.sendCommandPacket(rctComms.COMMANDS.GET_FREQUENCY)
         self.__log.info("Sent getF command")
@@ -262,7 +264,7 @@ class MAVModel:
         frequencyPacketEvent = threading.Event()
         self.registerCallback(
             Events.GetFreqs, frequencyPacketEvent.set())
-        frequencyPacketEvent.wait()
+        frequencyPacketEvent.wait(timeout=timeout)
         return self.frequencies
 
     def __handleRemoteException(self, packet, addr):
