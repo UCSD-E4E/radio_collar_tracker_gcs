@@ -5,6 +5,25 @@ from v1.0.  Working branch v1.0a, becomes v2.0 on release
 ## Dependencies
 1.	python3-tk
 
+## Setting up simulator for GCS
+1.  `> ssh -L 9002:localhost:9002 rct-ui@e4e-brix.dynamic.ucsd.edu`
+2.  `rct-ui@e4e-brix> tmux`
+3.  `rct-ui@e4e-brix (tmux a)> ~/connect_UPCORE`
+4.  `e4e@e4e-UPCORE-1 (tmux a)> sudo service rctstart stop`
+5.  `e4e@e4e-UPCORE-1 (tmux a)> ~/simulator`
+6.  `rct-ui@e4e-brix (tmux b)> ~/forward_RCT.sh`
+7.  `> cd scripts`
+8.  `> python rctGCS.py`
+9.  `> mkfifo /tmp/fifo`
+10. `> netcat -b -u localhost 9000 < /tmp/fifo | netcat localhost 9002 > /tmp/fifo`
+
+Note that for step 5 to step 6, you will need to switch to a new tmux pane.
+
+For step 9 to step 10, `rctGCS.py` should be trying to connect during this time.
+
+Steps 5, 6, 8, and 10 should not return to a prompt immediately.
+
+Essentially, start the simulator on the payload, start the UDP forwarding on the Brix, start the GCS, then start the UDP translating on the local machine.
 
 radio_collar_tracker_drone
 ====================
