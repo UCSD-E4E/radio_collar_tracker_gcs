@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 04/20/20  NH  Updated API and imports
 # 04/17/20  NH  Updated imports and MAVModel API
 # 02/15/20  NH  Initial commit
 #
@@ -33,7 +34,9 @@ import logging
 from tkinter import ttk
 from tkinter import messagebox as tkm
 import sys
-import scripts.rctCore as rctCore
+import rctTransport
+import rctComms
+import rctCore
 
 
 class GCS(tk.Tk):
@@ -47,7 +50,9 @@ class GCS(tk.Tk):
         '''
         super().__init__()
         self.__log = logging.getLogger('rctGCS.GCS')
-        self.__mavModel = rctCore.MAVModel()
+        self.__rctPort = rctTransport.RCTUDPClient()
+        self.__mavReceiver = rctComms.MAVReceiver(self.__rctPort)
+        self.__mavModel = rctCore.MAVModel(self.__mavReceiver)
         self.__buttons = []
         self.innerFreqFrame = None
         self.freqElements = []
