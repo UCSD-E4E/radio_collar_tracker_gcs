@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 04/20/20  NH  Updated docstrings and imports
 # 04/19/20  NH  Switched to RCT Transport for comms
 # 04/16/20  NH  Moved Commands and Events to module scope, added helper for
 #               sending commands, cleaned up eventing mechanisms
@@ -33,8 +34,7 @@ import datetime as dt
 import threading
 import enum
 
-from time import sleep
-import scripts.rctTransport as rctTransport
+import rctTransport
 
 
 class COMMANDS(enum.Enum):
@@ -83,18 +83,18 @@ class MAVReceiver:
     '''
     __BUFFER_LEN = 1024
 
-    def __init__(self, port: int, originString='gcs'):
+    def __init__(self, port: rctTransport.RCTAbstractTransport, originString='gcs'):
         '''
         Initializes the UDP interface on the specified port.  Also specifies a
         filename to use as a logfile, which defaults to no log.
 
-        :param port: Port number
-        :type port: Integer
+        :param port: Port object
+        :type port: rctTransport.RCTAbstractTransport
+        :param originString: Origin string
+        :type originString: str
         '''
-        assert(isinstance(port, (int)))
         self.__log = logging.getLogger('rctGCS.MAVReceiver')
-        self.sock = rctTransport.RCTUDPClient(port)
-        self.__portNo = port
+        self.sock = port
 
         self.__receiverThread = None
         self.__log.info('RTC MAVReceiver created')
@@ -120,12 +120,9 @@ class MAVReceiver:
         :type timeout: Integer
         '''
         assert(isinstance(timeout, (int)))
-        for i in range(timeout):
+        for _ in range(timeout):
             try:
                 data, addr = self.sock.receive(1024, 1)
-#             ready = select.select([self.sock], [], [], 1)
-#             if ready[0]:
-#                 data, addr = self.sock.recvfrom(1024)
                 strData = data.decode('utf-8')
                 for line in strData.split('\r\n'):
                     packet = json.loads(line)
@@ -152,9 +149,6 @@ class MAVReceiver:
         while self.__run:
             try:
                 data, addr = self.sock.receive(self.__BUFFER_LEN, 1)
-#             ready = select.select([self.sock], [], [], 1)
-#             if ready[0]:
-#                 data, addr = self.sock.recvfrom(self.__BUFFER_LEN)
                 self.__log.info("Received: %s" % data.decode())
                 packet = json.loads(data.decode())
                 for key in packet.keys():
@@ -180,9 +174,6 @@ class MAVReceiver:
         Starts the receiver.
         '''
         self.__log.info("RCT MAVReceiver starting...")
-#         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-#         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-#         self.sock.bind(("", self.__portNo))
         self.sock.open()
         self.__mavIP, packet = self.waitForHeartbeat(guiTick=gui)
         if self.__mavIP is None:
@@ -238,7 +229,6 @@ class MAVReceiver:
         assert(isinstance(packet, dict))
         msg = json.dumps(packet)
         self.__log.info("Send: %s" % (msg))
-#         self.sock.sendto(msg.encode('utf-8'), self.__mavIP)
         self.sock.send(msg.encode('utf-8'), self.__mavIP)
 
     def sendCommandPacket(self, command: COMMANDS, options: dict = None):
@@ -258,11 +248,3 @@ class MAVReceiver:
             commandPacket.update(options)
         packet[PACKET_TYPES.COMMAND.value] = commandPacket
         self.sendMessage(packet)
-
-
-if __name__ == '__main__':
-    rx = MAVReceiver(9000)
-    rx.start()
-    sleep(1)
-    rx.sendCommandPacket(COMMANDS.START)
-    rx.stop()

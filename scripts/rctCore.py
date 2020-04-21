@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 04/20/20  NH  Updated docstrings and imports
 # 04/19/20  NH  Added event clear for frequency packet event
 # 04/17/20  NH  Fixed callback map, added timeout to getFreqs
 # 04/16/20  NH  Added auto enum, moved enums to module scope, updated comms
@@ -31,7 +32,7 @@
 
 from enum import Enum, auto
 from builtins import list
-import scripts.rctComms as rctComms
+import rctComms
 import logging
 import threading
 
@@ -142,12 +143,14 @@ class MAVModel:
     vehicle state
     '''
 
-    def __init__(self, port: int=9000):
+    def __init__(self, receiver: rctComms.MAVReceiver):
         '''
-        Creates the MAVModel object.
+        Creates a new MAVModel
+        :param receiver: MAVReceiver Object
+        :type receiver: rctComms.MAVReceiver
         '''
         self.__log = logging.getLogger('rctGCS:MAVModel')
-        self.__rx = rctComms.MAVReceiver(port)
+        self.__rx = receiver
         self.sdrStatus = 0
         self.dirStatus = 0
         self.gpsStatus = 0
@@ -185,8 +188,10 @@ class MAVModel:
     def __processFrequencies(self, packet, addr):
         '''
         Internal callback to handle frequency messages
-        :param frequencies: Frequency message payload
-        :type frequencies: List of integers
+        :param packet: Frequency message payload
+        :type packet: List of integers
+        :param addr: Source of packet
+        :type addr: str
         '''
         self.__log.info("Received frequencies")
         self.frequencies = packet
@@ -197,7 +202,9 @@ class MAVModel:
         '''
         Internal callback to handle heartbeat messages
         :param packet: Heartbeat packet payload
-        :type packet:
+        :type packet: dict
+        :param addr: Source of packet
+        :type addr: str
         '''
         self.__log.info("Received heartbeat")
         statusString = packet['status']
@@ -212,10 +219,10 @@ class MAVModel:
     def __processNoHeartbeat(self, packet, addr):
         '''
         Internal callback to handle no hearbeat messages
-        :param packet:
-        :type packet:
-        :param addr:
-        :type addr:
+        :param packet: None
+        :type packet: None
+        :param addr: None
+        :type addr: None
         '''
         for callback in self.__callbacks[Events.NoHeartbeat]:
             callback()
@@ -231,7 +238,7 @@ class MAVModel:
         '''
         Registers a callback for the specified event
         :param event: Event to trigger on
-        :type event: Events
+        :type event: rctCore.Events
         :param callback: Callback to call
         :type callback:
         '''
@@ -255,9 +262,12 @@ class MAVModel:
         self.__rx.sendCommandPacket(rctComms.COMMANDS.STOP)
         self.__log.info("Sent stop command")
 
-    def getFreqs(self, timeout=None):
+    def getFreqs(self, timeout: float=None):
         '''
         Retrieves the frequencies from the payload
+
+        :param timeout: Seconds to wait before timing out
+        :type timeout: number
         '''
         self.__rx.sendCommandPacket(rctComms.COMMANDS.GET_FREQUENCY)
         self.__log.info("Sent getF command")
@@ -272,8 +282,10 @@ class MAVModel:
     def __handleRemoteException(self, packet, addr):
         '''
         Internal callback to handle exception messages
-        :param exception: Exception string
-        :type exception:
+        :param packet: Exception packet payload
+        :type packet: str
+        :param addr: Source of packet
+        :type addr: str
         '''
         self.__log.exception("Remote Exception: %s" % packet)
         self.lastException[0] = packet
@@ -281,8 +293,10 @@ class MAVModel:
     def __handleRemoteTraceback(self, packet, addr):
         '''
         Internal callback to handle traceback messages
-        :param traceback: Traceback string
-        :type traceback:
+        :param packet: Traceback packet payload
+        :type packet: str
+        :param addr: Source of packet
+        :type addr: str
         '''
         self.__log.exception("Remote Traceback: %s" % packet)
         self.lastException[1] = packet
@@ -294,12 +308,13 @@ class MAVModel:
     def setFrequencies(self, freqs):
         '''
         Sends the command to set the specified frequencies
-        :param freqs:
-        :type freqs:
+        :param freqs: Frequencies to set
+        :type freqs: list
         '''
         assert(isinstance(freqs, list))
         for freq in freqs:
             assert(isinstance(freq, int))
+        # TODO: Validate frequencies here?
         self.__rx.sendCommandPacket(
             rctComms.COMMANDS.SET_FREQUENCY, {'frequencies': freqs})
         self.__log.info("Set setF command")
