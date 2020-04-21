@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 04/20/20  NH  Fixed sender to not send tuple as addr
 # 04/19/20  NH  Added abstraction, switched to rctTransport comm interface
 # 04/14/20  NH  Initial history
 #
@@ -137,7 +138,7 @@ class DroneSimulator:
 
     def __sender(self):
         prevTime = dt.datetime.now()
-        sendTarget = (self._target, self._port)
+        sendTarget = self._target
 
         while self._run is True:
             now = dt.datetime.now()
