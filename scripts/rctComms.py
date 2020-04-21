@@ -18,16 +18,15 @@
 #
 ###############################################################################
 #
-# DATE        Name  Description
+# DATE      WHO Description
 # -----------------------------------------------------------------------------
-# 04/16/20    NH    Moved Commands and Events to module scope, added helper for
-#                   sending commands, cleaned up eventing mechanisms
-# 04/14/20    NH    Initial commit, fixed start parameters, added support for
-#                   multiline packet
+# 04/19/20  NH  Switched to RCT Transport for comms
+# 04/16/20  NH  Moved Commands and Events to module scope, added helper for
+#               sending commands, cleaned up eventing mechanisms
+# 04/14/20  NH  Initial commit, fixed start parameters, added support for
+#               multiline packet
 #
 ###############################################################################
-import socket
-import select
 import json
 import logging
 import datetime as dt
@@ -35,6 +34,7 @@ import threading
 import enum
 
 from time import sleep
+import scripts.rctTransport as rctTransport
 
 
 class COMMANDS(enum.Enum):
@@ -93,7 +93,7 @@ class MAVReceiver:
         '''
         assert(isinstance(port, (int)))
         self.__log = logging.getLogger('rctGCS.MAVReceiver')
-        self.sock = None
+        self.sock = rctTransport.RCTUDPClient(port)
         self.__portNo = port
 
         self.__receiverThread = None
@@ -121,9 +121,11 @@ class MAVReceiver:
         '''
         assert(isinstance(timeout, (int)))
         for i in range(timeout):
-            ready = select.select([self.sock], [], [], 1)
-            if ready[0]:
-                data, addr = self.sock.recvfrom(1024)
+            try:
+                data, addr = self.sock.receive(1024, 1)
+#             ready = select.select([self.sock], [], [], 1)
+#             if ready[0]:
+#                 data, addr = self.sock.recvfrom(1024)
                 strData = data.decode('utf-8')
                 for line in strData.split('\r\n'):
                     packet = json.loads(line)
@@ -131,6 +133,8 @@ class MAVReceiver:
                         self.__log.info("Received heartbeat %s" % (packet))
                         self.__lastHeartbeat = dt.datetime.now()
                         return addr, packet
+            except TimeoutError:
+                pass
             if guiTick is not None:
                 guiTick()
         self.__log.error("Failed to receive any heartbeats")
@@ -146,9 +150,11 @@ class MAVReceiver:
             if isinstance(event.value, PACKET_TYPES):
                 keywordEventMap[event.value.value] = event
         while self.__run:
-            ready = select.select([self.sock], [], [], 1)
-            if ready[0]:
-                data, addr = self.sock.recvfrom(self.__BUFFER_LEN)
+            try:
+                data, addr = self.sock.receive(self.__BUFFER_LEN, 1)
+#             ready = select.select([self.sock], [], [], 1)
+#             if ready[0]:
+#                 data, addr = self.sock.recvfrom(self.__BUFFER_LEN)
                 self.__log.info("Received: %s" % data.decode())
                 packet = json.loads(data.decode())
                 for key in packet.keys():
@@ -162,6 +168,8 @@ class MAVReceiver:
                     except Exception:
                         for callback in self.__packetMap[EVENTS.GENERAL_EXCEPTION]:
                             callback(packet=packet, addr=addr)
+            except TimeoutError:
+                pass
             if (dt.datetime.now() - self.__lastHeartbeat).total_seconds() > 30:
                 self.__log.warning("No heartbeats!")
                 for callback in self.__packetMap[EVENTS.NO_HEARTBEAT]:
@@ -172,9 +180,10 @@ class MAVReceiver:
         Starts the receiver.
         '''
         self.__log.info("RCT MAVReceiver starting...")
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.bind(("", self.__portNo))
+#         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+#         self.sock.bind(("", self.__portNo))
+        self.sock.open()
         self.__mavIP, packet = self.waitForHeartbeat(guiTick=gui)
         if self.__mavIP is None:
             raise RuntimeError("Failed to receive heartbeats")
@@ -229,7 +238,8 @@ class MAVReceiver:
         assert(isinstance(packet, dict))
         msg = json.dumps(packet)
         self.__log.info("Send: %s" % (msg))
-        self.sock.sendto(msg.encode('utf-8'), self.__mavIP)
+#         self.sock.sendto(msg.encode('utf-8'), self.__mavIP)
+        self.sock.send(msg.encode('utf-8'), self.__mavIP)
 
     def sendCommandPacket(self, command: COMMANDS, options: dict = None):
         '''

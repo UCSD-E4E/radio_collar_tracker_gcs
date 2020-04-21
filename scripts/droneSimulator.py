@@ -18,9 +18,10 @@
 #
 ###############################################################################
 #
-# DATE        Name  Description
+# DATE      WHO Description
 # -----------------------------------------------------------------------------
-# 04/14/20    NH    Initial history
+# 04/19/20  NH  Added abstraction, switched to rctTransport comm interface
+# 04/14/20  NH  Initial history
 #
 ###############################################################################
 import argparse
@@ -30,10 +31,10 @@ import datetime as dt
 import time
 import json
 from enum import Enum
-import select
 import traceback
 import logging
 import sys
+from rctTransport import RCTUDPServer as RCTUDPServer
 
 
 class DroneSimulator:
@@ -103,7 +104,7 @@ class DroneSimulator:
             'getF': self._transmitFreqs,
         }
 
-        self._socket = None
+        self._socket = RCTUDPServer(self._port)
 
     def start(self):
         print("Simulator started")
@@ -111,11 +112,12 @@ class DroneSimulator:
         self.numMsgSent = 0
         self.numMsgReceived = 0
         self._run = True
-        self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        self._socket.setblocking(0)
-        self._socket.bind(("", self._port))
+#         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#         self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+#         self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+#         self._socket.setblocking(0)
+#         self._socket.bind(("", self._port))
+        self._socket.open()
         self._senderThread = threading.Thread(target=self.__sender)
         self._receiveThread = threading.Thread(target=self.__receiver)
         self._senderThread.start()
@@ -159,13 +161,16 @@ class DroneSimulator:
     def __receiver(self):
         ownIPs = getIPs()
         while self._run is True:
-            ready = select.select([self._socket], [], [], 1)
-            if ready[0]:
-                with self.socketLock:
-                    data, addr = self._socket.recvfrom(1024)
+            try:
+                data, addr = self._socket.receive(1024, 1)
+#             ready = select.select([self._socket], [], [], 1)
+#             if ready[0]:
+#                 with self.socketLock:
+#                     data, addr = self._socket.recvfrom(1024)
 #                 Decode
                 msg = data.decode()
                 packet = dict(json.loads(msg))
+                print("RX: %s" % (packet))
                 # Ignore things that we output
                 if 'frequencies' in packet:
                     continue
@@ -185,7 +190,6 @@ class DroneSimulator:
                     continue
                 self.__log.info("Received %s at %.1f from %s" % (
                     msg, dt.datetime.now().timestamp(), addr))
-                print("RX: %s" % (packet))
                 self.numMsgReceived += 1
                 for key in packet.keys():
                     try:
@@ -196,6 +200,8 @@ class DroneSimulator:
                         errorPacket = {"exception": str(e),
                                        "traceback": traceback.format_exc()}
                         self.sendPacket(errorPacket, addr)
+            except TimeoutError:
+                pass
 
     def _processCommand(self, packet, addr):
         self.__log.info("Received Command Packet")
@@ -236,7 +242,8 @@ class DroneSimulator:
     def sendPacket(self, packet: dict, addr):
         msg = json.dumps(packet) + '\r\n'
         with self.socketLock:
-            self._socket.sendto(msg.encode(), addr)
+            #             self._socket.sendto(msg.encode(), addr)
+            self._socket.send(msg.encode(), addr)
         self.numMsgSent += 1
         self.__log.info("Sent %s at %.1f" % (
             msg, dt.datetime.now().timestamp()))
@@ -245,6 +252,93 @@ class DroneSimulator:
     def setFreqs(self, freqs):
         self.frequencies = freqs
         self.__log.info("Frequencies updated to %s" % freqs)
+
+
+class droneSimulator:
+    def __init__(self):
+        pass
+
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
+    def gotPing(self, dronePing):
+        pass
+
+    def setSystemState(self, system, state):
+        pass
+
+    def setException(self, exception: str, traceback: str):
+        pass
+
+    def __doGetFrequency(self):
+        pass
+
+    def __doStart(self):
+        pass
+
+    def __doStop(self):
+        pass
+
+    def __doSetFrequency(self):
+        pass
+
+    def __doGetOptions(self):
+        pass
+
+    def __doSetOptions(self):
+        pass
+
+    def __doWriteOptions(self):
+        pass
+
+    def __doUpgrade(self):
+        pass
+
+
+class dronePing:
+    def __init__(self):
+        pass
+
+
+class droneUDPComms:
+    def __init__(self, port=9000):
+        pass
+
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
+    def sendPacket(self, packet: dict):
+        pass
+
+    def sendHeartbeat(self):
+        pass
+
+    def sendPing(self, ping: dronePing):
+        pass
+
+    def sendFrequencies(self, frequencies: list):
+        pass
+
+    def sendOptions(self, options: dict):
+        pass
+
+    def sendException(self, exception: str, traceback: str):
+        pass
+
+    def sendUpgradeReady(self):
+        pass
+
+    def sendUpgradeStatus(self, status: str):
+        pass
+
+    def sendUpgradeComplete(self, status: bool, reason: str = None):
+        pass
 
 
 def getIPs():
