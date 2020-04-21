@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 04/19/20  NH  Added event clear for frequency packet event
 # 04/17/20  NH  Fixed callback map, added timeout to getFreqs
 # 04/16/20  NH  Added auto enum, moved enums to module scope, updated comms
 #               eventing, added event for no heartbeat, added start and
@@ -262,6 +263,7 @@ class MAVModel:
         self.__log.info("Sent getF command")
 
         frequencyPacketEvent = threading.Event()
+        frequencyPacketEvent.clear()
         self.registerCallback(
             Events.GetFreqs, frequencyPacketEvent.set())
         frequencyPacketEvent.wait(timeout=timeout)
