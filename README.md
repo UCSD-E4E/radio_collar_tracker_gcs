@@ -1,4 +1,6 @@
 # RCT GCS
+This is the redevelopment of the Radio Telemetry Tracker Ground Control Station
+from v1.0.  Working branch v1.0a, becomes v2.0 on release
 
 ## Dependencies
 1.	python3-tk
