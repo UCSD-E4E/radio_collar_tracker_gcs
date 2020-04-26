@@ -20,6 +20,7 @@
 #
 # DATE      WHO DESCRIPTION
 # -----------------------------------------------------------------------------
+# 04/25/20  NH  Moved Commands and PacketTypes to rctTransport
 # 04/19/20  NH  Initial commit: base class, UDP Transport
 #
 ###############################################################################
@@ -28,6 +29,31 @@ import abc
 import socket
 import select
 import os
+import enum
+
+
+class PACKET_TYPES(enum.Enum):
+    HEARTBEAT = 'heartbeat'
+    PING = 'ping'
+    FREQUENCIES = 'frequencies'
+    EXCEPTION = 'exception'
+    TRACEBACK = 'traceback'
+    OPTIONS = 'options'
+    UPGRADE_READY = 'upgrade_ready'
+    UPGRADE_STATUS = 'upgrade_status'
+    UPGRADE_COMPLETE = 'upgrade_complete'
+    COMMAND = 'cmd'
+
+
+class COMMANDS(enum.Enum):
+    GET_FREQUENCY = "getF"
+    START = 'start'
+    STOP = 'stop'
+    SET_FREQUENCY = 'setF'
+    GET_OPTIONS = 'getOpts'
+    SET_OPTIONS = 'setOpts'
+    WRITE_OPTIONS = 'writeOpts'
+    UPGRADE = 'upgrade'
 
 
 class RCTAbstractTransport(abc.ABC):
@@ -101,6 +127,8 @@ class RCTUDPServer(RCTAbstractTransport):
             raise TimeoutError
 
     def send(self, data: bytes, dest):
+        if dest is None:
+            dest = '255.255.255.255'
         self.__socket.sendto(data, (dest, self.__port))
 
 

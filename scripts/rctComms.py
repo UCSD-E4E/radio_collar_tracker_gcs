@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 04/25/20  NH  Moved Commands and PacketTypes to rctTransport
 # 04/20/20  NH  Updated docstrings and imports
 # 04/19/20  NH  Switched to RCT Transport for comms
 # 04/16/20  NH  Moved Commands and Events to module scope, added helper for
@@ -35,30 +36,7 @@ import threading
 import enum
 
 import rctTransport
-
-
-class COMMANDS(enum.Enum):
-    GET_FREQUENCY = "getF"
-    START = 'start'
-    STOP = 'stop'
-    SET_FREQUENCY = 'setF'
-    GET_OPTIONS = 'getOpts'
-    SET_OPTIONS = 'setOpts'
-    WRITE_OPTIONS = 'writeOpts'
-    UPGRADE = 'upgrade'
-
-
-class PACKET_TYPES(enum.Enum):
-    HEARTBEAT = 'heartbeat'
-    PING = 'ping'
-    FREQUENCIES = 'frequencies'
-    EXCEPTION = 'exception'
-    TRACEBACK = 'traceback'
-    OPTIONS = 'options'
-    UPGRADE_READY = 'upgrade_ready'
-    UPGRADE_STATUS = 'upgrade_status'
-    UPGRADE_COMPLETE = 'upgrade_complete'
-    COMMAND = 'cmd'
+from rctTransport import PACKET_TYPES, COMMANDS
 
 
 class EVENTS(enum.Enum):
