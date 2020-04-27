@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 04/26/20  NH  Updated API, switched from UDP to TCP
 # 04/20/20  NH  Updated API and imports
 # 04/17/20  NH  Updated imports and MAVModel API
 # 02/15/20  NH  Initial commit
@@ -50,7 +51,7 @@ class GCS(tk.Tk):
         '''
         super().__init__()
         self.__log = logging.getLogger('rctGCS.GCS')
-        self.__rctPort = rctTransport.RCTUDPClient()
+        self.__rctPort = rctTransport.RCTTCPClient(addr='127.0.0.1', port=9000)
         self.__mavReceiver = rctComms.MAVReceiver(self.__rctPort)
         self.__mavModel = rctCore.MAVModel(self.__mavReceiver)
         self.__buttons = []
@@ -120,7 +121,7 @@ class GCS(tk.Tk):
         '''
         Internal callback to retrieve the frequencies from the remote
         '''
-        self.__mavModel.getFreqs()
+        self.__mavModel.getFrequencies()
 
     def __addFreq(self):
         '''
