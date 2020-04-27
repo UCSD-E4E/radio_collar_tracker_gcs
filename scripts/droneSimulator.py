@@ -20,6 +20,9 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 04/26/20  NH  Removed old droneSimulator class, added output, added command
+#                 callback, fixed sendFrequencies, added error capture, fixed
+#                 cli args
 # 04/25/20  NH  Finished abstraction of droneSimulator to droneSim
 # 04/20/20  NH  Fixed sender to not send tuple as addr
 # 04/19/20  NH  Added abstraction, switched to rctTransport comm interface
@@ -80,189 +83,6 @@ class SYS_STATES(Enum):
 class SW_STATES(Enum):
     stop = 0
     start = 1
-
-
-class DroneSimulator:
-
-    __SDR_STATES_POS = 0
-    __STG_STATES_POS = 1
-    __EXT_STATES_POS = 2
-    __SYS_STATES_POS = 3
-    __SWT_STATES_POS = 4
-
-    def __init__(self, port=9000, target='255.255.255.255', log=False):
-        self._port = port
-        self._target = target
-        self.__log = logging.getLogger('simulator.DroneSimulator')
-        self.system_states = [None] * 5
-        self.system_states[self.__SDR_STATES_POS] = SDR_STATES.find_devices
-        self.system_states[self.__STG_STATES_POS] = STORAGE_STATES.get_output_dir
-        self.system_states[self.__EXT_STATES_POS] = EXT_SENSOR_STATES.get_tty
-        self.system_states[self.__SYS_STATES_POS] = SYS_STATES.init
-        self.system_states[self.__SWT_STATES_POS] = SW_STATES.stop
-        self.frequencies = []
-
-        self.numErrors = 0
-        self.numMsgSent = 0
-        self.numMsgReceived = 0
-
-        self.socketLock = threading.Lock()
-
-        self.MENU = {
-            'cmd': self._processCommand}
-
-        self.CMD_MENU = {
-            'getF': self._transmitFreqs,
-        }
-
-        self._socket = RCTUDPServer(self._port)
-
-    def start(self):
-        print("Simulator started")
-        self.numErrors = 0
-        self.numMsgSent = 0
-        self.numMsgReceived = 0
-        self._run = True
-#         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-#         self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-#         self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-#         self._socket.setblocking(0)
-#         self._socket.bind(("", self._port))
-        self._socket.open()
-        self._senderThread = threading.Thread(target=self.__sender)
-        self._receiveThread = threading.Thread(target=self.__receiver)
-        self._senderThread.start()
-        self._receiveThread.start()
-
-    def stop(self):
-        self._run = False
-        self._senderThread.join()
-        self._receiveThread.join()
-        self._socket.close()
-        self.__log.info("Stopped at %d" %
-                        (dt.datetime.now().timestamp()))
-        self.__log.info("Received %d messages" % self.numMsgReceived)
-        self.__log.info("Sent %d messages" % self.numMsgSent)
-        self.__log.info("%d Errors" % self.numErrors)
-        print("Simulator stopped")
-
-    def __sender(self):
-        prevTime = dt.datetime.now()
-        sendTarget = self._target
-
-        while self._run is True:
-            now = dt.datetime.now()
-
-#             Heartbeat
-            if (now - prevTime).total_seconds() > 1:
-                heartbeatPacket = {}
-                heartbeatPacket['heartbeat'] = {}
-                heartbeatPacket['heartbeat']['time'] = now.timestamp()
-                heartbeatPacket['heartbeat']['id'] = 'sim'
-                status_string = "%d%d%d%d%d" % (self.system_states[0].value,
-                                                self.system_states[1].value,
-                                                self.system_states[2].value,
-                                                self.system_states[3].value,
-                                                self.system_states[4].value)
-                heartbeatPacket['heartbeat']['status'] = status_string
-                self.sendPacket(heartbeatPacket, sendTarget)
-                prevTime = now
-            time.sleep(0.5)
-
-    def __receiver(self):
-        ownIPs = getIPs()
-        while self._run is True:
-            try:
-                data, addr = self._socket.receive(1024, 1)
-#             ready = select.select([self._socket], [], [], 1)
-#             if ready[0]:
-#                 with self.socketLock:
-#                     data, addr = self._socket.recvfrom(1024)
-#                 Decode
-                msg = data.decode()
-                packet = dict(json.loads(msg))
-                print("RX: %s" % (packet))
-                # Ignore things that we output
-                if 'frequencies' in packet:
-                    continue
-                elif 'heartbeat' in packet:
-                    continue
-                elif 'ping' in packet:
-                    continue
-                elif 'exception' in packet:
-                    continue
-                elif 'options' in packet:
-                    continue
-                elif 'upgrade_ready' in packet:
-                    continue
-                elif 'upgrade_status' in packet:
-                    continue
-                elif 'upgrade_complete' in packet:
-                    continue
-                self.__log.info("Received %s at %.1f from %s" % (
-                    msg, dt.datetime.now().timestamp(), addr))
-                self.numMsgReceived += 1
-                for key in packet.keys():
-                    try:
-                        self.MENU[key](packet[key], addr)
-                    except Exception as e:
-                        self.numErrors += 1
-                        self.__log.exception(str(e))
-                        errorPacket = {"exception": str(e),
-                                       "traceback": traceback.format_exc()}
-                        self.sendPacket(errorPacket, addr)
-            except TimeoutError:
-                pass
-
-    def _processCommand(self, packet, addr):
-        self.__log.info("Received Command Packet")
-        try:
-            self.CMD_MENU[packet['action']](packet, addr)
-        except Exception as e:
-            self.numErrors += 1
-            self.__log.exception(str(e))
-            errorPacket = {"exception": str(e),
-                           "traceback": traceback.format_exc()}
-            self.sendPacket(errorPacket, addr)
-
-    def setSDRState(self, state):
-        assert(isinstance(state, SDR_STATES))
-        self.system_states[self.__SDR_STATES_POS] = state
-
-    def setEXTState(self, state):
-        assert(isinstance(state, EXT_SENSOR_STATES))
-        self.system_states[self.__EXT_STATES_POS] = state
-
-    def setSTGState(self, state):
-        assert(isinstance(state, STORAGE_STATES))
-        self.system_states[self.__STG_STATES_POS] = state
-
-    def setSYSState(self, state):
-        assert(isinstance(state, SYS_STATES))
-        self.system_states[self.__SYS_STATES_POS] = state
-
-    def setSWTState(self, state):
-        assert(isinstance(state, SW_STATES))
-        self.system_states[self.__SYS_STATES_POS] = state
-
-    def _transmitFreqs(self, packet, addr):
-        self.__log.info("Request to transmit frequencies")
-        freqPacket = {"frequencies": self.frequencies}
-        self.sendPacket(freqPacket, addr)
-
-    def sendPacket(self, packet: dict, addr):
-        msg = json.dumps(packet) + '\r\n'
-        with self.socketLock:
-            #             self._socket.sendto(msg.encode(), addr)
-            self._socket.send(msg.encode(), addr)
-        self.numMsgSent += 1
-        self.__log.info("Sent %s at %.1f" % (
-            msg, dt.datetime.now().timestamp()))
-        print("TX: %s" % (packet))
-
-    def setFreqs(self, freqs):
-        self.frequencies = freqs
-        self.__log.info("Frequencies updated to %s" % freqs)
 
 
 class rctDroneCommEvent(Enum):
@@ -358,6 +178,7 @@ class droneComms:
             try:
                 data, addr = self.__port.receive(1024, 1)
                 msg = data.decode()
+                print(msg)
                 packet = dict(json.loads(msg))
                 for key in packet.keys():
                     if key in droneComms.__ownKeywords:
@@ -427,6 +248,8 @@ class droneSim:
         self.__commandMap[rctTransport.COMMANDS.WRITE_OPTIONS.value] = self.__doWriteOptions
         self.__commandMap[rctTransport.COMMANDS.UPGRADE.value] = self.__doUpgrade
 
+        self.port.registerCallback(rctDroneCommEvent.COMMAND, self.__doCommand)
+
     def setGain(self, gain: float):
         self.__gain = gain
 
@@ -492,6 +315,9 @@ class droneSim:
     def setFrequencies(self, frequencies: list):
         self.__frequencies = set(frequencies)
 
+    def getFrequencies(self):
+        return list(self.__frequencies)
+
     def setCenterFrequency(self, centerFreq: int):
         self.__centerFrequency = centerFreq
 
@@ -499,7 +325,7 @@ class droneSim:
         self.__samplingFrequency = samplingFreq
 
     def __doGetFrequency(self, commandPayload):
-        self.port.sendFrequencies(self.__frequencies)
+        self.port.sendFrequencies(list(self.__frequencies))
 
     def __doStartMission(self, commandPayload):
         pass
@@ -605,15 +431,19 @@ class droneSim:
     def __doUpgrade(self, commandPayload):
         pass
 
-    def __doCommand(self, commandPayload: dict):
+    def __doCommand(self, packet: dict = None, addr: str = None):
         try:
-            action = commandPayload['action']
+            action = packet['action']
         except KeyError as e:
+            print(str(e))
+            print(traceback.format_exc())
             self.setException(str(e), traceback.format_exc())
             return
         try:
-            self.__commandMap[action](commandPayload)
+            self.__commandMap[action](packet)
         except Exception as e:
+            print(str(e))
+            print(traceback.format_exc())
             self.setException(str(e), traceback.format_exc())
 
     def __sender(self):
@@ -627,6 +457,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Radio Collar Tracker Payload Control Simulator')
     parser.add_argument('--port', type=int, default=9000)
+    parser.add_argument('--protocol', type=str,
+                        choices=['udp', 'tcp'], required=True)
     parser.add_argument('--target', type=str, default='255.255.255.255',
                         help='Target IP Address.  Use 255.255.255.255 for broadcast')
     args = parser.parse_args()
@@ -641,6 +473,15 @@ if __name__ == '__main__':
     ch = logging.FileHandler(logName)
     ch.setLevel(logging.DEBUG)
     ch.setFormatter(formatter)
-    simulator = DroneSimulator(args.port, args.target, True)
 
-    simulator.start()
+    if args.protocol == 'udp':
+        port = rctTransport.RCTUDPServer(port=args.port)
+    elif args.protocol == 'tcp':
+        port = rctTransport.RCTTCPServer(port=args.port)
+
+    comms = droneComms(port, 'sim')
+    sim = droneSim(comms)
+    try:
+        __IPYTHON__
+    except NameError:
+        sim.start()
