@@ -20,6 +20,7 @@
 #
 # DATE      WHO DESCRIPTION
 # -----------------------------------------------------------------------------
+# 04/26/20  NH  Added TCP Server and Client
 # 04/25/20  NH  Moved Commands and PacketTypes to rctTransport
 # 04/19/20  NH  Initial commit: base class, UDP Transport
 #
@@ -154,3 +155,55 @@ class RCTPipeClient(RCTAbstractTransport):
 
     def send(self, data: bytes, dest):
         pass
+
+
+class RCTTCPClient(RCTAbstractTransport):
+    def __init__(self, port: int, addr: str):
+        self.__target = (addr, port)
+        self.__socket = None
+
+    def open(self):
+        self.__socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.__socket.connect(self.__target)
+
+    def close(self):
+        self.__socket.shutdown(socket.SHUT_RDWR)
+
+    def receive(self, bufLen: int, timeout: int=None):
+        ready = select.select([self.__socket], [], [], timeout)
+        if ready[0]:
+            data = self.__socket.recv(bufLen)
+            return data, self.__target[0]
+        else:
+            raise TimeoutError
+
+    def send(self, data: bytes, dest=None):
+        self.__socket.send(data)
+
+
+class RCTTCPServer(RCTAbstractTransport):
+    def __init__(self, port: int):
+        self.__port = port
+        self.__socket = None
+        self.__conn = None
+        self.__addr = None
+
+    def open(self):
+        self.__socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.__socket.bind(('', self.__port))
+        self.__socket.listen()
+        self.__conn, self.__addr = self.__socket.accept()
+
+    def close(self):
+        self.__socket.close()
+
+    def receive(self, bufLen: int, timeout: int=None):
+        ready = select.select([self.__conn], [], [], timeout)
+        if ready[0]:
+            data = self.__conn.recv(bufLen)
+            return data, self.__addr[0]
+        else:
+            raise TimeoutError
+
+    def send(self, data: bytes, dest=None):
+        self.__conn.send(data)
