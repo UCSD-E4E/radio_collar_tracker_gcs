@@ -20,6 +20,8 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 04/26/20  NH  Fixed getFrequencies name, added sleep hack to getFrequencies,
+#                 added object for options, removed builtins import
 # 04/20/20  NH  Updated docstrings and imports
 # 04/19/20  NH  Added event clear for frequency packet event
 # 04/17/20  NH  Fixed callback map, added timeout to getFreqs
@@ -31,10 +33,15 @@
 ###############################################################################
 
 from enum import Enum, auto
-from builtins import list
 import rctComms
 import logging
 import threading
+from time import sleep
+
+
+class rctOptions:
+    def __init__(self):
+        pass
 
 
 class SDR_INIT_STATES(Enum):
@@ -262,7 +269,7 @@ class MAVModel:
         self.__rx.sendCommandPacket(rctComms.COMMANDS.STOP)
         self.__log.info("Sent stop command")
 
-    def getFreqs(self, timeout: float=None):
+    def getFrequencies(self, timeout: float=None):
         '''
         Retrieves the frequencies from the payload
 
@@ -277,6 +284,7 @@ class MAVModel:
         self.registerCallback(
             Events.GetFreqs, frequencyPacketEvent.set())
         frequencyPacketEvent.wait(timeout=timeout)
+        sleep(0.1)
         return self.frequencies
 
     def __handleRemoteException(self, packet, addr):
