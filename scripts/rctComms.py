@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 04/26/20  NH  Added catch for JSON Decoder errors
 # 04/25/20  NH  Moved Commands and PacketTypes to rctTransport
 # 04/20/20  NH  Updated docstrings and imports
 # 04/19/20  NH  Switched to RCT Transport for comms
@@ -142,6 +143,9 @@ class MAVReceiver:
                             callback(packet=packet, addr=addr)
             except TimeoutError:
                 pass
+            except json.decoder.JSONDecodeError as e:
+                print(data.decode())
+                raise e
             if (dt.datetime.now() - self.__lastHeartbeat).total_seconds() > 30:
                 self.__log.warning("No heartbeats!")
                 for callback in self.__packetMap[EVENTS.NO_HEARTBEAT]:
