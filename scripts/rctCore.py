@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 04/27/20  NH  Fixed getFrequencies callback
 # 04/26/20  NH  Fixed getFrequencies name, added sleep hack to getFrequencies,
 #                 added object for options, removed builtins import
 # 04/20/20  NH  Updated docstrings and imports
@@ -276,15 +277,15 @@ class MAVModel:
         :param timeout: Seconds to wait before timing out
         :type timeout: number
         '''
-        self.__rx.sendCommandPacket(rctComms.COMMANDS.GET_FREQUENCY)
-        self.__log.info("Sent getF command")
-
         frequencyPacketEvent = threading.Event()
         frequencyPacketEvent.clear()
         self.registerCallback(
-            Events.GetFreqs, frequencyPacketEvent.set())
+            Events.GetFreqs, frequencyPacketEvent.set)
+
+        self.__rx.sendCommandPacket(rctComms.COMMANDS.GET_FREQUENCY)
+        self.__log.info("Sent getF command")
+
         frequencyPacketEvent.wait(timeout=timeout)
-        sleep(0.1)
         return self.frequencies
 
     def __handleRemoteException(self, packet, addr):
