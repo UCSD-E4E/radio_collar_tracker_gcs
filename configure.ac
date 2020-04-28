@@ -10,8 +10,7 @@ AC_LANG([C++])
 AC_PROG_CXX
 
 # Checks for python.
-AM_PATH_PYTHON(2.7)
-AC_PATH_PROGS(BASH, bash sh)
+AM_PATH_PYTHON(3.5)
 
 # Checks for programs.
 AC_PROG_SED
@@ -42,13 +41,6 @@ AM_COND_IF([HAVE_DOXYGEN], [AC_CONFIG_FILES([doc/Doxyfile])])
 AM_COND_IF([HAVE_DOXYGEN], [DX_INIT_DOXYGEN([Radio Telemetry Tracker], doc/Doxyfile)])
 
 
-# Checks for libraries.
-PKG_CHECK_MODULES([uhd], [uhd])
-AX_BOOST_BASE([1.50])
-AX_BOOST_SYSTEM
-AX_BOOST_THREAD
-AX_BOOST_PROGRAM_OPTIONS
-
 # Checks for Python libraries
 # AC_PYTHON_MODULE([mraa], [fatal])
 
@@ -64,12 +56,10 @@ AC_PYTHON3_MODULE([calendar], [fatal])
 AC_PYTHON3_MODULE([math], [fatal])
 
 # Checks for header files.
-AC_CHECK_HEADERS([sys/time.h syslog.h signal.h error.h uhd.h getopt.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 
 # Checks for library functions.
-LIBS="-lfftw3 -lfftw3_threads -lm -lutil -lboost_date_time"
 
 # Check for and configure dlib
 #AC_ARG_VAR([DLIB_INCLUDEDIR], [contains the include path to the DLIB headers, typically here /home/ntlhui/workspace/dlib/dlib-19.16/dlib])
@@ -95,10 +85,5 @@ LIBS="-lfftw3 -lfftw3_threads -lm -lutil -lboost_date_time"
 
 AC_CONFIG_FILES([Makefile
                  doc/Makefile
-                 scripts/Makefile
-                 scripts/autostart/Makefile
-                 src/Makefile
-                 src/sdr_record/Makefile
-                 tests/Makefile
-                 tests/sdr_record/Makefile])
+                 scripts/Makefile])
 AC_OUTPUT
