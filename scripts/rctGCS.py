@@ -73,11 +73,13 @@ class GCS(tk.Tk):
         Start thread for the GCSP Application object.  This is responsible for
         initializing the comm channel.
         '''
+        '''
         self.progressBar['maximum'] = 30
         try:
             self.__mavModel.start(self.progressBar.step)
         except RuntimeError:
             self.__noHeartbeat()
+        '''
 
     def __setFreqsFromRemote(self):
         '''
