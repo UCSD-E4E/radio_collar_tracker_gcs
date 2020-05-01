@@ -364,7 +364,7 @@ class MAVModel:
         :param opts: Options to set
         :type opts: list
         '''
-        assert(isinstance(opts, list))
+        assert(isinstance(opts, dict))
         # TODO: Do some type of checking on option types?
         self.__rx.sendCommandPacket(
             rctComms.COMMANDS.SET_OPTIONS, {'options': opts})
