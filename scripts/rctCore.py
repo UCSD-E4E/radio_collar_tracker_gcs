@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 05/01/20  AG  Added __processOptions, getOptions, and setOptions methods
 # 04/27/20  NH  Fixed getFrequencies callback
 # 04/26/20  NH  Fixed getFrequencies name, added sleep hack to getFrequencies,
 #                 added object for options, removed builtins import
@@ -39,11 +40,9 @@ import logging
 import threading
 from time import sleep
 
-
 class rctOptions:
     def __init__(self):
         pass
-
 
 class SDR_INIT_STATES(Enum):
     '''
@@ -62,16 +61,15 @@ class SDR_INIT_STATES(Enum):
     rdy = 3
     fail = 4
 
-
 class EXTS_STATES(Enum):
     '''
     GPS Initialization State
 
     get_tty      - The system is opening the serial port
-    get_msg      - The system is waiting for a message from the external 
+    get_msg      - The system is waiting for a message from the external
                    sensors
     wait_recycle - The system is cycling to retry initialization
-    rdy          - The system has initialized the external sensors and is 
+    rdy          - The system has initialized the external sensors and is
                    ready
     fail         - The system has encountered a fatal error initializing the
                    external sensors
@@ -81,7 +79,6 @@ class EXTS_STATES(Enum):
     wait_recycle = 2
     rdy = 3
     fail = 4
-
 
 class OUTPUT_DIR_STATES(Enum):
     '''
@@ -105,14 +102,13 @@ class OUTPUT_DIR_STATES(Enum):
     rdy = 4
     fail = 5
 
-
 class RCT_STATES(Enum):
     '''
     System Initialization State
 
     init       - The system is starting all initialization threads
     wait_init  - The system is waiting for initialization tasks to complete
-    wait_start - The system is initialized and is waiting for the start 
+    wait_start - The system is initialized and is waiting for the start
                  command
     start      - The system is starting the mission software
     wait_end   - The system is running and waiting for the stop command
@@ -128,7 +124,6 @@ class RCT_STATES(Enum):
     finish = 5
     fail = 6
 
-
 class Events(Enum):
     '''
     Callback Events
@@ -136,14 +131,15 @@ class Events(Enum):
     Hearbeat  - Callback when a heartbeat message is received
     Exception - Callback when an exception message is received
     GetFreqs  - Callback when the payload broadcasts a set of frequencies
+    GetOptions - Callback when the payload broadcasts its parameters
     '''
     Heartbeat = auto(),
     Exception = auto(),
     GetFreqs = auto(),
+    GetOptions = auto(),
     NoHeartbeat = auto(),
     NewPing = auto(),
     NewEstimate = auto(),
-
 
 class MAVModel:
     '''
@@ -165,6 +161,7 @@ class MAVModel:
         self.sysStatus = 0
         self.swStatus = 0
         self.frequencies = []
+        self.options = []
         self.__callbacks = {}
         for event in Events:
             self.__callbacks[event] = []
@@ -181,13 +178,15 @@ class MAVModel:
         self.__rx.registerCallback(
             rctComms.EVENTS.FREQUENCIES, self.__processFrequencies)
         self.__rx.registerCallback(
+            rctComms.EVENTS.OPTIONS, self.__processOptions)
+        self.__rx.registerCallback(
             rctComms.EVENTS.NO_HEARTBEAT, self.__processNoHeartbeat)
 
     def start(self, guiTickCallback=None):
         '''
         Initializes the MAVModel object
         :param guiTickCallback: Callback to a function for progress bar
-        :type guiTickCallback: Function with no parameters to be called for 
+        :type guiTickCallback: Function with no parameters to be called for
             progress
         '''
         self.__rx.start(guiTickCallback)
@@ -204,6 +203,19 @@ class MAVModel:
         self.__log.info("Received frequencies")
         self.frequencies = packet
         for callback in self.__callbacks[Events.GetFreqs]:
+            callback()
+
+    def __processOptions(self, packet, addr):
+        '''
+        Internal callback to handle options messages
+        :param packet: Options message payload
+        :type packet: List of integers
+        :param addr: Source of packet
+        :type addr: str
+        '''
+        self.__log.info("Received options")
+        self.options = packet
+        for callback in self.__callbacks[Events.GetOptions]:
             callback()
 
     def __processHeartbeat(self, packet, addr):
@@ -288,6 +300,24 @@ class MAVModel:
         frequencyPacketEvent.wait(timeout=timeout)
         return self.frequencies
 
+    def getOptions(self, timeout: float=None):
+        '''
+        Retrieves the options from the payload
+
+        :param timeout: Seconds to wait before timing out
+        :type timeout: number
+        '''
+        optionsPacketEvent = threading.Event()
+        optionsPacketEvent.clear()
+        self.registerCallback(
+            Events.GetOptions, optionsPacketEvent.set)
+
+        self.__rx.sendCommandPacket(rctComms.COMMANDS.GET_OPTIONS)
+        self.__log.info("Sent getO command")
+
+        optionsPacketEvent.wait(timeout=timeout)
+        return self.options
+
     def __handleRemoteException(self, packet, addr):
         '''
         Internal callback to handle exception messages
@@ -327,3 +357,15 @@ class MAVModel:
         self.__rx.sendCommandPacket(
             rctComms.COMMANDS.SET_FREQUENCY, {'frequencies': freqs})
         self.__log.info("Set setF command")
+
+    def setOptions(self, opts):
+        '''
+        Sends the command to set the specified options
+        :param opts: Options to set
+        :type opts: list
+        '''
+        assert(isinstance(opts, list))
+        # TODO: Do some type of checking on option types?
+        self.__rx.sendCommandPacket(
+            rctComms.COMMANDS.SET_OPTIONS, {'options': opts})
+        self.__log.info("Set setO command")
