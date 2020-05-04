@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 05/03/20  ML  Added Expert Settings popup, Added the ability to load TIFF img
 # 04/26/20  NH  Updated API, switched from UDP to TCP
 # 04/20/20  NH  Updated API and imports
 # 04/17/20  NH  Updated imports and MAVModel API
