@@ -35,6 +35,7 @@ import logging
 from tkinter import ttk
 from tkinter import messagebox as tkm
 import sys
+from tkinter import *
 import rctTransport
 import rctComms
 import rctCore
@@ -72,11 +73,13 @@ class GCS(tk.Tk):
         Start thread for the GCSP Application object.  This is responsible for
         initializing the comm channel.
         '''
+        '''
         self.progressBar['maximum'] = 30
         try:
             self.__mavModel.start(self.progressBar.step)
         except RuntimeError:
             self.__noHeartbeat()
+        '''
 
     def __setFreqsFromRemote(self):
         '''
@@ -260,81 +263,221 @@ class GCS(tk.Tk):
         self.destroy()
         self.quit()
 
+    def __handleConnectInput(self):
+        '''
+        Internal callback to open Connect Settings
+        '''
+        conWindow = tk.Toplevel(self)
+
+        conWindow.title('Connect Settings')
+
+        frm_conType = tk.Frame(master=conWindow, width=350, height=400, bg="light gray")
+        frm_conType.pack(fill=tk.Y, side=tk.LEFT)
+
+        lbl_conType = tk.Label(frm_conType, text='Connection Type:')
+        lbl_conType.pack(fill=tk.X)
+
+        btn_TCP = tk.Checkbutton(frm_conType, text='TCP')
+        btn_TCP.pack(fill=tk.X)
+
+        frm_port = tk.Frame(master=conWindow, width=500, height=400, bg="dark gray")
+        frm_port.pack(fill=tk.BOTH, side=tk.RIGHT)
+
+        lbl_port = tk.Label(frm_port, text='Port')
+        lbl_port.pack(fill=tk.BOTH)
+
+        entr_port = tk.Entry(frm_port)
+        entr_port.pack(fill=tk.BOTH)
+        
+
+        port = 'No Port Enterred'
+        def submit():
+            port = entr_port.get()
+            print(port)
+            conWindow.destroy()
+            conWindow.update()
+
+        btn_submit = tk.Button(frm_port, text='submit', command=submit)
+        btn_submit.pack()
+
+
+    def __mapWidgets(self, button):
+        '''
+        Internal helper to make GUI widgets for Map
+        '''
+        button.destroy()
+
+        frm_mapGrid = tk.Frame(master=self)
+        frm_mapGrid.pack(fill=tk.BOTH, side=tk.LEFT)
+        frm_mapGrid.grid_columnconfigure(0, weight=1)
+        frm_mapGrid.grid_rowconfigure(0, weight=1)
+
+        # MAP OPTIONS
+        frm_mapOptions = tk.Frame(master=frm_mapGrid, width=SBWidth)
+        frm_mapOptions.grid(column=0, row=0)
+
+        lbl_mapOptions = tk.Label(frm_mapOptions, bg='gray', width=SBWidth, text='Map Options')
+        lbl_mapOptions.grid(column=0, row=0, sticky='ew')
+
+        btn_setSearchArea = tk.Button(frm_mapOptions,  bg='light gray', width=SBWidth, 
+                relief=tk.FLAT, text='Set Search Area')
+        btn_setSearchArea.grid(column=0, row=1, sticky='ew')
+
+        btn_cacheMap = tk.Button(frm_mapOptions, width=SBWidth,  bg='light gray', 
+                relief=tk.FLAT, text='Cache Map')
+        btn_cacheMap.grid(column=0, row=2)
+
+        # MAP LEGEND
+        frm_mapLegend = tk.Frame(master=frm_mapGrid, width=SBWidth)
+        frm_mapLegend.grid(column=0, row=2)
+
+        lbl_legend = tk.Label(frm_mapLegend, width=SBWidth,  bg='gray', text='Map Legend')
+        lbl_legend.grid(column=0, row=0, sticky='ew')
+
+        lbl_legend = tk.Label(frm_mapLegend, width=SBWidth,  bg='light gray', text='Vehicle')
+        lbl_legend.grid(column=0, row=1, sticky='ew')
+
+        lbl_legend = tk.Label(frm_mapLegend, width=SBWidth,  bg='light gray', text='Target')
+        lbl_legend.grid(column=0, row=2, sticky='ew')
+
+        frm_mapSpacer = tk.Frame(master=frm_mapGrid, bg='black', height=400, width=450)
+        frm_mapSpacer.grid(column=1,row=1) 
+
     def __createWidgets(self):
         '''
         Internal helper to make GUI widgets
         '''
         self.title('RCT GCS')
-        self.grid_columnconfigure(0, weight=1)
-        self.startButton = tk.Button(
-            self, text='Start', command=self.__startCommand)
-        self.startButton.grid(row=0, column=0, sticky='we')
-        self.__buttons.append(self.startButton)
 
-        self.stopButton = tk.Button(
-            self, text='Stop', command=self.__stopCommand)
-        self.stopButton.grid(row=1, column=0, sticky='we')
-        self.__buttons.append(self.stopButton)
 
-        self.freqFrame = tk.LabelFrame(
-            self, text='Frequencies', padx=5, pady=5)
-        self.innerFreqFrame = tk.Frame(self.freqFrame)
-        self.innerFreqFrame.pack()
-        self.freqFrame.grid(row=2, column=0, sticky='we')
+        
+        frm_sideControl = tk.Frame(master=self, width=SBWidth, height=300, bg="dark gray")
+        frm_sideControl.pack(anchor=tk.NW, side=tk.RIGHT)
+        frm_sideControl.grid_columnconfigure(0, weight=1)
+        frm_sideControl.grid_rowconfigure(0, weight=1)
+        
 
-        self.getFrequencyButton = tk.Button(
-            self, text='Get Frequencies', command=self.__getFreqs)
-        self.getFrequencyButton.grid(row=3, column=0, sticky='we')
-        self.__buttons.append(self.getFrequencyButton)
+        # SYSTEM TAB        
+        frm_system = CollapseFrame(frm_sideControl, 'System: No Connection') 
+        frm_system.grid(row=0, column=0, sticky='new')
+  
+        btn_connect = Button(frm_system.frame, relief=tk.FLAT, width=SBWidth, text ="Connect", command=self.__handleConnectInput)
+        btn_connect.grid(column=0, row=0, sticky='new')
 
-        self.addFreqButton = tk.Button(
-            self, text='Add Frequency', command=self.__addFreq)
-        self.addFreqButton.grid(row=4, column=0, sticky='we')
-        self.__buttons.append(self.addFreqButton)
 
-        self.removeFreqButton = tk.Button(
-            self, text='Remove Frequency', command=self.__removeFreq)
-        self.removeFreqButton.grid(row=5, column=0, sticky='we')
-        self.__buttons.append(self.removeFreqButton)
+        # COMPONENTS TAB
+        frm_components = CollapseFrame(frm_sideControl, 'Components')
+        frm_components.grid(column=0, row=1, sticky='new')
 
-        self.commitFreqButton = tk.Button(
-            self, text="Upload Frequencies", command=self.__sendFreq)
-        self.commitFreqButton.grid(row=6, column=0, sticky='we')
-        self.__buttons.append(self.commitFreqButton)
+        lbl_componentNotif = tk.Label(frm_components.frame, width=SBWidth, text='Vehicle not connected')
+        lbl_componentNotif.grid(column=0, row=0, sticky='new')
 
-        self.configureButton = tk.Button(
-            self, text="Configure", command=self.__configureOpts)
-        self.configureButton.grid(row=7, column=0, sticky='we')
-        self.__buttons.append(self.configureButton)
 
-        self.upgradeButton = tk.Button(
-            self, text="Upgrade Software", command=self.__upgradeSoftware)
-        self.upgradeButton.grid(row=8, column=0, sticky='we')
-        self.__buttons.append(self.upgradeButton)
+        # DATA DISPLAY TOOLS
+        frm_displayTools = CollapseFrame(frm_sideControl, 'Data Display Tools')
+        frm_displayTools.grid(column=0, row=2, sticky='n')
 
-        self.statusFrame = tk.LabelFrame(
-            self, text="Payload Heartbeat", padx=5, pady=5)
-        self.statusFrame.grid(row=9, column=0, sticky='we')
+        btn_loadMap = Button(frm_displayTools.frame, relief=tk.FLAT, width=SBWidth, text ="Load Map")
+        btn_loadMap.grid(column=0, row=0, sticky='new')
 
-        self.sdrStatusLabel = tk.Label(self.statusFrame, text="SDR: NULL")
-        self.sdrStatusLabel.grid(row=1, column=1)
+        btn_displayMap = Button(frm_displayTools.frame, relief=tk.FLAT, width=SBWidth, text ="Display Map")
+        btn_displayMap['command'] = lambda binst=btn_displayMap: self.__mapWidgets(binst)
+        btn_displayMap.grid(column=0, row=1, sticky='new')
 
-        self.dirStatusLabel = tk.Label(self.statusFrame, text="DIR: NULL")
-        self.dirStatusLabel.grid(row=2, column=1)
+        btn_export = Button(frm_displayTools.frame, relief=tk.FLAT, width=SBWidth, text ="Export")
+        btn_export.grid(column=0, row=2, sticky='new')
 
-        self.gpsStatusLabel = tk.Label(self.statusFrame, text="GPS: NULL")
-        self.gpsStatusLabel.grid(row=3, column=1)
 
-        self.sysStatusLabel = tk.Label(self.statusFrame, text="SYS: NULL")
-        self.sysStatusLabel.grid(row=4, column=1)
+        # SYSTEM SETTINGS
+        frm_sysSettings = CollapseFrame(frm_sideControl, 'System Settings')
+        frm_sysSettings.grid(column=0, row=3, sticky='new')
 
-        self.swStatusLabel = tk.Label(self.statusFrame, text="SW: NULL")
-        self.swStatusLabel.grid(row=5, column=1)
+        lbl_targFreq = tk.Label(frm_sysSettings.frame, text='Target Frequency')
+        lbl_targFreq.grid(row=0, column=0, sticky='new')
 
-        self.protocol("WM_DELETE_WINDOW", self.__windowClose)
-        self.progressBar = ttk.Progressbar(
-            self, orient='horizontal', mode='determinate')
-        self.progressBar.grid(row=10, column=0, sticky='we')
+        lbl_cntrFreq = tk.Label(frm_sysSettings.frame, text='Center Frequency')
+        lbl_cntrFreq.grid(row=1, column=0, sticky='new')
+
+        lbl_sampFreq = tk.Label(frm_sysSettings.frame, text='Sampling Frequency')
+        lbl_sampFreq.grid(row=2, column=0, sticky='new')
+
+        lbl_sdrGrain = tk.Label(frm_sysSettings.frame, text='SDR Grain')
+        lbl_sdrGrain.grid(row=3, column=0, sticky='new')
+        
+        entr_targFreq = tk.Entry(frm_sysSettings.frame, width=8)
+        entr_targFreq.grid(row=0, column=1, sticky='new')
+        
+        entr_cntrFreq = tk.Entry(frm_sysSettings.frame, width=8)
+        entr_cntrFreq.grid(row=1, column=1, sticky='new')
+        
+        entr_sampFreq = tk.Entry(frm_sysSettings.frame, width=8)
+        entr_sampFreq.grid(row=2, column=1, sticky='new')
+        
+        entr_sdrGrain = tk.Entry(frm_sysSettings.frame, width=8)
+        entr_sdrGrain.grid(row=3, column=1, sticky='new')
+
+        btn_submit = tk.Button(frm_sysSettings.frame, text='Update')
+        btn_submit.grid(column=1, row=4, sticky='new')
+
+        btn_advSettings = tk.Button(frm_sysSettings.frame, 
+                text='Expert & Debug Configuration', relief=tk.FLAT)
+        btn_advSettings.grid(column=0, columnspan=2, row=5)
+
+
+        # START PAYLOAD RECORDING
+        btn_startRecord = tk.Button(frm_sideControl, width=SBWidth, text='Start Recording')
+        btn_startRecord.grid(column=0, row=4, sticky='nsew')
+
+SBWidth=25
+
+class CollapseFrame(ttk.Frame):
+    '''
+    Helper class to deal with collapsible GUI components
+    '''
+    def __init__(self, parent, labelText="label"): 
+  
+        ttk.Frame.__init__(self, parent) 
+  
+        # These are the class variable 
+        # see a underscore in expanded_text and _collapsed_text 
+        # this means these are private to class 
+        self.parent = parent 
+  
+        self.columnconfigure(0, weight = 1) 
+  
+        # Tkinter variable storing integer value 
+        self._variable = tk.IntVar() 
+  
+        self._button = ttk.Checkbutton(self, width=SBWidth, variable = self._variable, 
+                            command = self._activate, text=labelText, style ="TMenubutton")
+        self._button.grid(row = 0, column = 0, sticky = "we")
+  
+  
+        collapseStyle = ttk.Style()
+        collapseStyle.configure("TFrame", background="dark gray")
+        self.frame = ttk.Frame(self, style="TFrame")
+  
+        # This will call activate function of class 
+        self._activate() 
+  
+    def _activate(self): 
+        if not self._variable.get(): 
+  
+            self.frame.grid_forget() 
+  
+  
+        elif self._variable.get(): 
+            # increasing the frame area so new widgets 
+            # could reside in this container 
+            self.frame.grid(row = 1, column = 0, columnspan = 1) 
+  
+    def toggle(self): 
+        """Switches the label frame to the opposite state."""
+        self._variable.set(not self._variable.get()) 
+        self._activate()
+
+
+
 
 
 if __name__ == '__main__':
