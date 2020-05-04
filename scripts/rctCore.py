@@ -161,7 +161,7 @@ class MAVModel:
         self.sysStatus = 0
         self.swStatus = 0
         self.frequencies = []
-        self.options = []
+        self.options = {}
         self.__callbacks = {}
         for event in Events:
             self.__callbacks[event] = []
