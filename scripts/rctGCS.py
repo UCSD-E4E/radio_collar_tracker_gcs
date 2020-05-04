@@ -39,7 +39,6 @@ from tkinter import *
 import rctTransport
 import rctComms
 import rctCore
-<<<<<<< HEAD
 from tkinter.filedialog import askopenfilename
 import os
 from PIL import Image, ImageTk
@@ -51,9 +50,7 @@ from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 import rasterio as rio
 from rasterio.plot import show
-=======
 
->>>>>>> 28c2ded3f38cea76d1ae264f5d117d498b898121
 class GCS(tk.Tk):
     '''
     Ground Control Station GUI
