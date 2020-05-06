@@ -39,7 +39,6 @@ import enum
 import rctTransport
 from rctTransport import PACKET_TYPES, COMMANDS
 
-
 class EVENTS(enum.Enum):
     HEARTBEAT = PACKET_TYPES.HEARTBEAT
     PING = PACKET_TYPES.PING
@@ -54,7 +53,6 @@ class EVENTS(enum.Enum):
     NO_HEARTBEAT = enum.auto()
     UNKNOWN_PACKET = enum.auto()
     GENERAL_EXCEPTION = enum.auto()
-
 
 class MAVReceiver:
     '''
@@ -92,7 +90,7 @@ class MAVReceiver:
         '''
         Waits to receive a heartbeat packet.  Returns a tuple containing the
         MAV's IP address and port number as a single tuple, and the contents of
-        the received heartbeat packet. 
+        the received heartbeat packet.
         :param guiTick:
         :type guiTick:
         :param timeout: Seconds to wait before timing out
@@ -192,7 +190,7 @@ class MAVReceiver:
         :param event: Event to trigger on
         :type event: EVENTS
         :param callback: Callback function
-        :type callback: function pointer.  The function shall accept two 
+        :type callback: function pointer.  The function shall accept two
                 keyword parameters: packet (dict) and addr (str).  The packet
                 dictionary shall the the packet payload, and the addr shall be
                 the address of the MAV
@@ -210,6 +208,7 @@ class MAVReceiver:
         '''
         assert(isinstance(packet, dict))
         msg = json.dumps(packet)
+        msg = msg + '\n'
         self.__log.info("Send: %s" % (msg))
         self.sock.send(msg.encode('utf-8'), self.__mavIP)
 

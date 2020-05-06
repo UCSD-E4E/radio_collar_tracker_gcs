@@ -20,6 +20,8 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 05/05/20  AG  Tied options entries to string vars
+# 05/03/20  AG  Added TCP connection and update options functionalities
 # 04/26/20  NH  Updated API, switched from UDP to TCP
 # 04/20/20  NH  Updated API and imports
 # 04/17/20  NH  Updated imports and MAVModel API
@@ -40,7 +42,6 @@ import rctTransport
 import rctComms
 import rctCore
 
-
 class GCS(tk.Tk):
     '''
     Ground Control Station GUI
@@ -58,6 +59,9 @@ class GCS(tk.Tk):
         self.__buttons = []
         self.innerFreqFrame = None
         self.freqElements = []
+        self.cntrFreqEntry = StringVar()
+        self.sampFreqEntry = StringVar()
+        self.sdrGainEntry = StringVar()
         self.__createWidgets()
         for button in self.__buttons:
             button.config(state='disabled')
@@ -288,18 +292,22 @@ class GCS(tk.Tk):
 
         entr_port = tk.Entry(frm_port)
         entr_port.pack(fill=tk.BOTH)
-        
 
         port = 'No Port Enterred'
         def submit():
             port = entr_port.get()
             print(port)
+            port = int(port)
+            if port != 9000:
+                self.__rctPort = rctTransport.RCTTCPClient(addr='127.0.0.1', port=port)
+                self.__mavReceiver = rctComms.MAVReceiver(self.__rctPort)
+                self.__mavModel = rctCore.MAVModel(self.__mavReceiver)
+            self.__mavModel.start()
             conWindow.destroy()
             conWindow.update()
 
         btn_submit = tk.Button(frm_port, text='submit', command=submit)
         btn_submit.pack()
-
 
     def __mapWidgets(self, button):
         '''
@@ -319,11 +327,11 @@ class GCS(tk.Tk):
         lbl_mapOptions = tk.Label(frm_mapOptions, bg='gray', width=SBWidth, text='Map Options')
         lbl_mapOptions.grid(column=0, row=0, sticky='ew')
 
-        btn_setSearchArea = tk.Button(frm_mapOptions,  bg='light gray', width=SBWidth, 
+        btn_setSearchArea = tk.Button(frm_mapOptions,  bg='light gray', width=SBWidth,
                 relief=tk.FLAT, text='Set Search Area')
         btn_setSearchArea.grid(column=0, row=1, sticky='ew')
 
-        btn_cacheMap = tk.Button(frm_mapOptions, width=SBWidth,  bg='light gray', 
+        btn_cacheMap = tk.Button(frm_mapOptions, width=SBWidth,  bg='light gray',
                 relief=tk.FLAT, text='Cache Map')
         btn_cacheMap.grid(column=0, row=2)
 
@@ -341,7 +349,7 @@ class GCS(tk.Tk):
         lbl_legend.grid(column=0, row=2, sticky='ew')
 
         frm_mapSpacer = tk.Frame(master=frm_mapGrid, bg='black', height=400, width=450)
-        frm_mapSpacer.grid(column=1,row=1) 
+        frm_mapSpacer.grid(column=1,row=1)
 
     def __createWidgets(self):
         '''
@@ -349,21 +357,17 @@ class GCS(tk.Tk):
         '''
         self.title('RCT GCS')
 
-
-        
         frm_sideControl = tk.Frame(master=self, width=SBWidth, height=300, bg="dark gray")
         frm_sideControl.pack(anchor=tk.NW, side=tk.RIGHT)
         frm_sideControl.grid_columnconfigure(0, weight=1)
         frm_sideControl.grid_rowconfigure(0, weight=1)
-        
 
-        # SYSTEM TAB        
-        frm_system = CollapseFrame(frm_sideControl, 'System: No Connection') 
+        # SYSTEM TAB
+        frm_system = CollapseFrame(frm_sideControl, 'System: No Connection')
         frm_system.grid(row=0, column=0, sticky='new')
-  
+
         btn_connect = Button(frm_system.frame, relief=tk.FLAT, width=SBWidth, text ="Connect", command=self.__handleConnectInput)
         btn_connect.grid(column=0, row=0, sticky='new')
-
 
         # COMPONENTS TAB
         frm_components = CollapseFrame(frm_sideControl, 'Components')
@@ -371,7 +375,6 @@ class GCS(tk.Tk):
 
         lbl_componentNotif = tk.Label(frm_components.frame, width=SBWidth, text='Vehicle not connected')
         lbl_componentNotif.grid(column=0, row=0, sticky='new')
-
 
         # DATA DISPLAY TOOLS
         frm_displayTools = CollapseFrame(frm_sideControl, 'Data Display Tools')
@@ -387,7 +390,6 @@ class GCS(tk.Tk):
         btn_export = Button(frm_displayTools.frame, relief=tk.FLAT, width=SBWidth, text ="Export")
         btn_export.grid(column=0, row=2, sticky='new')
 
-
         # SYSTEM SETTINGS
         frm_sysSettings = CollapseFrame(frm_sideControl, 'System Settings')
         frm_sysSettings.grid(column=0, row=3, sticky='new')
@@ -401,28 +403,54 @@ class GCS(tk.Tk):
         lbl_sampFreq = tk.Label(frm_sysSettings.frame, text='Sampling Frequency')
         lbl_sampFreq.grid(row=2, column=0, sticky='new')
 
-        lbl_sdrGrain = tk.Label(frm_sysSettings.frame, text='SDR Grain')
-        lbl_sdrGrain.grid(row=3, column=0, sticky='new')
-        
+        lbl_sdrGain = tk.Label(frm_sysSettings.frame, text='SDR Gain')
+        lbl_sdrGain.grid(row=3, column=0, sticky='new')
+
         entr_targFreq = tk.Entry(frm_sysSettings.frame, width=8)
         entr_targFreq.grid(row=0, column=1, sticky='new')
-        
-        entr_cntrFreq = tk.Entry(frm_sysSettings.frame, width=8)
-        entr_cntrFreq.grid(row=1, column=1, sticky='new')
-        
-        entr_sampFreq = tk.Entry(frm_sysSettings.frame, width=8)
-        entr_sampFreq.grid(row=2, column=1, sticky='new')
-        
-        entr_sdrGrain = tk.Entry(frm_sysSettings.frame, width=8)
-        entr_sdrGrain.grid(row=3, column=1, sticky='new')
 
-        btn_submit = tk.Button(frm_sysSettings.frame, text='Update')
+        entr_cntrFreq = tk.Entry(frm_sysSettings.frame, textvariable=self.cntrFreqEntry, width=8)
+        entr_cntrFreq.grid(row=1, column=1, sticky='new')
+
+        entr_sampFreq = tk.Entry(frm_sysSettings.frame, textvariable=self.sampFreqEntry, width=8)
+        entr_sampFreq.grid(row=2, column=1, sticky='new')
+
+        entr_sdrGain = tk.Entry(frm_sysSettings.frame, textvariable=self.sdrGainEntry, width=8)
+        entr_sdrGain.grid(row=3, column=1, sticky='new')
+
+        def update():
+            cntrFreq = self.cntrFreqEntry.get()
+            sampFreq = self.sampFreqEntry.get()
+            optionsFlag = False #set to true if setOptions is necessary
+
+            setOptionsDict = {}
+            if cntrFreq != '':
+                optionsFlag = True
+                setOptionsDict['center_freq'] = int(cntrFreq)
+            if sampFreq != '':
+                optionsFlag = True
+                setOptionsDict['sampling_freq'] = int(sampFreq)
+            if optionsFlag:
+                self.__mavModel.setOptions(setOptionsDict)
+
+            options = self.__mavModel.getOptions(5)
+            print("Done with getOptions call")
+            print("Here are the options: ")
+            for option in options:
+                print(option + ':' + str(options[option]))
+            if 'center_freq' in options:
+                self.cntrFreqEntry.set(str(options['center_freq']))
+            if 'sampling_freq' in options:
+                self.sampFreqEntry.set(str(options['sampling_freq']))
+            if 'sdrGain' in options:
+                self.sdrGainEntry.set(str(options['sdrGain']))
+
+        btn_submit = tk.Button(frm_sysSettings.frame, text='Update', command=update)
         btn_submit.grid(column=1, row=4, sticky='new')
 
-        btn_advSettings = tk.Button(frm_sysSettings.frame, 
+        btn_advSettings = tk.Button(frm_sysSettings.frame,
                 text='Expert & Debug Configuration', relief=tk.FLAT)
         btn_advSettings.grid(column=0, columnspan=2, row=5)
-
 
         # START PAYLOAD RECORDING
         btn_startRecord = tk.Button(frm_sideControl, width=SBWidth, text='Start Recording')
@@ -434,51 +462,45 @@ class CollapseFrame(ttk.Frame):
     '''
     Helper class to deal with collapsible GUI components
     '''
-    def __init__(self, parent, labelText="label"): 
-  
-        ttk.Frame.__init__(self, parent) 
-  
-        # These are the class variable 
-        # see a underscore in expanded_text and _collapsed_text 
-        # this means these are private to class 
-        self.parent = parent 
-  
-        self.columnconfigure(0, weight = 1) 
-  
-        # Tkinter variable storing integer value 
-        self._variable = tk.IntVar() 
-  
-        self._button = ttk.Checkbutton(self, width=SBWidth, variable = self._variable, 
+    def __init__(self, parent, labelText="label"):
+
+        ttk.Frame.__init__(self, parent)
+
+        # These are the class variable
+        # see a underscore in expanded_text and _collapsed_text
+        # this means these are private to class
+        self.parent = parent
+
+        self.columnconfigure(0, weight = 1)
+
+        # Tkinter variable storing integer value
+        self._variable = tk.IntVar()
+
+        self._button = ttk.Checkbutton(self, width=SBWidth, variable = self._variable,
                             command = self._activate, text=labelText, style ="TMenubutton")
         self._button.grid(row = 0, column = 0, sticky = "we")
-  
-  
+
         collapseStyle = ttk.Style()
         collapseStyle.configure("TFrame", background="dark gray")
         self.frame = ttk.Frame(self, style="TFrame")
-  
-        # This will call activate function of class 
-        self._activate() 
-  
-    def _activate(self): 
-        if not self._variable.get(): 
-  
-            self.frame.grid_forget() 
-  
-  
-        elif self._variable.get(): 
-            # increasing the frame area so new widgets 
-            # could reside in this container 
-            self.frame.grid(row = 1, column = 0, columnspan = 1) 
-  
-    def toggle(self): 
-        """Switches the label frame to the opposite state."""
-        self._variable.set(not self._variable.get()) 
+
+        # This will call activate function of class
         self._activate()
 
+    def _activate(self):
+        if not self._variable.get():
 
+            self.frame.grid_forget()
 
+        elif self._variable.get():
+            # increasing the frame area so new widgets
+            # could reside in this container
+            self.frame.grid(row = 1, column = 0, columnspan = 1)
 
+    def toggle(self):
+        """Switches the label frame to the opposite state."""
+        self._variable.set(not self._variable.get())
+        self._activate()
 
 if __name__ == '__main__':
     logName = dt.datetime.now().strftime('%Y.%m.%d.%H.%M.%S.log')
