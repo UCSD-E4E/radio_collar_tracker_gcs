@@ -9,6 +9,7 @@ verify_ssl = true
 numpy = "*"
 utm = "*"
 simplekml = "*"
+scipy = "*"
 
 [requires]
 python_version = "3.6"
