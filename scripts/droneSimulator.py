@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 05/05/20  NH  Integrated mission simulator and ping generation
 # 04/26/20  NH  Removed old droneSimulator class, added output, added command
 #                 callback, fixed sendFrequencies, added error capture, fixed
 #                 cli args
@@ -42,7 +43,10 @@ import sys
 from rctTransport import RCTUDPServer, PACKET_TYPES
 import rctTransport
 import ping
-from lib2to3.fixer_util import Comma
+import numpy as np
+from time import sleep
+from ping import rctPing
+import utm
 
 
 class SDR_STATES(Enum):
@@ -238,6 +242,57 @@ class droneSim:
         self.__gpsBaud = 115200
         self.__autostart = False
 
+        self.SM_missionRun = False
+
+        self.SM_utmZoneNum = 11
+        self.SM_utmZone = 'S'
+        self.SM_origin = (478110, 3638925, 0)
+        self.SM_TakeoffTarget = (478110, 3638925, 30)
+        self.SM_waypoints = [(477974.06988529314, 3638776.3039655555, 30),
+                             (478281.5079546513, 3638711.2010632926, 30),
+                             (478274.9146625505, 3638679.2543171947, 30),
+                             (477975.5071926904, 3638745.8378777136, 30),
+                             (477968.40893670684, 3638712.893777053, 30),
+                             (478266.818223601, 3638648.3095763493, 30),
+                             (478258.7096344019, 3638611.871386835, 30),
+                             (477961.8023651167, 3638675.453913263, 30),
+                             (477953.6915540979, 3638638.5166701586, 30),
+                             (478246.5868126497, 3638575.4419162693, 30),
+                             (478239.4937485707, 3638544.494662541, 30),
+                             (477943.58029727807, 3638604.5801627054, 30),
+                             (477968.0164183045, 3638761.8351352056, 30),
+                             (477976.95013863116, 3638774.1124560814, 30)]
+        self.SM_targetThreshold = 5
+        self.SM_loopPeriod = 0.1
+        self.SM_TakeoffVel = 5
+        self.SM_WPVel = 5
+        self.SM_RTLVel = 20
+        self.SM_LandVel = 1
+
+        self.SC_VehiclePositionMsgPeriod = 1
+        self.SC_PingMeasurementPeriod = 1
+        self.SC_PingMeasurementSigma = 0
+        self.SP_TxPower = 144
+        self.SP_TxPowerSigma = 0
+        self.SP_SystemLoss = 0
+        self.SP_SystemLossSigma = 0
+        self.SP_Exponent = 2.5
+        self.SP_ExponentSigma = 0
+        self.SP_Position = (478110, 3638661, 0)
+        self.SP_NoiseFloor = 90
+        self.SP_NoiseFloorSigma = 0
+        self.SP_TxFreq = 173500000
+
+        self.SV_vehiclePosition = self.SM_origin
+        self.SV_vehiclePositionSigma = np.array((0, 0, 0))
+        self.SV_vehicleState = droneSim.MISSION_STATE.TAKEOFF
+        self.SV_startTime = dt.datetime.now()
+        self.SV_velocityVector = np.array([0, 0, 0])
+        self.SV_vehicleTarget = np.array(self.SM_TakeoffTarget)
+        self.SV_waypointIdx = 0
+
+        self.SS_payloadRunning = False
+
         # register command actions here
         self.__commandMap[rctTransport.COMMANDS.GET_FREQUENCY.value] = self.__doGetFrequency
         self.__commandMap[rctTransport.COMMANDS.START.value] = self.__doStartMission
@@ -303,8 +358,9 @@ class droneSim:
             self.__txThread.join()
             self.port.stop()
 
-    def gotPing(self, dronePing):
-        pass
+    def gotPing(self, dronePing: rctPing):
+        print("Ping on %d at %3.7f, %3.7f, %3.0f m, measuring %3.3f" %
+              (dronePing.freq, dronePing.lat, dronePing.lon, dronePing.alt, dronePing.amplitude))
 
     def setSystemState(self, system: str, state):
         self.__state[system] = state
@@ -328,10 +384,10 @@ class droneSim:
         self.port.sendFrequencies(list(self.__frequencies))
 
     def __doStartMission(self, commandPayload):
-        pass
+        self.SS_payloadRunning = True
 
     def __doStopMission(self, commandPayload):
-        pass
+        self.SS_payloadRunning = False
 
     def __doSetFrequency(self, commandPayload):
         frequencies = commandPayload['frequencies']
@@ -451,6 +507,137 @@ class droneSim:
             self.port.sendHeartbeat(self.__state['system'], self.__state['sdr'],
                                     self.__state['sensor'], self.__state['storage'], self.__state['switch'])
             time.sleep(self.__HeartbeatPeriod)
+
+    class MISSION_STATE:
+        TAKEOFF = 0
+        WAYPOINTS = 1
+        RTL = 2
+        LAND = 3
+        END = 4
+
+    def transmitPosition(self):
+        print(self.SV_vehiclePosition, self.SV_vehicleState,
+              np.linalg.norm(self.SV_velocityVector))
+
+    def doMission(self, returnOnEnd: bool = False):
+
+        self.SV_vehiclePosition = self.SM_origin
+        self.SV_vehicleState = droneSim.MISSION_STATE.TAKEOFF
+        self.SV_startTime = dt.datetime.now()
+        self.SV_velocityVector = np.array([0, 0, 0])
+        self.SV_vehicleTarget = np.array(self.SM_TakeoffTarget)
+        self.SV_waypointIdx = 0
+
+        prevPosTime = prevPingTime = prevTime = self.SV_startTime
+        wpTime = self.SV_startTime
+        while self.SM_missionRun:
+            curTime = dt.datetime.now()
+            elTime = (curTime - self.SV_startTime).total_seconds()
+            itTime = (curTime - prevTime).total_seconds()
+            segTime = (curTime - wpTime).total_seconds()
+            if self.SV_vehicleState == droneSim.MISSION_STATE.TAKEOFF:
+                self.SV_velocityVector = np.array(
+                    [0, 0, 1]) * self.SM_TakeoffVel
+                self.SV_vehiclePosition += self.SV_velocityVector * itTime
+                distanceToTarget = np.linalg.norm(
+                    self.SV_vehicleTarget - self.SV_vehiclePosition)
+                if distanceToTarget < self.SM_targetThreshold:
+                    self.SV_velocityVector = np.array([0, 0, 0])
+                    self.SV_vehicleState = droneSim.MISSION_STATE.WAYPOINTS
+                    self.SV_vehicleTarget = np.array(
+                        self.SM_waypoints[self.SV_waypointIdx])
+                    wpTime = dt.datetime.now()
+
+            elif self.SV_vehicleState == droneSim.MISSION_STATE.WAYPOINTS:
+                targetVector = self.SV_vehicleTarget - self.SV_vehiclePosition
+                distanceToTarget = np.linalg.norm(targetVector)
+                self.SV_velocityVector = targetVector / distanceToTarget * self.SM_WPVel
+
+                self.SV_vehiclePosition += self.SV_velocityVector * itTime
+                if distanceToTarget < self.SM_targetThreshold:
+                    self.SV_velocityVector = np.array([0, 0, 0])
+                    wpTime = dt.datetime.now()
+
+                    self.SV_waypointIdx += 1
+                    if self.SV_waypointIdx < len(self.SM_waypoints):
+                        self.SV_vehicleState = droneSim.MISSION_STATE.WAYPOINTS
+                        self.SV_vehicleTarget = np.array(
+                            self.SM_waypoints[self.SV_waypointIdx])
+                    else:
+                        self.SV_vehicleState = droneSim.MISSION_STATE.RTL
+                        self.SV_vehicleTarget = np.array(self.SM_TakeoffTarget)
+            elif self.SV_vehicleState == droneSim.MISSION_STATE.RTL:
+                targetVector = self.SV_vehicleTarget - self.SV_vehiclePosition
+                distanceToTarget = np.linalg.norm(targetVector)
+                self.SV_velocityVector = targetVector / distanceToTarget * self.SM_RTLVel
+
+                self.SV_vehiclePosition += self.SV_velocityVector * itTime
+                if distanceToTarget < self.SM_targetThreshold:
+                    self.SV_velocityVector = np.array([0, 0, 0])
+                    wpTime = dt.datetime.now()
+
+                    self.SV_vehicleState = droneSim.MISSION_STATE.LAND
+                    self.SV_vehicleTarget = np.array(self.SM_origin)
+            elif self.SV_vehicleState == droneSim.MISSION_STATE.LAND:
+                self.SV_velocityVector = np.array([0, 0, -1]) * self.SM_LandVel
+                self.SV_vehiclePosition += self.SV_velocityVector * itTime
+                distanceToTarget = np.linalg.norm(
+                    self.SV_vehicleTarget - self.SV_vehiclePosition)
+                if distanceToTarget < self.SM_targetThreshold:
+                    self.SV_velocityVector = np.array([0, 0, 0])
+                    wpTime = dt.datetime.now()
+                    self.SV_vehicleState = droneSim.MISSION_STATE.END
+            else:
+                if returnOnEnd:
+                    return
+                else:
+                    self.SV_velocityVector = np.array([0, 0, 0])
+
+            sleep(self.SM_loopPeriod)
+            if (curTime - prevPingTime).total_seconds() > self.SC_PingMeasurementPeriod:
+                pingMeasurement = self.calculatePingMeasurement()
+                if pingMeasurement is not None:
+                    lat, lon = utm.to_latlon(
+                        self.SV_vehiclePosition[0], self.SV_vehiclePosition[1], self.SM_utmZoneNum, self.SM_utmZone)
+                    newPing = rctPing(
+                        lat, lon, pingMeasurement[0], pingMeasurement[1], self.SV_vehiclePosition[2], curTime.timestamp())
+                    if self.SS_payloadRunning:
+                        self.gotPing(newPing)
+                prevPingTime = curTime
+
+            if (curTime - prevPosTime).total_seconds() > self.SC_VehiclePositionMsgPeriod:
+                self.transmitPosition()
+                prevPosTime = curTime
+            prevTime = curTime
+
+    def calculatePingMeasurement(self):
+        # check against frequencies
+        if abs(self.SP_TxFreq - self.__centerFrequency) > self.__samplingFrequency:
+            return None
+
+        if self.SP_TxFreq not in self.__frequencies:
+            return None
+
+        # vehicle is correctly configured
+        l_rx = np.array(self.SV_vehiclePosition)
+        l_tx = np.array(self.SP_Position)
+        P_tx = self.SP_TxPower
+        n = self.SP_Exponent
+        C = self.SP_SystemLoss
+        f_tx = self.SP_TxFreq
+        P_n = self.SP_NoiseFloor
+
+        d = np.linalg.norm(l_rx - l_tx)
+
+        Prx = P_tx - 10 * n * np.log10(d) - C
+
+        measurement = (Prx, f_tx)
+
+        # implement noise floor
+        if Prx < P_n:
+            measurement = None
+
+        return measurement
 
 
 if __name__ == '__main__':
