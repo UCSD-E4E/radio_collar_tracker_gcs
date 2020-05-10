@@ -338,13 +338,6 @@ class GCS(tk.Tk):
 
         lbl_minPingSNR = tk.Label(frm_advSettings, text='Min. Ping SNR(dB)')
         lbl_minPingSNR.grid(row=3, column=0, sticky='new')
-        btn_setSearchArea = tk.Button(frm_mapOptions,  bg='light gray', width=SBWidth,
-                relief=tk.FLAT, text='Set Search Area')
-        btn_setSearchArea.grid(column=0, row=1, sticky='ew')
-
-        btn_cacheMap = tk.Button(frm_mapOptions, width=SBWidth,  bg='light gray',
-                relief=tk.FLAT, text='Cache Map')
-        btn_cacheMap.grid(column=0, row=2)
 
         lbl_GPSPort = tk.Label(frm_advSettings, text='GPS Port')
         lbl_GPSPort.grid(row=4, column=0, sticky='new')
@@ -502,9 +495,53 @@ class GCS(tk.Tk):
         # SYSTEM SETTINGS
         frm_sysSettings = CollapseFrame(frm_sideControl, 'System Settings')
         frm_sysSettings.grid(column=0, row=3, sticky='new')
+    
 
-        lbl_targFreq = tk.Label(frm_sysSettings.frame, text='Target Frequency')
-        lbl_targFreq.grid(row=0, column=0, sticky='new')
+        targEntries = []
+        frm_targHolder = tk.Frame(master=frm_sysSettings.frame, width=SBWidth-2)
+        frm_targHolder.grid(row=4, column=0, columnspan=2, sticky='new')
+
+        def addTarget():
+            addTargetWindow = tk.Toplevel(self)
+
+            addTargetWindow.title('Add Target')
+            frm_targetSettings = tk.Frame(master=addTargetWindow)
+            frm_targetSettings.pack(fill=tk.BOTH)
+
+            lbl_targetName = tk.Label(frm_targetSettings, text='Target Name:')
+            lbl_targetName.grid(row=0, column=0, sticky='new')
+
+            entr_targetName = tk.Entry(frm_targetSettings, width = SBWidth)
+            entr_targetName.grid(row=0, column=1, sticky='new')
+
+            lbl_targetFreq = tk.Label(frm_targetSettings, text='Target Frequency:')
+            lbl_targetFreq.grid(row=1, column=0, sticky='new')
+
+            entr_targetFreq = tk.Entry(frm_targetSettings, width = SBWidth)
+            entr_targetFreq.grid(row=1, column=1, sticky='new')
+
+            def submit():
+                name = entr_targetName.get()
+                freq = entr_targetFreq.get()
+                lbl_newTarget = tk.Label(frm_targHolder, text=name, width=17)
+                lbl_newTarget.grid(row=len(targEntries), column=0)
+                entr_newTarget = tk.Entry(frm_targHolder, width=8, text=freq)
+                entr_newTarget.grid(row=len(targEntries), column=1)
+
+                targEntries.append((name,entr_newTarget))
+                frm_targHolder.grid(row=4, column=0, columnspan=2, sticky='new')
+                addTargetWindow.destroy()
+                addTargetWindow.update()
+
+            btn_submit = tk.Button(addTargetWindow, text='submit', command=submit)
+            btn_submit.pack()
+            
+
+
+
+        btn_addTarget = tk.Button(frm_sysSettings.frame, relief=tk.FLAT, text='Add Target',
+                command=addTarget)
+        btn_addTarget.grid(row=0, columnspan=2, sticky='new')
 
         lbl_cntrFreq = tk.Label(frm_sysSettings.frame, text='Center Frequency')
         lbl_cntrFreq.grid(row=1, column=0, sticky='new')
@@ -514,9 +551,6 @@ class GCS(tk.Tk):
 
         lbl_sdrGrain = tk.Label(frm_sysSettings.frame, text='SDR Grain')
         lbl_sdrGrain.grid(row=3, column=0, sticky='new')
-
-        entr_targFreq = tk.Entry(frm_sysSettings.frame, width=8)
-        entr_targFreq.grid(row=0, column=1, sticky='new')
 
         entr_cntrFreq = tk.Entry(frm_sysSettings.frame, width=8)
         entr_cntrFreq.grid(row=1, column=1, sticky='new')
@@ -528,13 +562,16 @@ class GCS(tk.Tk):
         entr_sdrGrain.grid(row=3, column=1, sticky='new')
 
         def update():
-            targFreq = entr_targFreq.get()
             cntrFreq = entr_cntrFreq.get()
             sampFreq = entr_sampFreq.get()
             sdrGrain = entr_sdrGrain.get()
             optionsFlag = False #set to true if setOptions is necessary
 
             setOptionsDict = {}
+            for targetName, targetFreq in targEntries:
+                if(targetFreq.get() != ''):
+                    optionsFlag = True
+                    setOptionsDict[targetName] = int(targetFreq.get())
             if cntrFreq != '':
                 optionsFlag = True
                 setOptionsDict['center_freq'] = int(cntrFreq)
@@ -549,9 +586,9 @@ class GCS(tk.Tk):
             print("Here are the options: ")
             for option in options:
                 print(option + ':' + str(options[option]))
-            if 'targFreq' in options:
-                entr_targFreq.delete(0, END)
-                entr_targFreq.insert(0, str(options['targFreq']))
+            #if 'targFreq' in options:
+             #   entr_targFreq.delete(0, END)
+              #  entr_targFreq.insert(0, str(options['targFreq']))
             if 'center_freq' in options:
                 entr_cntrFreq.delete(0, END)
                 entr_cntrFreq.insert(0, str(options['center_freq']))
@@ -562,14 +599,29 @@ class GCS(tk.Tk):
                 entr_sdrGrain.delete(0, END)
                 entr_sdrGrain.insert(0, str(options['sdrGrain']))
 
+            for targetName, targetFreq in targEntries:
+                if targetName in options:
+                    targetFreq.delete(0,END)
+                    targetFreq.insert(0, str(options[targetName]))
+                    
+        
+
+        def clearTargs():
+            for i in frm_targHolder.grid_slaves():
+                i.grid_forget()
+            frm_targHolder.grid_forget()
+            targEntries = []
+
+
+        btn_clearTargs = tk.Button(frm_sysSettings.frame, text='Clear Targets', command=clearTargs)
+        btn_clearTargs.grid(column=0, row=5, sticky='new')
+
         btn_submit = tk.Button(frm_sysSettings.frame, text='Update', command=update)
-        btn_submit.grid(column=1, row=4, sticky='new')
+        btn_submit.grid(column=1, row=5, sticky='new')
 
         btn_advSettings = tk.Button(frm_sysSettings.frame, 
                 text='Expert & Debug Configuration', relief=tk.FLAT, command=self.__advancedSettings)
-        btn_advSettings = tk.Button(frm_sysSettings.frame,
-                text='Expert & Debug Configuration', relief=tk.FLAT)
-        btn_advSettings.grid(column=0, columnspan=2, row=5)
+        btn_advSettings.grid(column=0, columnspan=2, row=6)
 
         # START PAYLOAD RECORDING
         btn_startRecord = tk.Button(frm_sideControl, width=SBWidth, text='Start Recording')
