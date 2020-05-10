@@ -20,7 +20,9 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 05/05/20  AG  Tied options entries to string vars
 # 05/03/20  ML  Added Expert Settings popup, Added the ability to load TIFF img
+# 05/03/20  AG  Added TCP connection and update options functionalities
 # 04/26/20  NH  Updated API, switched from UDP to TCP
 # 04/20/20  NH  Updated API and imports
 # 04/17/20  NH  Updated imports and MAVModel API
@@ -45,7 +47,6 @@ import os
 from PIL import Image, ImageTk
 from matplotlib.backends.backend_tkagg import (
     FigureCanvasTkAgg, NavigationToolbar2Tk)
-# Implement the default Matplotlib key bindings.
 from matplotlib.backend_bases import key_press_handler
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
@@ -69,6 +70,9 @@ class GCS(tk.Tk):
         self.__buttons = []
         self.innerFreqFrame = None
         self.freqElements = []
+        self.cntrFreqEntry = StringVar()
+        self.sampFreqEntry = StringVar()
+        self.sdrGainEntry = StringVar()
         self.__createWidgets()
         for button in self.__buttons:
             button.config(state='disabled')
@@ -549,22 +553,22 @@ class GCS(tk.Tk):
         lbl_sampFreq = tk.Label(frm_sysSettings.frame, text='Sampling Frequency')
         lbl_sampFreq.grid(row=2, column=0, sticky='new')
 
-        lbl_sdrGrain = tk.Label(frm_sysSettings.frame, text='SDR Grain')
-        lbl_sdrGrain.grid(row=3, column=0, sticky='new')
+        lbl_sdrGain = tk.Label(frm_sysSettings.frame, text='SDR Gain')
+        lbl_sdrGain.grid(row=3, column=0, sticky='new')
 
-        entr_cntrFreq = tk.Entry(frm_sysSettings.frame, width=8)
+
+        entr_cntrFreq = tk.Entry(frm_sysSettings.frame, textvariable=self.cntrFreqEntry, width=8)
         entr_cntrFreq.grid(row=1, column=1, sticky='new')
 
-        entr_sampFreq = tk.Entry(frm_sysSettings.frame, width=8)
+        entr_sampFreq = tk.Entry(frm_sysSettings.frame, textvariable=self.sampFreqEntry, width=8)
         entr_sampFreq.grid(row=2, column=1, sticky='new')
 
-        entr_sdrGrain = tk.Entry(frm_sysSettings.frame, width=8)
-        entr_sdrGrain.grid(row=3, column=1, sticky='new')
+        entr_sdrGain = tk.Entry(frm_sysSettings.frame, textvariable=self.sdrGainEntry, width=8)
+        entr_sdrGain.grid(row=3, column=1, sticky='new')
 
         def update():
-            cntrFreq = entr_cntrFreq.get()
-            sampFreq = entr_sampFreq.get()
-            sdrGrain = entr_sdrGrain.get()
+            cntrFreq = self.cntrFreqEntry.get()
+            sampFreq = self.sampFreqEntry.get()
             optionsFlag = False #set to true if setOptions is necessary
 
             setOptionsDict = {}
@@ -590,14 +594,11 @@ class GCS(tk.Tk):
              #   entr_targFreq.delete(0, END)
               #  entr_targFreq.insert(0, str(options['targFreq']))
             if 'center_freq' in options:
-                entr_cntrFreq.delete(0, END)
-                entr_cntrFreq.insert(0, str(options['center_freq']))
+                self.cntrFreqEntry.set(str(options['center_freq']))
             if 'sampling_freq' in options:
-                entr_sampFreq.delete(0, END)
-                entr_sampFreq.insert(0, str(options['sampling_freq']))
-            if 'sdrGrain' in options:
-                entr_sdrGrain.delete(0, END)
-                entr_sdrGrain.insert(0, str(options['sdrGrain']))
+                self.sampFreqEntry.set(str(options['sampling_freq']))
+            if 'sdrGain' in options:
+                self.sdrGainEntry.set(str(options['sdrGain']))
 
             for targetName, targetFreq in targEntries:
                 if targetName in options:
