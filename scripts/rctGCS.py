@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 05/09/20  ML  Added ability to add/clear target frequencies
 # 05/05/20  AG  Tied options entries to string vars
 # 05/03/20  ML  Added Expert Settings popup, Added the ability to load TIFF img
 # 05/03/20  AG  Added TCP connection and update options functionalities
@@ -611,6 +612,10 @@ class GCS(tk.Tk):
             for i in frm_targHolder.grid_slaves():
                 i.grid_forget()
             frm_targHolder.grid_forget()
+            options = self.__mavModel.getOptions(5)
+            for name, entry in targEntries:
+                if name in options:
+                    del options[name]
             targEntries = []
 
 
