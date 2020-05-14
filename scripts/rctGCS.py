@@ -74,6 +74,14 @@ class GCS(tk.Tk):
         self.cntrFreqEntry = StringVar()
         self.sampFreqEntry = StringVar()
         self.sdrGainEntry = StringVar()
+        self.pingWidthEntry = StringVar()
+        self.minWidthMultEntry = StringVar()
+        self.maxWidthMultEntry = StringVar()
+        self.minPingSNREntry = StringVar()
+        self.GPSPortEntry = StringVar()
+        self.GPSBaudEntry = StringVar()
+        self.outputDirEntry = StringVar()
+        self.GPSModeEntry = StringVar()
         self.__createWidgets()
         for button in self.__buttons:
             button.config(state='disabled')
@@ -305,7 +313,7 @@ class GCS(tk.Tk):
         entr_port = tk.Entry(frm_port)
         entr_port.pack(fill=tk.BOTH)
 
-        port = 'No Port Enterred'
+        port = 'No Port Entered'
         def submit():
             port = entr_port.get()
             print(port)
@@ -355,42 +363,95 @@ class GCS(tk.Tk):
 
         lbl_GPSMode = tk.Label(frm_advSettings, text='GPS Mode')
         lbl_GPSMode.grid(row=7, column=0, sticky='new')
-        
-        entr_pingWidth = tk.Entry(frm_advSettings, width=8)
+
+        entr_pingWidth = tk.Entry(frm_advSettings, textvariable=self.pingWidthEntry, width=8)
         entr_pingWidth.grid(row=0, column=1, sticky='new')
-        
-        entr_minWidthMult = tk.Entry(frm_advSettings, width=8)
+
+        entr_minWidthMult = tk.Entry(frm_advSettings, textvariable=self.minWidthMultEntry, width=8)
         entr_minWidthMult.grid(row=1, column=1, sticky='new')
-        
-        entr_maxWidthMult = tk.Entry(frm_advSettings, width=8)
+
+        entr_maxWidthMult = tk.Entry(frm_advSettings, textvariable=self.maxWidthMultEntry, width=8)
         entr_maxWidthMult.grid(row=2, column=1, sticky='new')
-        
-        entr_minPingSNR = tk.Entry(frm_advSettings, width=8)
+
+        entr_minPingSNR = tk.Entry(frm_advSettings, textvariable=self.minPingSNREntry, width=8)
         entr_minPingSNR.grid(row=3, column=1, sticky='new')
-        
-        entr_GPSPort = tk.Entry(frm_advSettings, width=8)
+
+        entr_GPSPort = tk.Entry(frm_advSettings, textvariable=self.GPSPortEntry, width=8)
         entr_GPSPort.grid(row=4, column=1, sticky='new')
-        
-        entr_GPSBaudRate = tk.Entry(frm_advSettings, width=8)
+
+        entr_GPSBaudRate = tk.Entry(frm_advSettings, textvariable=self.GPSBaudEntry, width=8)
         entr_GPSBaudRate.grid(row=5, column=1, sticky='new')
-        
-        entr_outputDir = tk.Entry(frm_advSettings, width=8)
+
+        entr_outputDir = tk.Entry(frm_advSettings, textvariable=self.outputDirEntry, width=8)
         entr_outputDir.grid(row=6, column=1, sticky='new')
 
-        entr_GPSMode = tk.Entry(frm_advSettings, width=8)
+        entr_GPSMode = tk.Entry(frm_advSettings, textvariable=self.GPSModeEntry, width=8)
         entr_GPSMode.grid(row=7, column=1, sticky='new')
 
-
-        
-
         def submit():
+            pingWidth = self.pingWidthEntry.get()
+            minWidthMult = self.minWidthMultEntry.get()
+            maxWidthMult = self.maxWidthMultEntry.get()
+            minPingSNR = self.minPingSNREntry.get()
+            GPSPort = self.GPSPortEntry.get()
+            GPSBaud = self.GPSBaudEntry.get()
+            outputDir = self.outputDirEntry.get()
+            GPSMode = self.GPSModeEntry.get()
+            optionsFlag = False #set to true if setOptions is necessary
+
+            setOptionsDict = {}
+            if pingWidth != '':
+                optionsFlag = True
+                setOptionsDict['ping_width_ms'] = int(pingWidth)
+            if minWidthMult != '':
+                optionsFlag = True
+                setOptionsDict['ping_min_len_mult'] = float(minWidthMult)
+            if maxWidthMult != '':
+                optionsFlag = True
+                setOptionsDict['ping_max_len_mult'] = float(maxWidthMult)
+            if minPingSNR != '':
+                optionsFlag = True
+                setOptionsDict['ping_min_snr'] = float(minPingSNR)
+            if GPSPort != '':
+                optionsFlag = True
+                setOptionsDict['gps_target'] = GPSPort
+            if outputDir != '':
+                optionsFlag = True
+                setOptionsDict['output_dir'] = outputDir
+            if GPSMode != '':
+                optionsFlag = True
+                setOptionsDict['gps_mode'] = bool(GPSMode)
+            if optionsFlag:
+                self.__mavModel.setOptions(setOptionsDict)
+
+            options = self.__mavModel.getOptions(5)
+
+            # print statements for debugging purposes
+            print("Done with getOptions call")
+            print("Here are the options: ")
+            for option in options:
+                print(option + ':' + str(options[option]))
+        
+            if 'ping_width_ms' in options:
+                self.pingWidthEntry.set(str(options['ping_width_ms']))
+            if 'ping_min_len_mult' in options:
+                self.minWidthMultEntry.set(str(options['ping_min_len_mult']))
+            if 'ping_max_len_mult' in options:
+                self.maxWidthMultEntry.set(str(options['ping_max_len_mult']))
+            if 'ping_min_snr' in options:
+                self.minPingSNREntry.set(str(options['ping_min_snr']))
+            if 'gps_target' in options:
+                self.GPSPortEntry.set(str(options['gps_target']))
+            if 'output_dir' in options:
+                self.outputDirEntry.set(str(options['output_dir']))
+            if 'gps_mode' in options:
+                self.GPSModeEntry.set(str(options['gps_mode']))
+
             settingsWindow.destroy()
             settingsWindow.update()
 
         btn_submit = tk.Button(settingsWindow, text='submit', command=submit)
         btn_submit.pack()
-
-
 
     def __createWidgets(self):
         '''
@@ -423,14 +484,16 @@ class GCS(tk.Tk):
         frm_mapGrid.grid_columnconfigure(0, weight=1)
         frm_mapGrid.grid_rowconfigure(0, weight=1)
         frm_mapSpacer = tk.Frame(master=frm_mapGrid, bg='gray', height=400, width=450)
-        frm_mapSpacer.grid(column=1,row=1) 
+        frm_mapSpacer.grid(column=1,row=1)
         dirName = os.path.dirname(__file__)
         path=os.path.join(dirName, '../../map.jpg')
+        '''
         load = Image.open(path)
         render = ImageTk.PhotoImage(load)
         img = Label(frm_mapSpacer, image=render)
         img.image = render
         img.pack(fill=tk.BOTH, expand=1)
+        '''
 
         frm_displayTools = CollapseFrame(frm_sideControl, 'Data Display Tools')
         frm_displayTools.grid(column=0, row=2, sticky='n')
@@ -464,7 +527,6 @@ class GCS(tk.Tk):
         btn_export = Button(frm_displayTools.frame, relief=tk.FLAT, width=SBWidth, text ="Export")
         btn_export.grid(column=0, row=2, sticky='new')
 
-
         # MAP OPTIONS
         frm_mapOptions = tk.Frame(master=frm_mapGrid, width=SBWidth)
         frm_mapOptions.grid(column=0, row=0)
@@ -472,11 +534,11 @@ class GCS(tk.Tk):
         lbl_mapOptions = tk.Label(frm_mapOptions, bg='gray', width=SBWidth, text='Map Options')
         lbl_mapOptions.grid(column=0, row=0, sticky='ew')
 
-        btn_setSearchArea = tk.Button(frm_mapOptions,  bg='light gray', width=SBWidth, 
+        btn_setSearchArea = tk.Button(frm_mapOptions,  bg='light gray', width=SBWidth,
                 relief=tk.FLAT, text='Set Search Area')
         btn_setSearchArea.grid(column=0, row=1, sticky='ew')
 
-        btn_cacheMap = tk.Button(frm_mapOptions, width=SBWidth,  bg='light gray', 
+        btn_cacheMap = tk.Button(frm_mapOptions, width=SBWidth,  bg='light gray',
                 relief=tk.FLAT, text='Cache Map')
         btn_cacheMap.grid(column=0, row=2)
 
@@ -493,14 +555,9 @@ class GCS(tk.Tk):
         lbl_legend = tk.Label(frm_mapLegend, width=SBWidth,  bg='light gray', text='Target')
         lbl_legend.grid(column=0, row=2, sticky='ew')
 
-
-
-
-
         # SYSTEM SETTINGS
         frm_sysSettings = CollapseFrame(frm_sideControl, 'System Settings')
         frm_sysSettings.grid(column=0, row=3, sticky='new')
-    
 
         targEntries = []
         frm_targHolder = tk.Frame(master=frm_sysSettings.frame, width=SBWidth-2)
@@ -540,9 +597,6 @@ class GCS(tk.Tk):
 
             btn_submit = tk.Button(addTargetWindow, text='submit', command=submit)
             btn_submit.pack()
-            
-
-
 
         btn_addTarget = tk.Button(frm_sysSettings.frame, relief=tk.FLAT, text='Add Target',
                 command=addTarget)
@@ -556,7 +610,6 @@ class GCS(tk.Tk):
 
         lbl_sdrGain = tk.Label(frm_sysSettings.frame, text='SDR Gain')
         lbl_sdrGain.grid(row=3, column=0, sticky='new')
-
 
         entr_cntrFreq = tk.Entry(frm_sysSettings.frame, textvariable=self.cntrFreqEntry, width=8)
         entr_cntrFreq.grid(row=1, column=1, sticky='new')
@@ -605,8 +658,6 @@ class GCS(tk.Tk):
                 if targetName in options:
                     targetFreq.delete(0,END)
                     targetFreq.insert(0, str(options[targetName]))
-                    
-        
 
         def clearTargs():
             for i in frm_targHolder.grid_slaves():
@@ -618,14 +669,13 @@ class GCS(tk.Tk):
                     del options[name]
             targEntries = []
 
-
         btn_clearTargs = tk.Button(frm_sysSettings.frame, text='Clear Targets', command=clearTargs)
         btn_clearTargs.grid(column=0, row=5, sticky='new')
 
         btn_submit = tk.Button(frm_sysSettings.frame, text='Update', command=update)
         btn_submit.grid(column=1, row=5, sticky='new')
 
-        btn_advSettings = tk.Button(frm_sysSettings.frame, 
+        btn_advSettings = tk.Button(frm_sysSettings.frame,
                 text='Expert & Debug Configuration', relief=tk.FLAT, command=self.__advancedSettings)
         btn_advSettings.grid(column=0, columnspan=2, row=6)
 
