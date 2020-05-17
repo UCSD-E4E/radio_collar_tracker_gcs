@@ -20,6 +20,9 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 05/17/20  AG  Finished implementing start/stop recording button
+# 05/17/20  AG  Added setting target frequencies and system connection text updates.
+# 05/13/20  AG  Added ability to set and receive expert debug options
 # 05/09/20  ML  Added ability to add/clear target frequencies
 # 05/05/20  AG  Tied options entries to string vars
 # 05/03/20  ML  Added Expert Settings popup, Added the ability to load TIFF img
@@ -69,8 +72,14 @@ class GCS(tk.Tk):
         self.__mavReceiver = rctComms.MAVReceiver(self.__rctPort)
         self.__mavModel = rctCore.MAVModel(self.__mavReceiver)
         self.__buttons = []
+        self.__systemConnectionTab = None
+        self.__missionStatusText = StringVar()
+        self.__missionStatusText.set("Start Recording")
         self.innerFreqFrame = None
         self.freqElements = []
+        self.targEntries = {}
+        self.targNameEntry = StringVar()
+        self.targFreqEntry = StringVar()
         self.cntrFreqEntry = StringVar()
         self.sampFreqEntry = StringVar()
         self.sdrGainEntry = StringVar()
@@ -199,6 +208,15 @@ class GCS(tk.Tk):
         tkm.showerror(title='RCT GCS', message='An exception has occured!\n%s\n%s' % (
             self.__mavModel.lastException[0], self.__mavModel.lastException[1]))
 
+    def __startStopMission(self):
+        #State machine for start recording -> stop recording
+        if self.__missionStatusText.get() == 'Start Recording':
+            self.__missionStatusText.set('Stop Recording')
+            self.__mavModel.startMission()
+        else:
+            self.__missionStatusText.set('Start Recording')
+            self.__mavModel.stopMission()
+
     def __updateStatus(self):
         '''
         Internal callback for status variable update
@@ -323,6 +341,18 @@ class GCS(tk.Tk):
                 self.__mavReceiver = rctComms.MAVReceiver(self.__rctPort)
                 self.__mavModel = rctCore.MAVModel(self.__mavReceiver)
             self.__mavModel.start()
+            self.__systemConnectionTab.updateText("System: Connected")
+            options = self.__mavModel.getOptions(5)
+            print("Done with getOptions call")
+            print("Here are the options: ")
+            for option in options:
+                print(option + ':' + str(options[option]))
+            if 'center_freq' in options:
+                self.cntrFreqEntry.set(str(options['center_freq']))
+            if 'sampling_freq' in options:
+                self.sampFreqEntry.set(str(options['sampling_freq']))
+            if 'sdrGain' in options:
+                self.sdrGainEntry.set(str(options['sdrGain']))
             conWindow.destroy()
             conWindow.update()
 
@@ -465,10 +495,10 @@ class GCS(tk.Tk):
         frm_sideControl.grid_rowconfigure(0, weight=1)
 
         # SYSTEM TAB
-        frm_system = CollapseFrame(frm_sideControl, 'System: No Connection')
-        frm_system.grid(row=0, column=0, sticky='new')
+        self.__systemConnectionTab = CollapseFrame(frm_sideControl, 'System: No Connection')
+        self.__systemConnectionTab.grid(row=0, column=0, sticky='new')
 
-        btn_connect = Button(frm_system.frame, relief=tk.FLAT, width=SBWidth, text ="Connect", command=self.__handleConnectInput)
+        btn_connect = Button(self.__systemConnectionTab.frame, relief=tk.FLAT, width=SBWidth, text ="Connect", command=self.__handleConnectInput)
         btn_connect.grid(column=0, row=0, sticky='new')
 
         # COMPONENTS TAB
@@ -559,7 +589,6 @@ class GCS(tk.Tk):
         frm_sysSettings = CollapseFrame(frm_sideControl, 'System Settings')
         frm_sysSettings.grid(column=0, row=3, sticky='new')
 
-        targEntries = []
         frm_targHolder = tk.Frame(master=frm_sysSettings.frame, width=SBWidth-2)
         frm_targHolder.grid(row=4, column=0, columnspan=2, sticky='new')
 
@@ -573,24 +602,26 @@ class GCS(tk.Tk):
             lbl_targetName = tk.Label(frm_targetSettings, text='Target Name:')
             lbl_targetName.grid(row=0, column=0, sticky='new')
 
-            entr_targetName = tk.Entry(frm_targetSettings, width = SBWidth)
+            entr_targetName = tk.Entry(frm_targetSettings, textvariable=self.targNameEntry, width = SBWidth)
             entr_targetName.grid(row=0, column=1, sticky='new')
 
             lbl_targetFreq = tk.Label(frm_targetSettings, text='Target Frequency:')
             lbl_targetFreq.grid(row=1, column=0, sticky='new')
 
-            entr_targetFreq = tk.Entry(frm_targetSettings, width = SBWidth)
+            entr_targetFreq = tk.Entry(frm_targetSettings, textvariable=self.targFreqEntry, width = SBWidth)
             entr_targetFreq.grid(row=1, column=1, sticky='new')
 
             def submit():
-                name = entr_targetName.get()
-                freq = entr_targetFreq.get()
+                name = self.targNameEntry.get()
+                freq = self.targFreqEntry.get()
                 lbl_newTarget = tk.Label(frm_targHolder, text=name, width=17)
-                lbl_newTarget.grid(row=len(targEntries), column=0)
-                entr_newTarget = tk.Entry(frm_targHolder, width=8, text=freq)
-                entr_newTarget.grid(row=len(targEntries), column=1)
+                lbl_newTarget.grid(row=len(self.targEntries), column=0)
+                newTargFreqEntry = StringVar()
+                newTargFreqEntry.set(freq)
+                entr_newTarget = tk.Entry(frm_targHolder, textvariable=newTargFreqEntry, width=8)
+                entr_newTarget.grid(row=len(self.targEntries), column=1)
 
-                targEntries.append((name,entr_newTarget))
+                self.targEntries[name] = newTargFreqEntry
                 frm_targHolder.grid(row=4, column=0, columnspan=2, sticky='new')
                 addTargetWindow.destroy()
                 addTargetWindow.update()
@@ -626,16 +657,26 @@ class GCS(tk.Tk):
             optionsFlag = False #set to true if setOptions is necessary
 
             setOptionsDict = {}
-            for targetName, targetFreq in targEntries:
+            setOptionsDict['frequencies'] = []
+            for targetName in self.targEntries:
+                targetFreq = self.targEntries[targetName]
                 if(targetFreq.get() != ''):
                     optionsFlag = True
-                    setOptionsDict[targetName] = int(targetFreq.get())
+                    setOptionsDict['frequencies'].append(int(targetFreq.get()))
             if cntrFreq != '':
                 optionsFlag = True
                 setOptionsDict['center_freq'] = int(cntrFreq)
+                lastCntrFreq = self.__mavModel.options['center_freq']
+                if int(cntrFreq) != lastCntrFreq:
+                    setOptionsDict['frequencies'] = []
+                    clearTargs()
             if sampFreq != '':
                 optionsFlag = True
                 setOptionsDict['sampling_freq'] = int(sampFreq)
+                lastSampFreq = self.__mavModel.options['sampling_freq']
+                if int(sampFreq) != lastSampFreq:
+                    setOptionsDict['frequencies'] = []
+                    clearTargs()
             if optionsFlag:
                 self.__mavModel.setOptions(setOptionsDict)
 
@@ -644,9 +685,6 @@ class GCS(tk.Tk):
             print("Here are the options: ")
             for option in options:
                 print(option + ':' + str(options[option]))
-            #if 'targFreq' in options:
-             #   entr_targFreq.delete(0, END)
-              #  entr_targFreq.insert(0, str(options['targFreq']))
             if 'center_freq' in options:
                 self.cntrFreqEntry.set(str(options['center_freq']))
             if 'sampling_freq' in options:
@@ -654,20 +692,21 @@ class GCS(tk.Tk):
             if 'sdrGain' in options:
                 self.sdrGainEntry.set(str(options['sdrGain']))
 
+            '''
             for targetName, targetFreq in targEntries:
                 if targetName in options:
                     targetFreq.delete(0,END)
                     targetFreq.insert(0, str(options[targetName]))
+            '''
 
         def clearTargs():
             for i in frm_targHolder.grid_slaves():
                 i.grid_forget()
             frm_targHolder.grid_forget()
-            options = self.__mavModel.getOptions(5)
-            for name, entry in targEntries:
-                if name in options:
-                    del options[name]
-            targEntries = []
+            setOptionsDict = {}
+            setOptionsDict['frequencies'] = []
+            self.__mavModel.setOptions(setOptionsDict)
+            self.targEntries = {}
 
         btn_clearTargs = tk.Button(frm_sysSettings.frame, text='Clear Targets', command=clearTargs)
         btn_clearTargs.grid(column=0, row=5, sticky='new')
@@ -680,7 +719,7 @@ class GCS(tk.Tk):
         btn_advSettings.grid(column=0, columnspan=2, row=6)
 
         # START PAYLOAD RECORDING
-        btn_startRecord = tk.Button(frm_sideControl, width=SBWidth, text='Start Recording')
+        btn_startRecord = tk.Button(frm_sideControl, width=SBWidth, textvariable=self.__missionStatusText, command=self.__startStopMission)
         btn_startRecord.grid(column=0, row=4, sticky='nsew')
 
 SBWidth=25
@@ -728,6 +767,9 @@ class CollapseFrame(ttk.Frame):
         """Switches the label frame to the opposite state."""
         self._variable.set(not self._variable.get())
         self._activate()
+
+    def updateText(self, newText="label"):
+        self._button.config(text=newText)
 
 if __name__ == '__main__':
     logName = dt.datetime.now().strftime('%Y.%m.%d.%H.%M.%S.log')
