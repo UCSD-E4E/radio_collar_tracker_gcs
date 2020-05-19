@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 05/18/20  NH  Added logic to convert rctPing to/from rctPingPacket
 # 05/05/20  NH  Added estimator
 # 04/25/20  NH  Moved rctPings to own module
 #
@@ -29,6 +30,7 @@ import datetime as dt
 import numpy as np
 from scipy.optimize import least_squares
 import utm
+import rctComms
 
 
 class rctPing:
@@ -54,6 +56,9 @@ class rctPing:
         d['alt'] = self.alt
         d['time'] = int(self.time.timestamp() / 1e3)
 
+    def toPacket(self):
+        return rctComms.rctPingPacket(self.lat, self.lon, self.alt, self.amplitude, self.freq, self.time)
+
     @classmethod
     def fromDict(cls, packet: dict):
         latStr = packet['lat']
@@ -70,6 +75,16 @@ class rctPing:
         alt = float(altStr)
         time = int(timeStr) / 1e3
 
+        return rctPing(lat, lon, amp, freq, alt, time)
+
+    @classmethod
+    def fromPacket(cls, packet: rctComms.rctPingPacket):
+        lat = packet.lat
+        lon = packet.lon
+        alt = packet.alt
+        amp = packet.txp
+        freq = packet.txf
+        time = packet.timestamp
         return rctPing(lat, lon, amp, freq, alt, time)
 
 
@@ -169,6 +184,8 @@ class LocationEstimator:
         raise NotImplementedError()
 
     def getEstimate(self):
+        if self.__params is None:
+            return None
         return self.__params, self.__staleEstimate
 
     def _getComparator(self):

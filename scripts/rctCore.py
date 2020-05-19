@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 05/18/20  NH  Updated to use binary interface and dictionary options
 # 04/27/20  NH  Fixed getFrequencies callback
 # 04/26/20  NH  Fixed getFrequencies name, added sleep hack to getFrequencies,
 #                 added object for options, removed builtins import
@@ -37,7 +38,7 @@ from enum import Enum, auto
 import rctComms
 import logging
 import threading
-from time import sleep
+import ping
 
 
 class rctOptions:
@@ -135,14 +136,17 @@ class Events(Enum):
 
     Hearbeat  - Callback when a heartbeat message is received
     Exception - Callback when an exception message is received
-    GetFreqs  - Callback when the payload broadcasts a set of frequencies
+    GetFreqs  - Callback when the payload broadcasts a set of PRX_frequencies
     '''
     Heartbeat = auto(),
     Exception = auto(),
     GetFreqs = auto(),
+    GetOptions = auto(),
     NoHeartbeat = auto(),
     NewPing = auto(),
     NewEstimate = auto(),
+    UpgradeStatus = auto()
+    VehicleInfo = auto()
 
 
 class MAVModel:
@@ -151,37 +155,74 @@ class MAVModel:
     vehicle state
     '''
 
-    def __init__(self, receiver: rctComms.MAVReceiver):
+    BASE_OPTIONS = 0x00
+    EXP_OPTIONS = 0x01
+    ENG_OPTIONS = 0xFF
+
+    __baseOptionKeywords = ['SDR_centerFreq', 'SDR_samplingFreq', 'SDR_gain']
+    __expOptionKeywords = ['DSP_pingWidth', 'DSP_pingSNR',
+                           'DSP_pingMax', 'DSP_pingMin', 'SYS_outputDir']
+    __engOptionKeywords = ['GPS_mode',
+                           'GPS_baud', 'GPS_device', 'SYS_autostart']
+
+    def __init__(self, receiver: rctComms.gcsComms):
         '''
         Creates a new MAVModel
-        :param receiver: MAVReceiver Object
-        :type receiver: rctComms.MAVReceiver
+        :param receiver: gcsComms Object
+        :type receiver: rctComms.gcsComms
         '''
         self.__log = logging.getLogger('rctGCS:MAVModel')
         self.__rx = receiver
-        self.sdrStatus = 0
-        self.dirStatus = 0
-        self.gpsStatus = 0
-        self.sysStatus = 0
-        self.swStatus = 0
-        self.frequencies = []
+
+        self.state = {
+            'STS_sdrStatus': 0,
+            'STS_dirStatus': 0,
+            'STS_gpsStatus': 0,
+            'STS_sysStatus': 0,
+            'STS_swStatus': 0,
+            "UPG_state": -1,
+            "UPG_msg": "",
+            "VCL_track": {},
+        }
+
+        self.__options = {
+            "TGT_frequencies": [],
+            "SDR_centerFreq": 0,
+            "SDR_samplingFreq": 0,
+            "SDR_gain": 0,
+            "DSP_pingWidth": 0,
+            "DSP_pingSNR": 0,
+            "DSP_pingMax": 0,
+            "DSP_pingMin": 0,
+            "GPS_mode": 0,
+            "GPS_device": "",
+            "GPS_baud": 0,
+            "SYS_outputDir": "",
+            "SYS_autostart": False,
+        }
+
+        self.EST_mgr = ping.DataManager()
+
         self.__callbacks = {}
         for event in Events:
             self.__callbacks[event] = []
-        self.__exceptions = []
         self.lastException = [None, None]
         self.__log.info("MAVModel Created")
 
+        self.__ackVectors = {}
+
         self.__rx.registerCallback(
-            rctComms.EVENTS.HEARTBEAT, self.__processHeartbeat)
+            rctComms.EVENTS.STATUS_HEARTBEAT, self.__processHeartbeat)
         self.__rx.registerCallback(
-            rctComms.EVENTS.EXCEPTION, self.__handleRemoteException)
+            rctComms.EVENTS.STATUS_EXCEPTION, self.__handleRemoteException)
         self.__rx.registerCallback(
-            rctComms.EVENTS.TRACEBACK, self.__handleRemoteTraceback)
+            rctComms.EVENTS.CONFIG_FREQUENCIES, self.__processFrequencies)
         self.__rx.registerCallback(
-            rctComms.EVENTS.FREQUENCIES, self.__processFrequencies)
+            rctComms.EVENTS.GENERAL_NO_HEARTBEAT, self.__processNoHeartbeat)
         self.__rx.registerCallback(
-            rctComms.EVENTS.NO_HEARTBEAT, self.__processNoHeartbeat)
+            rctComms.EVENTS.CONFIG_OPTIONS, self.__processOptions)
+        self.__rx.registerCallback(
+            rctComms.EVENTS.COMMAND_ACK, self.__processAck)
 
     def start(self, guiTickCallback=None):
         '''
@@ -193,7 +234,7 @@ class MAVModel:
         self.__rx.start(guiTickCallback)
         self.__log.info("MVAModel started")
 
-    def __processFrequencies(self, packet, addr):
+    def __processFrequencies(self, packet: rctComms.rctFrequenciesPacket, addr: str):
         '''
         Internal callback to handle frequency messages
         :param packet: Frequency message payload
@@ -202,11 +243,18 @@ class MAVModel:
         :type addr: str
         '''
         self.__log.info("Received frequencies")
-        self.frequencies = packet
+        self.__options['TGT_frequencies'] = packet.frequencies
         for callback in self.__callbacks[Events.GetFreqs]:
             callback()
 
-    def __processHeartbeat(self, packet, addr):
+    def __processOptions(self, packet: rctComms.rctOptionsPacket, addr: str):
+        self.__log.info('Received options')
+        for parameter in packet.options:
+            self.__options[parameter] = packet.options[parameter]
+        for callback in self.__callbacks[Events.GetOptions]:
+            callback()
+
+    def __processHeartbeat(self, packet: rctComms.rctHeartBeatPacket, addr: str):
         '''
         Internal callback to handle heartbeat messages
         :param packet: Heartbeat packet payload
@@ -215,12 +263,12 @@ class MAVModel:
         :type addr: str
         '''
         self.__log.info("Received heartbeat")
-        statusString = packet['status']
-        self.sdrStatus = SDR_INIT_STATES(int(statusString[0]))
-        self.dirStatus = OUTPUT_DIR_STATES(int(statusString[1]))
-        self.gpsStatus = EXTS_STATES(int(statusString[2]))
-        self.sysStatus = RCT_STATES(int(statusString[3]))
-        self.swStatus = int(statusString[4])
+        self.state['STS_sdrStatus'] = SDR_INIT_STATES(packet.sdrState)
+        self.state['STS_dirStatus'] = OUTPUT_DIR_STATES(
+            packet.storageState)
+        self.state['STS_gpsStatus'] = EXTS_STATES(packet.sensorState)
+        self.state['STS_sysStatus'] = RCT_STATES(packet.systemState)
+        self.state['STS_swStatus'] = packet.switchState
         for callback in self.__callbacks[Events.Heartbeat]:
             callback()
 
@@ -233,6 +281,12 @@ class MAVModel:
         :type addr: None
         '''
         for callback in self.__callbacks[Events.NoHeartbeat]:
+            callback()
+
+    def __processUpgradeStatus(self, packet: rctComms.rctUpgradeStatusPacket, addr: str):
+        self.__options['UPG_state'] = packet.state
+        self.__options['UPG_msg'] = packet.msg
+        for callback in self.__callback[Events.UpgradeStatus]:
             callback()
 
     def stop(self):
@@ -256,23 +310,35 @@ class MAVModel:
         else:
             self.__callbacks[event].append(callback)
 
-    def startMission(self):
+    def startMission(self, timeout):
         '''
         Sends the start mission command
         '''
-        self.__rx.sendCommandPacket(rctComms.COMMANDS.START)
+        event = threading.Event()
+        event.clear()
+        self.__ackVectors[0x07] = [event, 0]
+        self.__rx.sendPacket(rctComms.rctSTARTCommand())
         self.__log.info("Sent start command")
+        event.wait(timeout=timeout)
+        if not self.__ackVectors.pop(0x07)[1]:
+            raise RuntimeError('START NACKED')
 
-    def stopMission(self):
+    def stopMission(self, timeout):
         '''
         Sends the stop mission command
         '''
-        self.__rx.sendCommandPacket(rctComms.COMMANDS.STOP)
+        event = threading.Event()
+        event.clear()
+        self.__ackVectors[0x09] = [event, 0]
+        self.__rx.sendPacket(rctComms.rctSTOPCommand())
         self.__log.info("Sent stop command")
+        event.wait(timeout=timeout)
+        if not self.__ackVectors.pop(0x09)[1]:
+            raise RuntimeError('STOP NACKED')
 
-    def getFrequencies(self, timeout: float=None):
+    def getFrequencies(self, timeout):
         '''
-        Retrieves the frequencies from the payload
+        Retrieves the PRX_frequencies from the payload
 
         :param timeout: Seconds to wait before timing out
         :type timeout: number
@@ -282,24 +348,13 @@ class MAVModel:
         self.registerCallback(
             Events.GetFreqs, frequencyPacketEvent.set)
 
-        self.__rx.sendCommandPacket(rctComms.COMMANDS.GET_FREQUENCY)
+        self.__rx.sendPacket(rctComms.rctGETFCommand())
         self.__log.info("Sent getF command")
 
         frequencyPacketEvent.wait(timeout=timeout)
-        return self.frequencies
+        return self.__options['TGT_frequencies']
 
-    def __handleRemoteException(self, packet, addr):
-        '''
-        Internal callback to handle exception messages
-        :param packet: Exception packet payload
-        :type packet: str
-        :param addr: Source of packet
-        :type addr: str
-        '''
-        self.__log.exception("Remote Exception: %s" % packet)
-        self.lastException[0] = packet
-
-    def __handleRemoteTraceback(self, packet, addr):
+    def __handleRemoteException(self, packet: rctComms.rctExceptionPacket, addr):
         '''
         Internal callback to handle traceback messages
         :param packet: Traceback packet payload
@@ -307,23 +362,102 @@ class MAVModel:
         :param addr: Source of packet
         :type addr: str
         '''
-        self.__log.exception("Remote Traceback: %s" % packet)
-        self.lastException[1] = packet
+        self.__log.exception("Remote Exception: %s" % packet.exception)
+        self.__log.exception("Remote Traceback: %s" % packet.traceback)
+        self.lastException[0] = packet.exception
+        self.lastException[1] = packet.traceback
 #         This is a hack - there is no guarantee that the traceback occurs after
 #         the exception!
         for callback in self.__callbacks[Events.Exception]:
             callback()
 
-    def setFrequencies(self, freqs):
+    def setFrequencies(self, freqs, timeout):
         '''
-        Sends the command to set the specified frequencies
+        Sends the command to set the specified PRX_frequencies
         :param freqs: Frequencies to set
         :type freqs: list
         '''
         assert(isinstance(freqs, list))
         for freq in freqs:
             assert(isinstance(freq, int))
-        # TODO: Validate frequencies here?
-        self.__rx.sendCommandPacket(
-            rctComms.COMMANDS.SET_FREQUENCY, {'frequencies': freqs})
+        # TODO: Validate PRX_frequencies here?
+        event = threading.Event()
+        self.__ackVectors[0x03] = [event, 0]
+        self.__rx.sendPacket(rctComms.rctSETFCommand(freqs))
         self.__log.info("Set setF command")
+        event.wait(timeout=timeout)
+        if not self.__ackVectors.pop(0x03)[1]:
+            raise RuntimeError("SETF NACKED")
+
+    def getOptions(self, scope: int, timeout):
+        optionPacketEvent = threading.Event()
+        optionPacketEvent.clear()
+        self.registerCallback(
+            Events.GetOptions, optionPacketEvent.set)
+
+        self.__rx.sendPacket(rctComms.rctGETOPTCommand(scope))
+        self.__log.info("Sent GETOPT command")
+
+        optionPacketEvent.wait(timeout=timeout)
+
+        acceptedKeywords = []
+        if scope >= self.BASE_OPTIONS:
+            acceptedKeywords.extend(self.__baseOptionKeywords)
+        if scope >= self.EXP_OPTIONS:
+            acceptedKeywords.extend(self.__expOptionKeywords)
+        if scope >= self.ENG_OPTIONS:
+            acceptedKeywords.extend(self.__engOptionKeywords)
+
+        return {key: self.__options[key] for key in acceptedKeywords}
+
+    def setOptions(self, timeout, **kwargs):
+        scope = self.BASE_OPTIONS
+        for keyword in kwargs:
+            if keyword in self.__baseOptionKeywords:
+                scope = max(scope, self.BASE_OPTIONS)
+            elif keyword in self.__expOptionKeywords:
+                scope = max(scope, self.EXP_OPTIONS)
+            elif keyword in self.__engOptionKeywords:
+                scope = max(scope, self.ENG_OPTIONS)
+            else:
+                raise KeyError
+
+        self.__options.update(kwargs)
+        acceptedKeywords = []
+        if scope >= self.BASE_OPTIONS:
+            acceptedKeywords.extend(self.__baseOptionKeywords)
+        if scope >= self.EXP_OPTIONS:
+            acceptedKeywords.extend(self.__expOptionKeywords)
+        if scope >= self.ENG_OPTIONS:
+            acceptedKeywords.extend(self.__engOptionKeywords)
+
+        event = threading.Event()
+        self.__ackVectors[0x05] = [event, 0]
+        self.__rx.sendPacket(rctComms.rctSETOPTCommand(
+            scope, **{key: self.__options[key] for key in acceptedKeywords}))
+        self.__log.info('Sent GETOPT command')
+        event.wait(timeout=timeout)
+        if not self.__ackVectors.pop(0x05)[1]:
+            raise RuntimeError("GETOPT NACKED")
+
+    def __processPing(self, packet: rctComms.rctPingPacket, addr: str):
+        ping = ping.rctPing.fromPacket(packet)
+        estimate = self.EST_mgr.addPing(ping)
+        for callback in self.__callbacks[Events.NewPing]:
+            callback()
+        if estimate is not None:
+            for callback in self.__callbacks[Events.NewEstimate]:
+                callback()
+
+    def __processVehicle(self, packet: rctComms.rctVehiclePacket, addr: str):
+        coordinate = [packet.lat, packet.lon. packet.alt, packet.hdg]
+        self.state['VCL_track'][packet.timestamp] = coordinate
+        for callback in self.__callbacks[Events.VehicleInfo]:
+            callback()
+
+    def __processAck(self, packet: rctComms.rctACKCommand, addr: str):
+        commandID = packet.commandID
+        if commandID in self.__ackVectors:
+            vector = self.__ackVectors[commandID]
+            vector[1] = packet.ack
+            vector[0].set()

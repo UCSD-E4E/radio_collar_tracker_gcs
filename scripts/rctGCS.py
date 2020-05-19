@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 05/18/20  NH  Updated API for core
 # 04/26/20  NH  Updated API, switched from UDP to TCP
 # 04/20/20  NH  Updated API and imports
 # 04/17/20  NH  Updated imports and MAVModel API
@@ -52,7 +53,7 @@ class GCS(tk.Tk):
         super().__init__()
         self.__log = logging.getLogger('rctGCS.GCS')
         self.__rctPort = rctTransport.RCTTCPClient(addr='127.0.0.1', port=9000)
-        self.__mavReceiver = rctComms.MAVReceiver(self.__rctPort)
+        self.__mavReceiver = rctComms.gcsComms(self.__rctPort)
         self.__mavModel = rctCore.MAVModel(self.__mavReceiver)
         self.__buttons = []
         self.innerFreqFrame = None
@@ -80,10 +81,10 @@ class GCS(tk.Tk):
 
     def __setFreqsFromRemote(self):
         '''
-        Callback to update the GUI with frequencies from the payload
+        Callback to update the GUI with PRX_frequencies from the payload
         '''
-        self.__log.info("Setting frequencies")
-        freqs = self.__mavModel.frequencies
+        self.__log.info("Setting PRX_frequencies")
+        freqs = self.__mavModel.PRX_frequencies
         if self.innerFreqFrame is not None:
             self.freqElements = []
             self.innerFreqFrame.destroy()
@@ -119,7 +120,7 @@ class GCS(tk.Tk):
 
     def __getFreqs(self):
         '''
-        Internal callback to retrieve the frequencies from the remote
+        Internal callback to retrieve the PRX_frequencies from the remote
         '''
         self.__mavModel.getFrequencies()
 
@@ -143,7 +144,7 @@ class GCS(tk.Tk):
 
     def __sendFreq(self):
         '''
-        Internal callback to send the current set of frequencies
+        Internal callback to send the current set of PRX_frequencies
         '''
 
     def __configureOpts(self):
@@ -179,11 +180,11 @@ class GCS(tk.Tk):
         for button in self.__buttons:
             button.config(state='normal')
         self.progressBar['value'] = 0
-        sdrStatus = self.__mavModel.sdrStatus
-        dirStatus = self.__mavModel.dirStatus
-        gpsStatus = self.__mavModel.gpsStatus
-        sysStatus = self.__mavModel.sysStatus
-        swStatus = self.__mavModel.swStatus
+        sdrStatus = self.__mavModel.STS_sdrStatus
+        dirStatus = self.__mavModel.STS_dirStatus
+        gpsStatus = self.__mavModel.STS_gpsStatus
+        sysStatus = self.__mavModel.STS_sysStatus
+        swStatus = self.__mavModel.STS_swStatus
 
         sdrMap = {
             self.__mavModel.SDR_INIT_STATES.find_devices: ('SDR: Searching for devices', 'yellow'),
