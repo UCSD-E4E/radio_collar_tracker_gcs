@@ -20,6 +20,10 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 05/19/20  NH  Removed rctOptions skeleton, added cache bits for options,
+#                 renamed rctCore.__options to rctCore.PP_options, fixed
+#                 NO_HEARTBEAT name, added incremental frequency modifiers,
+#                 added single option getter
 # 05/18/20  NH  Updated to use binary interface and dictionary options
 # 05/01/20  AG  Added __processOptions, getOptions, and setOptions methods
 # 04/27/20  NH  Fixed getFrequencies callback

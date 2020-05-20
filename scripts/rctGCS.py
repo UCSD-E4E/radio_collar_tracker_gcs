@@ -20,6 +20,8 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 05/19/20  NH  Removed PIL, rasterio, refactored options, connectionDialog,
+#                 AddTargetDialog, SystemSettingsControl, fixed exit behavior,
 # 05/18/20  NH  Updated API for core
 # 05/17/20  AG  Finished implementing start/stop recording button
 # 05/17/20  AG  Added setting target frequencies and system connection text updates.
