@@ -54,7 +54,6 @@ class RCTAbstractTransport(abc.ABC):
     def close(self):
         pass
 
-
 class RCTUDPClient(RCTAbstractTransport):
     def __init__(self, port: int = 9000):
         self.__socket = None
@@ -78,7 +77,6 @@ class RCTUDPClient(RCTAbstractTransport):
 
     def send(self, data: bytes, dest):
         self.__socket.sendto(data, (dest, self.__port))
-
 
 class RCTUDPServer(RCTAbstractTransport):
     def __init__(self, port: int = 9000):
@@ -108,7 +106,6 @@ class RCTUDPServer(RCTAbstractTransport):
             dest = '255.255.255.255'
         self.__socket.sendto(data, (dest, self.__port))
 
-
 class RCTPipeClient(RCTAbstractTransport):
     def __init__(self):
         pass
@@ -132,7 +129,6 @@ class RCTPipeClient(RCTAbstractTransport):
     def send(self, data: bytes, dest):
         pass
 
-
 class RCTTCPClient(RCTAbstractTransport):
     def __init__(self, port: int, addr: str):
         self.__target = (addr, port)
@@ -140,6 +136,7 @@ class RCTTCPClient(RCTAbstractTransport):
 
     def open(self):
         self.__socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.__socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY,1)
         self.__socket.connect(self.__target)
 
     def close(self):
@@ -155,7 +152,6 @@ class RCTTCPClient(RCTAbstractTransport):
 
     def send(self, data: bytes, dest=None):
         self.__socket.send(data)
-
 
 class RCTTCPServer(RCTAbstractTransport):
     def __init__(self, port: int):

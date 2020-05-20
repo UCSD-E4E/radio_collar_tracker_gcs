@@ -21,6 +21,7 @@
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
 # 05/18/20  NH  Updated to use binary interface and dictionary options
+# 05/01/20  AG  Added __processOptions, getOptions, and setOptions methods
 # 04/27/20  NH  Fixed getFrequencies callback
 # 04/26/20  NH  Fixed getFrequencies name, added sleep hack to getFrequencies,
 #                 added object for options, removed builtins import
@@ -40,11 +41,9 @@ import logging
 import threading
 import ping
 
-
 class rctOptions:
     def __init__(self):
         pass
-
 
 class SDR_INIT_STATES(Enum):
     '''
@@ -63,16 +62,15 @@ class SDR_INIT_STATES(Enum):
     rdy = 3
     fail = 4
 
-
 class EXTS_STATES(Enum):
     '''
     GPS Initialization State
 
     get_tty      - The system is opening the serial port
-    get_msg      - The system is waiting for a message from the external 
+    get_msg      - The system is waiting for a message from the external
                    sensors
     wait_recycle - The system is cycling to retry initialization
-    rdy          - The system has initialized the external sensors and is 
+    rdy          - The system has initialized the external sensors and is
                    ready
     fail         - The system has encountered a fatal error initializing the
                    external sensors
@@ -82,7 +80,6 @@ class EXTS_STATES(Enum):
     wait_recycle = 2
     rdy = 3
     fail = 4
-
 
 class OUTPUT_DIR_STATES(Enum):
     '''
@@ -106,14 +103,13 @@ class OUTPUT_DIR_STATES(Enum):
     rdy = 4
     fail = 5
 
-
 class RCT_STATES(Enum):
     '''
     System Initialization State
 
     init       - The system is starting all initialization threads
     wait_init  - The system is waiting for initialization tasks to complete
-    wait_start - The system is initialized and is waiting for the start 
+    wait_start - The system is initialized and is waiting for the start
                  command
     start      - The system is starting the mission software
     wait_end   - The system is running and waiting for the stop command
@@ -129,14 +125,14 @@ class RCT_STATES(Enum):
     finish = 5
     fail = 6
 
-
 class Events(Enum):
     '''
     Callback Events
 
     Hearbeat  - Callback when a heartbeat message is received
     Exception - Callback when an exception message is received
-    GetFreqs  - Callback when the payload broadcasts a set of PRX_frequencies
+    GetFreqs  - Callback when the payload broadcasts a set of frequencies
+    GetOptions - Callback when the payload broadcasts its parameters
     '''
     Heartbeat = auto(),
     Exception = auto(),
@@ -147,7 +143,6 @@ class Events(Enum):
     NewEstimate = auto(),
     UpgradeStatus = auto()
     VehicleInfo = auto()
-
 
 class MAVModel:
     '''
@@ -223,12 +218,14 @@ class MAVModel:
             rctComms.EVENTS.CONFIG_OPTIONS, self.__processOptions)
         self.__rx.registerCallback(
             rctComms.EVENTS.COMMAND_ACK, self.__processAck)
+        self.__rx.registerCallback(
+            rctComms.EVENTS.NO_HEARTBEAT, self.__processNoHeartbeat)
 
     def start(self, guiTickCallback=None):
         '''
         Initializes the MAVModel object
         :param guiTickCallback: Callback to a function for progress bar
-        :type guiTickCallback: Function with no parameters to be called for 
+        :type guiTickCallback: Function with no parameters to be called for
             progress
         '''
         self.__rx.start(guiTickCallback)

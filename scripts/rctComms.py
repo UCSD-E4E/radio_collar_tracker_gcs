@@ -830,7 +830,7 @@ class gcsComms:
         '''
         Waits to receive a heartbeat packet.  Returns a tuple containing the
         MAV's IP address and port number as a single tuple, and the contents of
-        the received heartbeat packet. 
+        the received heartbeat packet.
         :param guiTick:
         :type guiTick:
         :param timeout: Seconds to wait before timing out
@@ -933,7 +933,7 @@ class gcsComms:
         :param event: Event to trigger on
         :type event: EVENTS
         :param callback: Callback function
-        :type callback: function pointer.  The function shall accept two 
+        :type callback: function pointer.  The function shall accept two
                 keyword parameters: packet (dict) and addr (str).  The packet
                 dictionary shall the the packet payload, and the addr shall be
                 the address of the MAV
