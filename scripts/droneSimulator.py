@@ -20,6 +20,8 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 05/19/20  NH  Renamed droneSim.__options to droneSim.PP_options to provide
+#                 command line access
 # 05/18/20  NH  Moved droneComms to rctComms, combined payload options into
 #                 dict, annotated simulator parameters, updated commands to use
 #                 binary protocol, integrated vehicle and ping data
@@ -80,7 +82,8 @@ class droneSim:
             'STS_swStatus': 0,
         }
 
-        self.__options = {
+        # PP - Payload parameters
+        self.PP_options = {
             "TGT_frequencies": [],
             "SDR_centerFreq": 173500000,
             "SDR_samplingFreq": 2000000,
@@ -176,36 +179,36 @@ class droneSim:
             rctComms.EVENTS.COMMAND_UPGRADE, self.__doUpgrade)
 
     def setGain(self, gain: float):
-        self.__options['SDR_gain'] = gain
+        self.PP_options['SDR_gain'] = gain
 
     def setOutputDir(self, outputDir: str):
-        self.__options['SYS_outputDir'] = outputDir
+        self.PP_options['SYS_outputDir'] = outputDir
 
     def setPingParameters(self, DSP_pingWidth: int = None, DSP_pingSNR: float = None, DSP_pingMax: float = None, DSP_pingMin: float = None):
         if DSP_pingWidth is not None:
-            self.__options['DSP_pingWidth'] = DSP_pingWidth
+            self.PP_options['DSP_pingWidth'] = DSP_pingWidth
 
         if DSP_pingSNR is not None:
-            self.__options['DSP_pingSNR'] = DSP_pingSNR
+            self.PP_options['DSP_pingSNR'] = DSP_pingSNR
 
         if DSP_pingMax is not None:
-            self.__options['DSP_pingMax'] = DSP_pingMax
+            self.PP_options['DSP_pingMax'] = DSP_pingMax
 
         if DSP_pingMin is not None:
-            self.__options['DSP_pingMin'] = DSP_pingMin
+            self.PP_options['DSP_pingMin'] = DSP_pingMin
 
     def setGPSParameters(self, GPS_device: str = None, GPS_baud: int = None, GPS_mode: bool = None):
         if GPS_device is not None:
-            self.__options['GPS_device'] = GPS_device
+            self.PP_options['GPS_device'] = GPS_device
 
         if GPS_baud is not None:
-            self.__options['GPS_baud'] = GPS_baud
+            self.PP_options['GPS_baud'] = GPS_baud
 
         if GPS_mode is not None:
-            self.__options['GPS_mode'] = GPS_mode
+            self.PP_options['GPS_mode'] = GPS_mode
 
     def setAutostart(self, SYS_autostart: bool):
-        self.__options['SYS_autostart'] = SYS_autostart
+        self.PP_options['SYS_autostart'] = SYS_autostart
 
     def __init(self):
         self.__state['STS_sdrStatus'] = 0
@@ -244,23 +247,23 @@ class droneSim:
         self.port.sendException(exception, traceback)
 
     def setFrequencies(self, frequencies: list):
-        self.__options['TGT_frequencies'] = frequencies
+        self.PP_options['TGT_frequencies'] = frequencies
 
     def getFrequencies(self):
-        return self.__options['TGT_frequencies']
+        return self.PP_options['TGT_frequencies']
 
     def setCenterFrequency(self, centerFreq: int):
-        self.__options['SDR_centerFreq'] = centerFreq
+        self.PP_options['SDR_centerFreq'] = centerFreq
 
     def setSamplingFrequency(self, samplingFreq: int):
-        self.__options['SDR_samplingFreq'] = samplingFreq
+        self.PP_options['SDR_samplingFreq'] = samplingFreq
 
     def __ackCommand(self, command: rctBinaryPacket):
         self.port.sendToGCS(rctComms.rctACKCommand(command._pid, 1))
 
     def __doGetFrequency(self, packet: rctComms.rctGETFCommand, addr: str):
         self.port.sendToGCS(rctComms.rctFrequenciesPacket(
-            self.__options['TGT_frequencies']))
+            self.PP_options['TGT_frequencies']))
 
     def __doStartMission(self, packet: rctComms.rctSTARTCommand, addr: str):
         self.SS_payloadRunning = True
@@ -279,20 +282,20 @@ class droneSim:
 
         # Nyquist check
         for freq in frequencies:
-            if abs(freq - self.__options['SDR_centerFreq']) > self.__options['SDR_samplingFreq']:
+            if abs(freq - self.PP_options['SDR_centerFreq']) > self.PP_options['SDR_samplingFreq']:
                 raise RuntimeError("Invalid frequency")
 
-        self.__options['TGT_frequencies'] = frequencies
+        self.PP_options['TGT_frequencies'] = frequencies
         self.__ackCommand(packet)
         self.__doGetFrequency(packet, addr)
 
     def __doGetOptions(self, packet: rctComms.rctGETOPTCommand, addr: str):
         scope = packet.scope
-        packet = rctComms.rctOptionsPacket(scope, **self.__options)
+        packet = rctComms.rctOptionsPacket(scope, **self.PP_options)
         self.port.sendToGCS(packet)
 
     def __doSetOptions(self, packet: rctComms.rctSETOPTCommand, addr: str):
-        self.__options.update(packet.options)
+        self.PP_options.update(packet.options)
         self.__doGetOptions(packet, addr)
         self.__ackCommand(packet)
 
@@ -419,10 +422,10 @@ class droneSim:
 
     def calculatePingMeasurement(self):
         # check against frequencies
-        if abs(self.SP_TxFreq - self.__options['SDR_centerFreq']) > self.__options['SDR_samplingFreq']:
+        if abs(self.SP_TxFreq - self.PP_options['SDR_centerFreq']) > self.PP_options['SDR_samplingFreq']:
             return None
 
-        if self.SP_TxFreq not in self.__options['TGT_frequencies']:
+        if self.SP_TxFreq not in self.PP_options['TGT_frequencies']:
             return None
 
         # vehicle is correctly configured
