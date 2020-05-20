@@ -10,9 +10,7 @@ numpy = "*"
 utm = "*"
 simplekml = "*"
 scipy = "*"
-pillow = "*"
 matplotlib = "*"
-rasterio = "*"
 
 [requires]
 python_version = "3.6"
