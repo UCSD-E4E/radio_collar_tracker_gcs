@@ -20,6 +20,8 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 05/19/20  AG  Finished implementation of pulling target freqs from the drone
+# 05/19/20  AG  Finished target frequency validation
 # 05/17/20  AG  Finished implementing start/stop recording button
 # 05/17/20  AG  Added setting target frequencies and system connection text updates.
 # 05/13/20  AG  Added ability to set and receive expert debug options
@@ -78,6 +80,7 @@ class GCS(tk.Tk):
         self.innerFreqFrame = None
         self.freqElements = []
         self.targEntries = {}
+        self.frm_targHolder = None
         self.targNameEntry = StringVar()
         self.targFreqEntry = StringVar()
         self.cntrFreqEntry = StringVar()
@@ -353,6 +356,21 @@ class GCS(tk.Tk):
                 self.sampFreqEntry.set(str(options['sampling_freq']))
             if 'sdrGain' in options:
                 self.sdrGainEntry.set(str(options['sdrGain']))
+            if 'frequencies' in options:
+                freqs = options['frequencies']
+                for i in range(len(freqs)):
+                    name = "targ" + str(i+1)
+                    freq = freqs[i]
+                    lbl_newTarget = tk.Label(self.frm_targHolder, text=name, width=17)
+                    lbl_newTarget.grid(row=len(self.targEntries), column=0)
+                    newTargFreqEntry = StringVar()
+                    newTargFreqEntry.set(freq)
+                    entr_newTarget = tk.Entry(self.frm_targHolder, textvariable=newTargFreqEntry, width=8)
+                    entr_newTarget.grid(row=len(self.targEntries), column=1)
+
+                    self.targEntries[name] = newTargFreqEntry
+                    self.frm_targHolder.grid(row=4, column=0, columnspan=2, sticky='new')
+
             conWindow.destroy()
             conWindow.update()
 
@@ -589,8 +607,8 @@ class GCS(tk.Tk):
         frm_sysSettings = CollapseFrame(frm_sideControl, 'System Settings')
         frm_sysSettings.grid(column=0, row=3, sticky='new')
 
-        frm_targHolder = tk.Frame(master=frm_sysSettings.frame, width=SBWidth-2)
-        frm_targHolder.grid(row=4, column=0, columnspan=2, sticky='new')
+        self.frm_targHolder = tk.Frame(master=frm_sysSettings.frame, width=SBWidth-2)
+        self.frm_targHolder.grid(row=4, column=0, columnspan=2, sticky='new')
 
         def addTarget():
             addTargetWindow = tk.Toplevel(self)
@@ -612,19 +630,35 @@ class GCS(tk.Tk):
             entr_targetFreq.grid(row=1, column=1, sticky='new')
 
             def submit():
+                invalidFreqWindow = None
                 name = self.targNameEntry.get()
                 freq = self.targFreqEntry.get()
-                lbl_newTarget = tk.Label(frm_targHolder, text=name, width=17)
-                lbl_newTarget.grid(row=len(self.targEntries), column=0)
-                newTargFreqEntry = StringVar()
-                newTargFreqEntry.set(freq)
-                entr_newTarget = tk.Entry(frm_targHolder, textvariable=newTargFreqEntry, width=8)
-                entr_newTarget.grid(row=len(self.targEntries), column=1)
+                curCntrFreq = self.__mavModel.options['center_freq']
+                curSampFreq = self.__mavModel.options['sampling_freq']
 
-                self.targEntries[name] = newTargFreqEntry
-                frm_targHolder.grid(row=4, column=0, columnspan=2, sticky='new')
-                addTargetWindow.destroy()
-                addTargetWindow.update()
+                def exit():
+                    self.targFreqEntry.set('')
+                    invalidFreqWindow.destroy()
+
+                if (int(freq) < curCntrFreq - curSampFreq) or (int(freq) > curCntrFreq + curSampFreq):
+                    invalidFreqWindow = tk.Toplevel(self)
+                    invalidTxt = tk.Text(invalidFreqWindow)
+                    invalidTxt.insert(INSERT, "Please enter a valid frequency.")
+                    invalidTxt.pack()
+                    btn_exit = tk.Button(invalidFreqWindow, text="exit", command=exit)
+                    btn_exit.pack()
+                else: 
+                    lbl_newTarget = tk.Label(self.frm_targHolder, text=name, width=17)
+                    lbl_newTarget.grid(row=len(self.targEntries), column=0)
+                    newTargFreqEntry = StringVar()
+                    newTargFreqEntry.set(freq)
+                    entr_newTarget = tk.Entry(self.frm_targHolder, textvariable=newTargFreqEntry, width=8)
+                    entr_newTarget.grid(row=len(self.targEntries), column=1)
+
+                    self.targEntries[name] = newTargFreqEntry
+                    self.frm_targHolder.grid(row=4, column=0, columnspan=2, sticky='new')
+                    addTargetWindow.destroy()
+                    addTargetWindow.update()
 
             btn_submit = tk.Button(addTargetWindow, text='submit', command=submit)
             btn_submit.pack()
@@ -700,9 +734,9 @@ class GCS(tk.Tk):
             '''
 
         def clearTargs():
-            for i in frm_targHolder.grid_slaves():
+            for i in self.frm_targHolder.grid_slaves():
                 i.grid_forget()
-            frm_targHolder.grid_forget()
+            self.frm_targHolder.grid_forget()
             setOptionsDict = {}
             setOptionsDict['frequencies'] = []
             self.__mavModel.setOptions(setOptionsDict)
