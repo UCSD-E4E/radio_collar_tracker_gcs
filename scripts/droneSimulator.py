@@ -20,6 +20,8 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 05/20/20  NH  Added droneSim.reset to facilitate simulator reset, fixed
+#                 logging setup
 # 05/19/20  NH  Renamed droneSim.__options to droneSim.PP_options to provide
 #                 command line access
 # 05/18/20  NH  Moved droneComms to rctComms, combined payload options into
@@ -73,6 +75,113 @@ class droneSim:
 
     def __init__(self, port: mavComms):
         self.port = port
+        self.__commandMap = {}
+        self.__state = {
+            'STS_sdrStatus': 0,
+            'STS_dirStatus': 0,
+            'STS_gpsStatus': 0,
+            'STS_sysStatus': 0,
+            'STS_swStatus': 0,
+        }
+
+        # PP - Payload parameters
+        self.PP_options = {
+            "TGT_frequencies": [],
+            "SDR_centerFreq": 173500000,
+            "SDR_samplingFreq": 2000000,
+            "SDR_gain": 20.0,
+            "DSP_pingWidth": 15,
+            "DSP_pingSNR": 4.0,
+            "DSP_pingMax": 1.5,
+            "DSP_pingMin": 0.5,
+            "GPS_mode": 0,
+            "GPS_device": "/dev/null",
+            "GPS_baud": 115200,
+            "SYS_outputDir": "/tmp",
+            "SYS_autostart": False,
+        }
+
+        # SM - Simulator Mission parameters
+        self.SM_missionRun = False
+
+        self.SM_utmZoneNum = 11
+        self.SM_utmZone = 'S'
+        self.SM_origin = (478110, 3638925, 0)
+        self.SM_TakeoffTarget = (478110, 3638925, 30)
+        self.SM_waypoints = [(477974.06988529314, 3638776.3039655555, 30),
+                             (478281.5079546513, 3638711.2010632926, 30),
+                             (478274.9146625505, 3638679.2543171947, 30),
+                             (477975.5071926904, 3638745.8378777136, 30),
+                             (477968.40893670684, 3638712.893777053, 30),
+                             (478266.818223601, 3638648.3095763493, 30),
+                             (478258.7096344019, 3638611.871386835, 30),
+                             (477961.8023651167, 3638675.453913263, 30),
+                             (477953.6915540979, 3638638.5166701586, 30),
+                             (478246.5868126497, 3638575.4419162693, 30),
+                             (478239.4937485707, 3638544.494662541, 30),
+                             (477943.58029727807, 3638604.5801627054, 30),
+                             (477968.0164183045, 3638761.8351352056, 30),
+                             (477976.95013863116, 3638774.1124560814, 30)]
+        self.SM_targetThreshold = 5
+        self.SM_loopPeriod = 0.1
+        self.SM_TakeoffVel = 5
+        self.SM_WPVel = 5
+        self.SM_RTLVel = 20
+        self.SM_LandVel = 1
+
+        # SC - Simulation Communications parameters
+        self.SC_VehiclePositionMsgPeriod = 1
+        self.SC_PingMeasurementPeriod = 1
+        self.SC_PingMeasurementSigma = 0
+        self.SC_HeartbeatPeriod = 5
+
+        # SP - Simulation Ping parameters
+        self.SP_TxPower = 144
+        self.SP_TxPowerSigma = 0
+        self.SP_SystemLoss = 0
+        self.SP_SystemLossSigma = 0
+        self.SP_Exponent = 2.5
+        self.SP_ExponentSigma = 0
+        self.SP_Position = (478110, 3638661, 0)
+        self.SP_NoiseFloor = 90
+        self.SP_NoiseFloorSigma = 0
+        self.SP_TxFreq = 173500000
+
+        # SV - Simulation Vehicle parameters
+        self.SV_vehiclePositionSigma = np.array((0, 0, 0))
+
+        # SS - Simulation State parameters
+        self.SS_utmZoneNum = 11
+        self.SS_utmZone = 'S'
+        self.SS_vehiclePosition = self.SM_origin
+        self.SS_vehicleState = droneSim.MISSION_STATE.TAKEOFF
+        self.SS_startTime = dt.datetime.now()
+        self.SS_velocityVector = np.array([0, 0, 0])
+        self.SS_vehicleTarget = np.array(self.SM_TakeoffTarget)
+        self.SS_waypointIdx = 0
+        self.SS_payloadRunning = False
+
+        # HS - Heartbeat State parameters
+        self.HS_run = True
+
+        # register command actions here
+        self.port.registerCallback(
+            rctComms.EVENTS.COMMAND_GETF, self.__doGetFrequency)
+        self.port.registerCallback(
+            rctComms.EVENTS.COMMAND_SETF, self.__doSetFrequency)
+        self.port.registerCallback(
+            rctComms.EVENTS.COMMAND_GETOPT, self.__doGetOptions)
+        self.port.registerCallback(
+            rctComms.EVENTS.COMMAND_SETOPT, self.__doSetOptions)
+        self.port.registerCallback(
+            rctComms.EVENTS.COMMAND_START, self.__doStartMission)
+        self.port.registerCallback(
+            rctComms.EVENTS.COMMAND_STOP, self.__doStopMission)
+        self.port.registerCallback(
+            rctComms.EVENTS.COMMAND_UPGRADE, self.__doUpgrade)
+
+    def reset(self):
+        self.stop()
         self.__commandMap = {}
         self.__state = {
             'STS_sdrStatus': 0,
@@ -459,8 +568,9 @@ if __name__ == '__main__':
     parser.add_argument('--target', type=str, default='255.255.255.255',
                         help='Target IP Address.  Use 255.255.255.255 for broadcast')
     args = parser.parse_args()
-    logName = dt.datetime.now().strftime('%Y.%m.%d.%H.%M.%S.log')
-    logger = logging.getLogger('simulator.DroneSimulator')
+    logName = dt.datetime.now().strftime('%Y.%m.%d.%H.%M.%S_sim.log')
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
     ch = logging.StreamHandler(sys.stdout)
     ch.setLevel(logging.INFO)
     formatter = logging.Formatter(
@@ -470,6 +580,7 @@ if __name__ == '__main__':
     ch = logging.FileHandler(logName)
     ch.setLevel(logging.DEBUG)
     ch.setFormatter(formatter)
+    logger.addHandler(ch)
 
     if args.protocol == 'udp':
         port = rctTransport.RCTUDPServer(port=args.port)
