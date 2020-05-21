@@ -20,6 +20,8 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 05/20/20  NH  Fixed SYS_autostart type in SETOPT command, added exception
+#                 logging to both receivers
 # 05/18/20  NH  Implemented binary data protocol, moved droneComms to rctComms,
 #                 added callback functionality
 # 04/26/20  NH  Added catch for JSON Decoder errors
@@ -579,19 +581,17 @@ class rctSETOPTCommand(rctBinaryPacket):
         'GPS_mode': (int, '<B', 1),
         'GPS_baud': (int, '<L', 4),
         'GPS_device': (str, 's', 2),
-        'SYS_autostart': (int, '<B', 1)
+        'SYS_autostart': (bool, '<?', 1)
     }
 
     def __init__(self, scope: int, **kwargs):
-        if scope == self.BASE_OPTIONS:
+        if scope >= self.BASE_OPTIONS:
             acceptedKeywords = self.__baseOptionKeywords
-        elif scope == self.EXP_OPTIONS:
+        if scope >= self.EXP_OPTIONS:
             acceptedKeywords = self.__baseOptionKeywords + self.__expOptionKeywords
-        elif scope == self.ENG_OPTIONS:
+        if scope >= self.ENG_OPTIONS:
             acceptedKeywords = self.__baseOptionKeywords + \
                 self.__expOptionKeywords + self.__engOptionKeywords
-        else:
-            raise RuntimeError('Unrecognized scope')
 
         self._pclass = 0x05
         self._pid = 0x05
@@ -872,7 +872,12 @@ class gcsComms:
                     except KeyError:
                         for callback in self.__packetMap[EVENTS.GENERAL_UNKNOWN.value]:
                             callback(packet=packet, addr=addr)
-                    except Exception:
+                    except Exception as e:
+                        self.__log.error("Exception %s: %s" %
+                                         (type(e), str(e)))
+                        self.__log.error("Traceback: %s" %
+                                         (traceback.format_exc()))
+
                         for callback in self.__packetMap[EVENTS.GENERAL_EXCEPTION.value]:
                             callback(packet=packet, addr=addr)
 
@@ -1037,9 +1042,13 @@ class mavComms:
                     except KeyError:
                         for callback in self.__packetMap[EVENTS.GENERAL_UNKNOWN.value]:
                             callback(packet=packet, addr=addr)
-                    except Exception as e:
-                        self.sendException(str(e), traceback.format_exc())
             except TimeoutError:
+                continue
+            except Exception as e:
+                self.sendException(str(e), traceback.format_exc())
+                self.__log.error("Exception %s: %s" %
+                                 (type(e), str(e)))
+                self.__log.error("Traceback: %s" % (traceback.format_exc()))
                 continue
 
     def registerCallback(self, event: EVENTS, callback):
