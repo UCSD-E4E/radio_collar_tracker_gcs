@@ -20,6 +20,9 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 05/20/20  NH  Fixed window close action, added function to handle registering
+#                 callbacks when connection established, removed unused
+#                 callbacks, added advanced settings dialog, fixed logging
 # 05/19/20  NH  Removed PIL, rasterio, refactored options, connectionDialog,
 #                 AddTargetDialog, SystemSettingsControl, fixed exit behavior,
 # 05/18/20  NH  Updated API for core
@@ -86,32 +89,13 @@ class GCS(tk.Tk):
         self.__createWidgets()
         for button in self._buttons:
             button.config(state='disabled')
-#         self._mavModel.registerCallback(
-#             rctCore.Events.Heartbeat, self.__updateStatus)
-#         self._mavModel.registerCallback(
-#             rctCore.Events.Exception, self.__handleRemoteException)
-#         self._mavModel.registerCallback(
-#             rctCore.Events.GetFreqs, self.__setFreqsFromRemote)
         self.protocol('WM_DELETE_WINDOW', self.__windowClose)
 
-    def __setFreqsFromRemote(self):
-        '''
-        Callback to update the GUI with PRX_frequencies from the payload
-        '''
-        self.__log.info("Setting PRX_frequencies")
-        freqs = self._mavModel.PRX_frequencies
-        if self.innerFreqFrame is not None:
-            self.freqElements = []
-            self.innerFreqFrame.destroy()
-        self.innerFreqFrame = tk.Frame(self.freqFrame)
-
-        for freq in freqs:
-            self.freqElements.append(tk.Entry(self.innerFreqFrame))
-            self.freqElements[-1].insert(0, freq)
-            self.freqElements[-1].pack()
-        self.__log.info("Updating GUI")
-        self.innerFreqFrame.pack()
-        self.update()
+    def __registerModelCallbacks(self):
+        #         self._mavModel.registerCallback(
+        #             rctCore.Events.Heartbeat, self.__updateStatus)
+        self._mavModel.registerCallback(
+            rctCore.Events.Exception, self.__handleRemoteException)
 
     def mainloop(self, n=0):
         '''
@@ -129,45 +113,6 @@ class GCS(tk.Tk):
     def __stopCommand(self):
         '''
         Internal callback to send the stop command
-        '''
-
-    def __getFreqs(self):
-        '''
-        Internal callback to retrieve the PRX_frequencies from the remote
-        '''
-        self._mavModel.getFrequencies()
-
-    def __addFreq(self):
-        '''
-        Internal callback to add a new frequency entry
-        '''
-        self.freqElements.append(tk.Entry(self.innerFreqFrame))
-        self.freqElements[-1].pack()
-        self.innerFreqFrame.update()
-        self.__log.info("Added frequency entry")
-
-    def __removeFreq(self):
-        '''
-        Internal callback to remove the lowest frequency entry
-        '''
-        self.freqElements[-1].destroy()
-        self.freqElements.remove(self.freqElements[-1])
-        self.innerFreqFrame.update()
-        self.__log.info("Removed last frequency entry")
-
-    def __sendFreq(self):
-        '''
-        Internal callback to send the current set of PRX_frequencies
-        '''
-
-    def __configureOpts(self):
-        '''
-        Internal callback to open the option configuration window
-        '''
-
-    def __upgradeSoftware(self):
-        '''
-        Internal callback to start the firmware upgrade process
         '''
 
     def __noHeartbeat(self):
@@ -278,7 +223,8 @@ class GCS(tk.Tk):
         '''
         Internal callback for window close
         '''
-        self._mavModel.stop()
+        if self._mavModel is not None:
+            self._mavModel.stop()
         self.destroy()
         self.quit()
 
@@ -295,7 +241,7 @@ class GCS(tk.Tk):
             return
 
         self._systemConnectionTab.updateText("System: Connected")
-
+        self.__registerModelCallbacks()
         self.systemSettingsWidget.updateGUIOptionVars()
 
     def __advancedSettings(self):
@@ -713,8 +659,7 @@ class SystemSettingsControl(CollapseFrame):
         self.update()
 
     def __advancedSettings(self):
-        # TODO: add advanced settings dialog
-        pass
+        ExpertSettingsDialog(self, self.optionVars)
 
     def validateFrequency(self, var: tk.IntVar):
         cntrFreq = self.__root._mavModel.getOption('SDR_centerFreq')
@@ -741,12 +686,12 @@ class SystemSettingsControl(CollapseFrame):
         if cntrFreq != '':
             lastCntrFreq = self.__root._mavModel.getOption('SDR_centerFreq')
             if int(cntrFreq) != lastCntrFreq:
-                self.__root.clearTargets()
+                self.clearTargets()
         if sampFreq != '':
             lastSampFreq = self.__root._mavModel.getOption(
                 'SDR_samplingFreq')
             if int(sampFreq) != lastSampFreq:
-                self.__root.clearTargets()
+                self.clearTargets()
 
         self.submitGUIOptionVars(0x00)
 
@@ -794,6 +739,102 @@ class SystemSettingsControl(CollapseFrame):
 
         self.__root._mavModel.addFrequency(freq, self.__root.defaultTimeout)
         self.update()
+
+
+class ExpertSettingsDialog(tk.Toplevel):
+    def __init__(self, parent: SystemSettingsControl, optionVars: dict):
+        tk.Toplevel.__init__(self, parent)
+        self.__parent = parent
+        self.optionVars = optionVars
+
+        # Configure member vars here
+        self.__parent.updateGUIOptionVars(0xFF)
+        # Modal window
+        self.transient(parent)
+        self.__createWidget()
+        self.wait_window(self)
+
+    def __createWidget(self):
+        self.title('Expert/Engineering Settings')
+        expSettingsFrame = tk.Frame(self)
+        expSettingsFrame.pack(fill=tk.BOTH)
+
+        lbl_pingWidth = tk.Label(
+            expSettingsFrame, text='Expected Ping Width(ms)')
+        lbl_pingWidth.grid(row=0, column=0, sticky='new')
+
+        lbl_minWidthMult = tk.Label(
+            expSettingsFrame, text='Min. Width Multiplier')
+        lbl_minWidthMult.grid(row=1, column=0, sticky='new')
+
+        lbl_maxWidthMult = tk.Label(
+            expSettingsFrame, text='Max. Width Multiplier')
+        lbl_maxWidthMult.grid(row=2, column=0, sticky='new')
+
+        lbl_minPingSNR = tk.Label(expSettingsFrame, text='Min. Ping SNR(dB)')
+        lbl_minPingSNR.grid(row=3, column=0, sticky='new')
+
+        lbl_GPSPort = tk.Label(expSettingsFrame, text='GPS Port')
+        lbl_GPSPort.grid(row=4, column=0, sticky='new')
+
+        lbl_GPSBaudRate = tk.Label(expSettingsFrame, text='GPS Baud Rate')
+        lbl_GPSBaudRate.grid(row=5, column=0, sticky='new')
+
+        lbl_outputDir = tk.Label(expSettingsFrame, text='Output Directory')
+        lbl_outputDir.grid(row=6, column=0, sticky='new')
+
+        lbl_GPSMode = tk.Label(expSettingsFrame, text='GPS Mode')
+        lbl_GPSMode.grid(row=7, column=0, sticky='new')
+
+        entr_pingWidth = tk.Entry(
+            expSettingsFrame, textvariable=self.optionVars['DSP_pingWidth'], width=8)
+        entr_pingWidth.grid(row=0, column=1, sticky='new')
+
+        entr_minWidthMult = tk.Entry(
+            expSettingsFrame, textvariable=self.optionVars['DSP_pingMin'], width=8)
+        entr_minWidthMult.grid(row=1, column=1, sticky='new')
+
+        entr_maxWidthMult = tk.Entry(
+            expSettingsFrame, textvariable=self.optionVars['DSP_pingMax'], width=8)
+        entr_maxWidthMult.grid(row=2, column=1, sticky='new')
+
+        entr_minPingSNR = tk.Entry(
+            expSettingsFrame, textvariable=self.optionVars['DSP_pingSNR'], width=8)
+        entr_minPingSNR.grid(row=3, column=1, sticky='new')
+
+        entr_GPSPort = tk.Entry(
+            expSettingsFrame, textvariable=self.optionVars['GPS_device'], width=8)
+        entr_GPSPort.grid(row=4, column=1, sticky='new')
+
+        entr_GPSBaudRate = tk.Entry(
+            expSettingsFrame, textvariable=self.optionVars['GPS_baud'], width=8)
+        entr_GPSBaudRate.grid(row=5, column=1, sticky='new')
+
+        entr_outputDir = tk.Entry(
+            expSettingsFrame, textvariable=self.optionVars['SYS_outputDir'], width=8)
+        entr_outputDir.grid(row=6, column=1, sticky='new')
+
+        entr_GPSMode = tk.Entry(
+            expSettingsFrame, textvariable=self.optionVars['GPS_mode'], width=8)
+        entr_GPSMode.grid(row=7, column=1, sticky='new')
+
+        btn_submit = tk.Button(self, text='submit', command=self.submit)
+        btn_submit.pack()
+
+    def validateParameters(self):
+        return True
+
+    def submit(self):
+        if not self.validateParameters():
+            return
+        self.__parent.submitGUIOptionVars(0xFF)
+
+        self.cancel()
+
+    def cancel(self):
+        self.__parent.focus_set()
+        self.destroy()
+        self.__parent.update()
 
 
 class AddTargetDialog(tk.Toplevel):
@@ -915,9 +956,9 @@ class ConnectionDialog(tk.Toplevel):
 
 
 if __name__ == '__main__':
-    logName = dt.datetime.now().strftime('%Y.%m.%d.%H.%M.%S.log')
-    logName = 'log.log'
+    logName = dt.datetime.now().strftime('%Y.%m.%d.%H.%M.%S_gcs.log')
     logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
     ch = logging.StreamHandler(sys.stdout)
     ch.setLevel(logging.WARNING)
     formatter = logging.Formatter(
@@ -927,6 +968,8 @@ if __name__ == '__main__':
     ch = logging.FileHandler(logName)
     ch.setLevel(logging.DEBUG)
     ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
     app = GCS()
     app.mainloop()
     app.quit()
