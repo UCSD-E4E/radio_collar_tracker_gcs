@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 05/20/20  NH  Fixed logging message in MAVmodel.setOptions
 # 05/19/20  NH  Removed rctOptions skeleton, added cache bits for options,
 #                 renamed rctCore.__options to rctCore.PP_options, fixed
 #                 NO_HEARTBEAT name, added incremental frequency modifiers,
@@ -490,10 +491,10 @@ class MAVModel:
         self.__ackVectors[0x05] = [event, 0]
         self.__rx.sendPacket(rctComms.rctSETOPTCommand(
             scope, **{key: self.PP_options[key] for key in acceptedKeywords}))
-        self.__log.info('Sent GETOPT command')
+        self.__log.info('Sent SETOPT command with scope %d' % scope)
         event.wait(timeout=timeout)
         if not self.__ackVectors.pop(0x05)[1]:
-            raise RuntimeError("GETOPT NACKED")
+            raise RuntimeError("SETOPT NACKED")
 
     def __processPing(self, packet: rctComms.rctPingPacket, addr: str):
         ping = ping.rctPing.fromPacket(packet)
