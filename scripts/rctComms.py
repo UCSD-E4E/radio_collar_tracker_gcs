@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 05/23/20  NH  Moved heartbeat watchdog timeout to parameter
 # 05/21/20  NH  Refactored options information into own class
 # 05/20/20  NH  Fixed SYS_autostart type in SETOPT command, added exception
 #                 logging to both receivers
@@ -778,7 +779,7 @@ class gcsComms:
     '''
     __BUFFER_LEN = 1024
 
-    def __init__(self, port: rctTransport.RCTAbstractTransport):
+    def __init__(self, port: rctTransport.RCTAbstractTransport, GC_HeartbeatWatchdogTime=30):
         '''
         Initializes the UDP interface on the specified port.  Also specifies a
         filename to use as a logfile, which defaults to no log.
@@ -803,9 +804,11 @@ class gcsComms:
             EVENTS.GENERAL_UNKNOWN.value: [],
         }
 
+        self.GC_HeartbeatWatchdogTime = GC_HeartbeatWatchdogTime
+
         self.__parser = rctBinaryPacketFactory()
 
-    def waitForHeartbeat(self, guiTick=None, timeout: int=30):
+    def waitForHeartbeat(self, guiTick=None, timeout: int=None):
         '''
         Waits to receive a heartbeat packet.  Returns a tuple containing the
         MAV's IP address and port number as a single tuple, and the contents of
@@ -815,7 +818,8 @@ class gcsComms:
         :param timeout: Seconds to wait before timing out
         :type timeout: Integer
         '''
-        assert(isinstance(timeout, (int)))
+        if timeout is None:
+            timeout = self.GC_HeartbeatWatchdogTime
         for _ in range(timeout):
             try:
                 data, addr = self.sock.receive(1024, 1)
@@ -863,7 +867,7 @@ class gcsComms:
             except TimeoutError:
                 pass
 
-            if (dt.datetime.now() - self.__lastHeartbeat).total_seconds() > 30:
+            if (dt.datetime.now() - self.__lastHeartbeat).total_seconds() > self.GC_HeartbeatWatchdogTime:
                 self.__log.warning(
                     "No heartbeats, last heartbeat at %s" % self.__lastHeartbeat)
                 for callback in self.__packetMap[EVENTS.GENERAL_NO_HEARTBEAT.value]:
