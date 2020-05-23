@@ -20,6 +20,8 @@
 #
 # DATE      WHO DESCRIPTION
 # -----------------------------------------------------------------------------
+# 05/20/20  NH  Fixed select condition in TCP clients
+# 05/18/20  NH  Removed unused enumerations
 # 04/26/20  NH  Added TCP Server and Client
 # 04/25/20  NH  Moved Commands and PacketTypes to rctTransport
 # 04/19/20  NH  Initial commit: base class, UDP Transport
@@ -30,29 +32,7 @@ import abc
 import socket
 import select
 import os
-import enum
 
-class PACKET_TYPES(enum.Enum):
-    HEARTBEAT = 'heartbeat'
-    PING = 'ping'
-    FREQUENCIES = 'frequencies'
-    EXCEPTION = 'exception'
-    TRACEBACK = 'traceback'
-    OPTIONS = 'options'
-    UPGRADE_READY = 'upgrade_ready'
-    UPGRADE_STATUS = 'upgrade_status'
-    UPGRADE_COMPLETE = 'upgrade_complete'
-    COMMAND = 'cmd'
-
-class COMMANDS(enum.Enum):
-    GET_FREQUENCY = "getF"
-    START = 'start'
-    STOP = 'stop'
-    SET_FREQUENCY = 'setF'
-    GET_OPTIONS = 'getOpts'
-    SET_OPTIONS = 'setOpts'
-    WRITE_OPTIONS = 'writeOpts'
-    UPGRADE = 'upgrade'
 
 class RCTAbstractTransport(abc.ABC):
     @abc.abstractmethod
@@ -75,6 +55,7 @@ class RCTAbstractTransport(abc.ABC):
     def close(self):
         pass
 
+
 class RCTUDPClient(RCTAbstractTransport):
     def __init__(self, port: int = 9000):
         self.__socket = None
@@ -90,7 +71,7 @@ class RCTUDPClient(RCTAbstractTransport):
 
     def receive(self, bufLen: int, timeout: int=None):
         ready = select.select([self.__socket], [], [], timeout)
-        if ready[0]:
+        if len(ready[0]) == 1:
             data, addr = self.__socket.recvfrom(bufLen)
             return data, addr[0]
         else:
@@ -98,6 +79,7 @@ class RCTUDPClient(RCTAbstractTransport):
 
     def send(self, data: bytes, dest):
         self.__socket.sendto(data, (dest, self.__port))
+
 
 class RCTUDPServer(RCTAbstractTransport):
     def __init__(self, port: int = 9000):
@@ -127,6 +109,7 @@ class RCTUDPServer(RCTAbstractTransport):
             dest = '255.255.255.255'
         self.__socket.sendto(data, (dest, self.__port))
 
+
 class RCTPipeClient(RCTAbstractTransport):
     def __init__(self):
         pass
@@ -150,6 +133,7 @@ class RCTPipeClient(RCTAbstractTransport):
     def send(self, data: bytes, dest):
         pass
 
+
 class RCTTCPClient(RCTAbstractTransport):
     def __init__(self, port: int, addr: str):
         self.__target = (addr, port)
@@ -157,7 +141,7 @@ class RCTTCPClient(RCTAbstractTransport):
 
     def open(self):
         self.__socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.__socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY,1)
+        self.__socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         self.__socket.connect(self.__target)
 
     def close(self):
@@ -165,7 +149,7 @@ class RCTTCPClient(RCTAbstractTransport):
 
     def receive(self, bufLen: int, timeout: int=None):
         ready = select.select([self.__socket], [], [], timeout)
-        if ready[0]:
+        if len(ready[0]) == 1:
             data = self.__socket.recv(bufLen)
             return data, self.__target[0]
         else:
@@ -173,6 +157,7 @@ class RCTTCPClient(RCTAbstractTransport):
 
     def send(self, data: bytes, dest=None):
         self.__socket.send(data)
+
 
 class RCTTCPServer(RCTAbstractTransport):
     def __init__(self, port: int):
