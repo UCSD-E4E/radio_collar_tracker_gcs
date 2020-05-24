@@ -20,8 +20,12 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
-# 05/19/20  AG  Finished implementation of pulling target freqs from the drone
-# 05/19/20  AG  Finished target frequency validation
+# 05/20/20  NH  Fixed window close action, added function to handle registering
+#                 callbacks when connection established, removed unused
+#                 callbacks, added advanced settings dialog, fixed logging
+# 05/19/20  NH  Removed PIL, rasterio, refactored options, connectionDialog,
+#                 AddTargetDialog, SystemSettingsControl, fixed exit behavior,
+# 05/18/20  NH  Updated API for core
 # 05/17/20  AG  Finished implementing start/stop recording button
 # 05/17/20  AG  Added setting target frequencies and system connection text updates.
 # 05/13/20  AG  Added ability to set and receive expert debug options
@@ -50,19 +54,19 @@ import rctComms
 import rctCore
 from tkinter.filedialog import askopenfilename
 import os
-from PIL import Image, ImageTk
 from matplotlib.backends.backend_tkagg import (
     FigureCanvasTkAgg, NavigationToolbar2Tk)
-from matplotlib.backend_bases import key_press_handler
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
-import rasterio as rio
-from rasterio.plot import show
 
 class GCS(tk.Tk):
     '''
     Ground Control Station GUI
     '''
+
+    SBWidth = 25
+
+    defaultTimeout = 5
 
     def __init__(self):
         '''
@@ -70,71 +74,26 @@ class GCS(tk.Tk):
         '''
         super().__init__()
         self.__log = logging.getLogger('rctGCS.GCS')
-        self.__rctPort = rctTransport.RCTTCPClient(addr='127.0.0.1', port=9000)
-        self.__mavReceiver = rctComms.MAVReceiver(self.__rctPort)
-        self.__mavModel = rctCore.MAVModel(self.__mavReceiver)
-        self.__buttons = []
-        self.__systemConnectionTab = None
+        self._rctPort = None
+        self._mavReceiver = None
+        self._mavModel = None
+        self._buttons = []
+        self._systemConnectionTab = None
         self.__missionStatusText = StringVar()
         self.__missionStatusText.set("Start Recording")
         self.innerFreqFrame = None
         self.freqElements = []
         self.targEntries = {}
-        self.frm_targHolder = None
-        self.targNameEntry = StringVar()
-        self.targFreqEntry = StringVar()
-        self.cntrFreqEntry = StringVar()
-        self.sampFreqEntry = StringVar()
-        self.sdrGainEntry = StringVar()
-        self.pingWidthEntry = StringVar()
-        self.minWidthMultEntry = StringVar()
-        self.maxWidthMultEntry = StringVar()
-        self.minPingSNREntry = StringVar()
-        self.GPSPortEntry = StringVar()
-        self.GPSBaudEntry = StringVar()
-        self.outputDirEntry = StringVar()
-        self.GPSModeEntry = StringVar()
         self.__createWidgets()
-        for button in self.__buttons:
+        for button in self._buttons:
             button.config(state='disabled')
-        self.__mavModel.registerCallback(
-            rctCore.Events.Heartbeat, self.__updateStatus)
-        self.__mavModel.registerCallback(
+        self.protocol('WM_DELETE_WINDOW', self.__windowClose)
+
+    def __registerModelCallbacks(self):
+        #         self._mavModel.registerCallback(
+        #             rctCore.Events.Heartbeat, self.__updateStatus)
+        self._mavModel.registerCallback(
             rctCore.Events.Exception, self.__handleRemoteException)
-        self.__mavModel.registerCallback(
-            rctCore.Events.GetFreqs, self.__setFreqsFromRemote)
-
-    def start(self):
-        '''
-        Start thread for the GCSP Application object.  This is responsible for
-        initializing the comm channel.
-        '''
-        '''
-        self.progressBar['maximum'] = 30
-        try:
-            self.__mavModel.start(self.progressBar.step)
-        except RuntimeError:
-            self.__noHeartbeat()
-        '''
-
-    def __setFreqsFromRemote(self):
-        '''
-        Callback to update the GUI with frequencies from the payload
-        '''
-        self.__log.info("Setting frequencies")
-        freqs = self.__mavModel.frequencies
-        if self.innerFreqFrame is not None:
-            self.freqElements = []
-            self.innerFreqFrame.destroy()
-        self.innerFreqFrame = tk.Frame(self.freqFrame)
-
-        for freq in freqs:
-            self.freqElements.append(tk.Entry(self.innerFreqFrame))
-            self.freqElements[-1].insert(0, freq)
-            self.freqElements[-1].pack()
-        self.__log.info("Updating GUI")
-        self.innerFreqFrame.pack()
-        self.update()
 
     def mainloop(self, n=0):
         '''
@@ -142,8 +101,6 @@ class GCS(tk.Tk):
         :param n:
         :type n:
         '''
-        self.__startThread = threading.Thread(target=self.start)
-        self.__startThread.start()
         tk.Tk.mainloop(self, n=n)
 
     def __startCommand(self):
@@ -156,50 +113,11 @@ class GCS(tk.Tk):
         Internal callback to send the stop command
         '''
 
-    def __getFreqs(self):
-        '''
-        Internal callback to retrieve the frequencies from the remote
-        '''
-        self.__mavModel.getFrequencies()
-
-    def __addFreq(self):
-        '''
-        Internal callback to add a new frequency entry
-        '''
-        self.freqElements.append(tk.Entry(self.innerFreqFrame))
-        self.freqElements[-1].pack()
-        self.innerFreqFrame.update()
-        self.__log.info("Added frequency entry")
-
-    def __removeFreq(self):
-        '''
-        Internal callback to remove the lowest frequency entry
-        '''
-        self.freqElements[-1].destroy()
-        self.freqElements.remove(self.freqElements[-1])
-        self.innerFreqFrame.update()
-        self.__log.info("Removed last frequency entry")
-
-    def __sendFreq(self):
-        '''
-        Internal callback to send the current set of frequencies
-        '''
-
-    def __configureOpts(self):
-        '''
-        Internal callback to open the option configuration window
-        '''
-
-    def __upgradeSoftware(self):
-        '''
-        Internal callback to start the firmware upgrade process
-        '''
-
     def __noHeartbeat(self):
         '''
         Internal callback for the no heartbeat state
         '''
-        for button in self.__buttons:
+        for button in self._buttons:
             button.config(state='disabled')
         tkm.showerror(
             title="RCT GCS", message="No Heartbeats Received")
@@ -209,36 +127,36 @@ class GCS(tk.Tk):
         Internal callback for an exception message
         '''
         tkm.showerror(title='RCT GCS', message='An exception has occured!\n%s\n%s' % (
-            self.__mavModel.lastException[0], self.__mavModel.lastException[1]))
+            self._mavModel.lastException[0], self._mavModel.lastException[1]))
 
     def __startStopMission(self):
-        #State machine for start recording -> stop recording
+        # State machine for start recording -> stop recording
         if self.__missionStatusText.get() == 'Start Recording':
             self.__missionStatusText.set('Stop Recording')
-            self.__mavModel.startMission()
+            self._mavModel.startMission(timeout=self.defaultTimeout)
         else:
             self.__missionStatusText.set('Start Recording')
-            self.__mavModel.stopMission()
+            self._mavModel.stopMission(timeout=self.defaultTimeout)
 
     def __updateStatus(self):
         '''
         Internal callback for status variable update
         '''
-        for button in self.__buttons:
+        for button in self._buttons:
             button.config(state='normal')
         self.progressBar['value'] = 0
-        sdrStatus = self.__mavModel.sdrStatus
-        dirStatus = self.__mavModel.dirStatus
-        gpsStatus = self.__mavModel.gpsStatus
-        sysStatus = self.__mavModel.sysStatus
-        swStatus = self.__mavModel.swStatus
+        sdrStatus = self._mavModel.STS_sdrStatus
+        dirStatus = self._mavModel.STS_dirStatus
+        gpsStatus = self._mavModel.STS_gpsStatus
+        sysStatus = self._mavModel.STS_sysStatus
+        swStatus = self._mavModel.STS_swStatus
 
         sdrMap = {
-            self.__mavModel.SDR_INIT_STATES.find_devices: ('SDR: Searching for devices', 'yellow'),
-            self.__mavModel.SDR_INIT_STATES.wait_recycle: ('SDR: Recycling!', 'yellow'),
-            self.__mavModel.SDR_INIT_STATES.usrp_probe: ('SDR: Initializing SDR', 'yellow'),
-            self.__mavModel.SDR_INIT_STATES.rdy: ('SDR: Ready', 'green'),
-            self.__mavModel.SDR_INIT_STATES.fail: ('SDR: Failed!', 'red')
+            self._mavModel.SDR_INIT_STATES.find_devices: ('SDR: Searching for devices', 'yellow'),
+            self._mavModel.SDR_INIT_STATES.wait_recycle: ('SDR: Recycling!', 'yellow'),
+            self._mavModel.SDR_INIT_STATES.usrp_probe: ('SDR: Initializing SDR', 'yellow'),
+            self._mavModel.SDR_INIT_STATES.rdy: ('SDR: Ready', 'green'),
+            self._mavModel.SDR_INIT_STATES.fail: ('SDR: Failed!', 'red')
         }
 
         try:
@@ -249,12 +167,12 @@ class GCS(tk.Tk):
                 text='SDR: NULL', bg='red')
 
         dirMap = {
-            self.__mavModel.OUTPUT_DIR_STATES.get_output_dir: ('DIR: Searching', 'yellow'),
-            self.__mavModel.OUTPUT_DIR_STATES.check_output_dir: ('DIR: Checking for mount', 'yellow'),
-            self.__mavModel.OUTPUT_DIR_STATES.check_space: ('DIR: Checking for space', 'yellow'),
-            self.__mavModel.OUTPUT_DIR_STATES.wait_recycle: ('DIR: Recycling!', 'yellow'),
-            self.__mavModel.OUTPUT_DIR_STATES.rdy: ('DIR: Ready', 'green'),
-            self.__mavModel.OUTPUT_DIR_STATES.fail: ('DIR: Failed!', 'red'),
+            self._mavModel.OUTPUT_DIR_STATES.get_output_dir: ('DIR: Searching', 'yellow'),
+            self._mavModel.OUTPUT_DIR_STATES.check_output_dir: ('DIR: Checking for mount', 'yellow'),
+            self._mavModel.OUTPUT_DIR_STATES.check_space: ('DIR: Checking for space', 'yellow'),
+            self._mavModel.OUTPUT_DIR_STATES.wait_recycle: ('DIR: Recycling!', 'yellow'),
+            self._mavModel.OUTPUT_DIR_STATES.rdy: ('DIR: Ready', 'green'),
+            self._mavModel.OUTPUT_DIR_STATES.fail: ('DIR: Failed!', 'red'),
         }
 
         try:
@@ -264,11 +182,11 @@ class GCS(tk.Tk):
             self.dirStatusLabel.config(text='DIR: NULL', bg='red')
 
         gpsMap = {
-            self.__mavModel.GPS_STATES.get_tty: {'text': 'GPS: Getting TTY Device', 'bg': 'yellow'},
-            self.__mavModel.GPS_STATES.get_msg: {'text': 'GPS: Waiting for message', 'bg': 'yellow'},
-            self.__mavModel.GPS_STATES.wait_recycle: {'text': 'GPS: Recycling', 'bg': 'yellow'},
-            self.__mavModel.GPS_STATES.rdy: {'text': 'GPS: Ready', 'bg': 'green'},
-            self.__mavModel.GPS_STATES.fail: {
+            self._mavModel.GPS_STATES.get_tty: {'text': 'GPS: Getting TTY Device', 'bg': 'yellow'},
+            self._mavModel.GPS_STATES.get_msg: {'text': 'GPS: Waiting for message', 'bg': 'yellow'},
+            self._mavModel.GPS_STATES.wait_recycle: {'text': 'GPS: Recycling', 'bg': 'yellow'},
+            self._mavModel.GPS_STATES.rdy: {'text': 'GPS: Ready', 'bg': 'green'},
+            self._mavModel.GPS_STATES.fail: {
                 'text': 'GPS: Failed!', 'bg': 'red'}
         }
 
@@ -278,13 +196,13 @@ class GCS(tk.Tk):
             self.gpsStatusLabel.config(text='GPS: NULL', bg='red')
 
         sysMap = {
-            self.__mavModel.RCT_STATES.init: {'text': 'SYS: Initializing', 'bg': 'yellow'},
-            self.__mavModel.RCT_STATES.wait_init: {'text': 'SYS: Initializing', 'bg': 'yellow'},
-            self.__mavModel.RCT_STATES.wait_start: {'text': 'SYS: Ready for start', 'bg': 'green'},
-            self.__mavModel.RCT_STATES.start: {'text': 'SYS: Starting', 'bg': 'blue'},
-            self.__mavModel.RCT_STATES.wait_end: {'text': 'SYS: Running', 'bg': 'blue'},
-            self.__mavModel.RCT_STATES.finish: {'text': 'SYS: Stopping', 'bg': 'blue'},
-            self.__mavModel.RCT_STATES.fail: {'text': 'SYS: Failed!', 'bg': 'red'},
+            self._mavModel.RCT_STATES.init: {'text': 'SYS: Initializing', 'bg': 'yellow'},
+            self._mavModel.RCT_STATES.wait_init: {'text': 'SYS: Initializing', 'bg': 'yellow'},
+            self._mavModel.RCT_STATES.wait_start: {'text': 'SYS: Ready for start', 'bg': 'green'},
+            self._mavModel.RCT_STATES.start: {'text': 'SYS: Starting', 'bg': 'blue'},
+            self._mavModel.RCT_STATES.wait_end: {'text': 'SYS: Running', 'bg': 'blue'},
+            self._mavModel.RCT_STATES.finish: {'text': 'SYS: Stopping', 'bg': 'blue'},
+            self._mavModel.RCT_STATES.fail: {'text': 'SYS: Failed!', 'bg': 'red'},
         }
 
         try:
@@ -303,8 +221,8 @@ class GCS(tk.Tk):
         '''
         Internal callback for window close
         '''
-        self.__startThread.join(timeout=1)
-        self.__mavModel.stop()
+        if self._mavModel is not None:
+            self._mavModel.stop()
         self.destroy()
         self.quit()
 
@@ -312,70 +230,17 @@ class GCS(tk.Tk):
         '''
         Internal callback to open Connect Settings
         '''
-        conWindow = tk.Toplevel(self)
+        connectionDialog = ConnectionDialog(self)
 
-        conWindow.title('Connect Settings')
+        self._rctPort = connectionDialog.comms
+        self._mavReceiver = connectionDialog.comms
+        self._mavModel = connectionDialog.model
+        if self._mavModel is None:
+            return
 
-        frm_conType = tk.Frame(master=conWindow, width=350, height=400, bg="light gray")
-        frm_conType.pack(fill=tk.Y, side=tk.LEFT)
-
-        lbl_conType = tk.Label(frm_conType, text='Connection Type:')
-        lbl_conType.pack(fill=tk.X)
-
-        btn_TCP = tk.Checkbutton(frm_conType, text='TCP')
-        btn_TCP.pack(fill=tk.X)
-
-        frm_port = tk.Frame(master=conWindow, width=500, height=400, bg="dark gray")
-        frm_port.pack(fill=tk.BOTH, side=tk.RIGHT)
-
-        lbl_port = tk.Label(frm_port, text='Port')
-        lbl_port.pack(fill=tk.BOTH)
-
-        entr_port = tk.Entry(frm_port)
-        entr_port.pack(fill=tk.BOTH)
-
-        port = 'No Port Entered'
-        def submit():
-            port = entr_port.get()
-            print(port)
-            port = int(port)
-            if port != 9000:
-                self.__rctPort = rctTransport.RCTTCPClient(addr='127.0.0.1', port=port)
-                self.__mavReceiver = rctComms.MAVReceiver(self.__rctPort)
-                self.__mavModel = rctCore.MAVModel(self.__mavReceiver)
-            self.__mavModel.start()
-            self.__systemConnectionTab.updateText("System: Connected")
-            options = self.__mavModel.getOptions(5)
-            print("Done with getOptions call")
-            print("Here are the options: ")
-            for option in options:
-                print(option + ':' + str(options[option]))
-            if 'center_freq' in options:
-                self.cntrFreqEntry.set(str(options['center_freq']))
-            if 'sampling_freq' in options:
-                self.sampFreqEntry.set(str(options['sampling_freq']))
-            if 'sdrGain' in options:
-                self.sdrGainEntry.set(str(options['sdrGain']))
-            if 'frequencies' in options:
-                freqs = options['frequencies']
-                for i in range(len(freqs)):
-                    name = "targ" + str(i+1)
-                    freq = freqs[i]
-                    lbl_newTarget = tk.Label(self.frm_targHolder, text=name, width=17)
-                    lbl_newTarget.grid(row=len(self.targEntries), column=0)
-                    newTargFreqEntry = StringVar()
-                    newTargFreqEntry.set(freq)
-                    entr_newTarget = tk.Entry(self.frm_targHolder, textvariable=newTargFreqEntry, width=8)
-                    entr_newTarget.grid(row=len(self.targEntries), column=1)
-
-                    self.targEntries[name] = newTargFreqEntry
-                    self.frm_targHolder.grid(row=4, column=0, columnspan=2, sticky='new')
-
-            conWindow.destroy()
-            conWindow.update()
-
-        btn_submit = tk.Button(frm_port, text='submit', command=submit)
-        btn_submit.pack()
+        self._systemConnectionTab.updateText("System: Connected")
+        self.__registerModelCallbacks()
+        self.systemSettingsWidget.updateGUIOptionVars()
 
     def __advancedSettings(self):
         '''
@@ -388,13 +253,16 @@ class GCS(tk.Tk):
         frm_advSettings.pack(fill=tk.BOTH)
 
         # EXPERT SETTINGS
-        lbl_pingWidth = tk.Label(frm_advSettings, text='Expected Ping Width(ms)')
+        lbl_pingWidth = tk.Label(
+            frm_advSettings, text='Expected Ping Width(ms)')
         lbl_pingWidth.grid(row=0, column=0, sticky='new')
 
-        lbl_minWidthMult = tk.Label(frm_advSettings, text='Min. Width Multiplier')
+        lbl_minWidthMult = tk.Label(
+            frm_advSettings, text='Min. Width Multiplier')
         lbl_minWidthMult.grid(row=1, column=0, sticky='new')
 
-        lbl_maxWidthMult = tk.Label(frm_advSettings, text='Max. Width Multiplier')
+        lbl_maxWidthMult = tk.Label(
+            frm_advSettings, text='Max. Width Multiplier')
         lbl_maxWidthMult.grid(row=2, column=0, sticky='new')
 
         lbl_minPingSNR = tk.Label(frm_advSettings, text='Min. Ping SNR(dB)')
@@ -412,40 +280,48 @@ class GCS(tk.Tk):
         lbl_GPSMode = tk.Label(frm_advSettings, text='GPS Mode')
         lbl_GPSMode.grid(row=7, column=0, sticky='new')
 
-        entr_pingWidth = tk.Entry(frm_advSettings, textvariable=self.pingWidthEntry, width=8)
+        entr_pingWidth = tk.Entry(
+            frm_advSettings, textvariable=self.optionVars['DSP_pingWidth'], width=8)
         entr_pingWidth.grid(row=0, column=1, sticky='new')
 
-        entr_minWidthMult = tk.Entry(frm_advSettings, textvariable=self.minWidthMultEntry, width=8)
+        entr_minWidthMult = tk.Entry(
+            frm_advSettings, textvariable=self.optionVars['DSP_pingMin'], width=8)
         entr_minWidthMult.grid(row=1, column=1, sticky='new')
 
-        entr_maxWidthMult = tk.Entry(frm_advSettings, textvariable=self.maxWidthMultEntry, width=8)
+        entr_maxWidthMult = tk.Entry(
+            frm_advSettings, textvariable=self.optionVars['DSP_pingMax'], width=8)
         entr_maxWidthMult.grid(row=2, column=1, sticky='new')
 
-        entr_minPingSNR = tk.Entry(frm_advSettings, textvariable=self.minPingSNREntry, width=8)
+        entr_minPingSNR = tk.Entry(
+            frm_advSettings, textvariable=self.optionVars['DSP_pingSNR'], width=8)
         entr_minPingSNR.grid(row=3, column=1, sticky='new')
 
-        entr_GPSPort = tk.Entry(frm_advSettings, textvariable=self.GPSPortEntry, width=8)
+        entr_GPSPort = tk.Entry(
+            frm_advSettings, textvariable=self.optionVars['GPS_device'], width=8)
         entr_GPSPort.grid(row=4, column=1, sticky='new')
 
-        entr_GPSBaudRate = tk.Entry(frm_advSettings, textvariable=self.GPSBaudEntry, width=8)
+        entr_GPSBaudRate = tk.Entry(
+            frm_advSettings, textvariable=self.optionVars['GPS_baud'], width=8)
         entr_GPSBaudRate.grid(row=5, column=1, sticky='new')
 
-        entr_outputDir = tk.Entry(frm_advSettings, textvariable=self.outputDirEntry, width=8)
+        entr_outputDir = tk.Entry(
+            frm_advSettings, textvariable=self.optionVars['SYS_outputDir'], width=8)
         entr_outputDir.grid(row=6, column=1, sticky='new')
 
-        entr_GPSMode = tk.Entry(frm_advSettings, textvariable=self.GPSModeEntry, width=8)
+        entr_GPSMode = tk.Entry(
+            frm_advSettings, textvariable=self.optionVars['GPS_mode'], width=8)
         entr_GPSMode.grid(row=7, column=1, sticky='new')
 
         def submit():
-            pingWidth = self.pingWidthEntry.get()
-            minWidthMult = self.minWidthMultEntry.get()
-            maxWidthMult = self.maxWidthMultEntry.get()
-            minPingSNR = self.minPingSNREntry.get()
-            GPSPort = self.GPSPortEntry.get()
-            GPSBaud = self.GPSBaudEntry.get()
-            outputDir = self.outputDirEntry.get()
-            GPSMode = self.GPSModeEntry.get()
-            optionsFlag = False #set to true if setOptions is necessary
+            pingWidth = self.optionVars['DSP_pingWidth'].get()
+            minWidthMult = self.optionVars['DSP_pingMin'].get()
+            maxWidthMult = self.optionVars['DSP_pingMax'].get()
+            minPingSNR = self.optionVars['DSP_pingSNR'].get()
+            GPSPort = self.optionVars['GPS_device'].get()
+            GPSBaud = self.optionVars['GPS_baud'].get()
+            outputDir = self.optionVars['SYS_outputDir'].get()
+            GPSMode = self.optionVars['GPS_mode'].get()
+            optionsFlag = False  # set to true if setOptions is necessary
 
             setOptionsDict = {}
             if pingWidth != '':
@@ -470,30 +346,35 @@ class GCS(tk.Tk):
                 optionsFlag = True
                 setOptionsDict['gps_mode'] = bool(GPSMode)
             if optionsFlag:
-                self.__mavModel.setOptions(setOptionsDict)
+                self._mavModel.setOptions(setOptionsDict)
 
-            options = self.__mavModel.getOptions(5)
+            options = self._mavModel.getOptions(5)
 
             # print statements for debugging purposes
             print("Done with getOptions call")
             print("Here are the options: ")
             for option in options:
                 print(option + ':' + str(options[option]))
-        
+
             if 'ping_width_ms' in options:
-                self.pingWidthEntry.set(str(options['ping_width_ms']))
+                self.optionVars['DSP_pingWidth'].set(
+                    str(options['ping_width_ms']))
             if 'ping_min_len_mult' in options:
-                self.minWidthMultEntry.set(str(options['ping_min_len_mult']))
+                self.optionVars['DSP_pingMin'].set(
+                    str(options['ping_min_len_mult']))
             if 'ping_max_len_mult' in options:
-                self.maxWidthMultEntry.set(str(options['ping_max_len_mult']))
+                self.optionVars['DSP_pingMax'].set(
+                    str(options['ping_max_len_mult']))
             if 'ping_min_snr' in options:
-                self.minPingSNREntry.set(str(options['ping_min_snr']))
+                self.optionVars['DSP_pingSNR'].set(
+                    str(options['ping_min_snr']))
             if 'gps_target' in options:
-                self.GPSPortEntry.set(str(options['gps_target']))
+                self.optionVars['GPS_device'].set(str(options['gps_target']))
             if 'output_dir' in options:
-                self.outputDirEntry.set(str(options['output_dir']))
+                self.optionVars['SYS_outputDir'].set(
+                    str(options['output_dir']))
             if 'gps_mode' in options:
-                self.GPSModeEntry.set(str(options['gps_mode']))
+                self.optionVars['GPS_mode'].set(str(options['gps_mode']))
 
             settingsWindow.destroy()
             settingsWindow.update()
@@ -507,23 +388,25 @@ class GCS(tk.Tk):
         '''
         self.title('RCT GCS')
 
-        frm_sideControl = tk.Frame(master=self, width=SBWidth, height=300, bg="dark gray")
+        frm_sideControl = tk.Frame(
+            master=self, width=self.SBWidth, height=300, bg="dark gray")
         frm_sideControl.pack(anchor=tk.NW, side=tk.RIGHT)
         frm_sideControl.grid_columnconfigure(0, weight=1)
         frm_sideControl.grid_rowconfigure(0, weight=1)
 
         # SYSTEM TAB
-        self.__systemConnectionTab = CollapseFrame(frm_sideControl, 'System: No Connection')
-        self.__systemConnectionTab.grid(row=0, column=0, sticky='new')
-
-        btn_connect = Button(self.__systemConnectionTab.frame, relief=tk.FLAT, width=SBWidth, text ="Connect", command=self.__handleConnectInput)
-        btn_connect.grid(column=0, row=0, sticky='new')
+        self._systemConnectionTab = CollapseFrame(
+            frm_sideControl, 'System: No Connection')
+        self._systemConnectionTab.grid(row=0, column=0, sticky='new')
+        Button(self._systemConnectionTab.frame, relief=tk.FLAT, width=self.SBWidth,
+               text="Connect", command=self.__handleConnectInput).grid(column=0, row=0, sticky='new')
 
         # COMPONENTS TAB
         frm_components = CollapseFrame(frm_sideControl, 'Components')
         frm_components.grid(column=0, row=1, sticky='new')
 
-        lbl_componentNotif = tk.Label(frm_components.frame, width=SBWidth, text='Vehicle not connected')
+        lbl_componentNotif = tk.Label(
+            frm_components.frame, width=self.SBWidth, text='Vehicle not connected')
         lbl_componentNotif.grid(column=0, row=0, sticky='new')
 
         # DATA DISPLAY TOOLS
@@ -531,10 +414,11 @@ class GCS(tk.Tk):
         frm_mapGrid.pack(fill=tk.BOTH, side=tk.LEFT)
         frm_mapGrid.grid_columnconfigure(0, weight=1)
         frm_mapGrid.grid_rowconfigure(0, weight=1)
-        frm_mapSpacer = tk.Frame(master=frm_mapGrid, bg='gray', height=400, width=450)
-        frm_mapSpacer.grid(column=1,row=1)
+        frm_mapSpacer = tk.Frame(
+            master=frm_mapGrid, bg='gray', height=400, width=450)
+        frm_mapSpacer.grid(column=1, row=1)
         dirName = os.path.dirname(__file__)
-        path=os.path.join(dirName, '../../map.jpg')
+        path = os.path.join(dirName, '../../map.jpg')
         '''
         load = Image.open(path)
         render = ImageTk.PhotoImage(load)
@@ -547,7 +431,7 @@ class GCS(tk.Tk):
         frm_displayTools.grid(column=0, row=2, sticky='n')
 
         def __selectMapFile():
-            img.destroy()
+            #             img.destroy()
             filename = askopenfilename()
             print(filename)
             fig = Figure(figsize=(5, 4), dpi=100)
@@ -556,213 +440,76 @@ class GCS(tk.Tk):
             canvas1.draw()
             canvas1.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1, padx=10, pady=5)
 
-            canvas1._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=1, padx=10, pady=5)
+            canvas1._tkcanvas.pack(
+                side=tk.TOP, fill=tk.BOTH, expand=1, padx=10, pady=5)
 
             ax = fig.add_subplot(111)
 
-            with rio.open(filename) as src_plot:
-                show(src_plot, ax=ax, cmap='gist_gray')
-                plt.close()
-                ax.spines["top"].set_visible(False)
-                ax.spines["right"].set_visible(False)
-                ax.spines["left"].set_visible(False)
-                ax.spines["bottom"].set_visible(False)
-                canvas1.draw()
+#             with rio.open(filename) as src_plot:
+#                 show(src_plot, ax=ax, cmap='gist_gray')
+#                 plt.close()
+#                 ax.spines["top"].set_visible(False)
+#                 ax.spines["right"].set_visible(False)
+#                 ax.spines["left"].set_visible(False)
+#                 ax.spines["bottom"].set_visible(False)
+#                 canvas1.draw()
 
-        btn_loadMap = Button(frm_displayTools.frame, command=__selectMapFile, relief=tk.FLAT, width=SBWidth, text ="Load Map")
+        btn_loadMap = Button(frm_displayTools.frame, command=__selectMapFile,
+                             relief=tk.FLAT, width=self.SBWidth, text="Load Map")
         btn_loadMap.grid(column=0, row=0, sticky='new')
 
-        btn_export = Button(frm_displayTools.frame, relief=tk.FLAT, width=SBWidth, text ="Export")
+        btn_export = Button(frm_displayTools.frame,
+                            relief=tk.FLAT, width=self.SBWidth, text="Export")
         btn_export.grid(column=0, row=2, sticky='new')
 
         # MAP OPTIONS
-        frm_mapOptions = tk.Frame(master=frm_mapGrid, width=SBWidth)
+        frm_mapOptions = tk.Frame(master=frm_mapGrid, width=self.SBWidth)
         frm_mapOptions.grid(column=0, row=0)
 
-        lbl_mapOptions = tk.Label(frm_mapOptions, bg='gray', width=SBWidth, text='Map Options')
+        lbl_mapOptions = tk.Label(
+            frm_mapOptions, bg='gray', width=self.SBWidth, text='Map Options')
         lbl_mapOptions.grid(column=0, row=0, sticky='ew')
 
-        btn_setSearchArea = tk.Button(frm_mapOptions,  bg='light gray', width=SBWidth,
-                relief=tk.FLAT, text='Set Search Area')
+        btn_setSearchArea = tk.Button(frm_mapOptions,  bg='light gray', width=self.SBWidth,
+                                      relief=tk.FLAT, text='Set Search Area')
         btn_setSearchArea.grid(column=0, row=1, sticky='ew')
 
-        btn_cacheMap = tk.Button(frm_mapOptions, width=SBWidth,  bg='light gray',
-                relief=tk.FLAT, text='Cache Map')
+        btn_cacheMap = tk.Button(frm_mapOptions, width=self.SBWidth,  bg='light gray',
+                                 relief=tk.FLAT, text='Cache Map')
         btn_cacheMap.grid(column=0, row=2)
 
         # MAP LEGEND
-        frm_mapLegend = tk.Frame(master=frm_mapGrid, width=SBWidth)
+        frm_mapLegend = tk.Frame(master=frm_mapGrid, width=self.SBWidth)
         frm_mapLegend.grid(column=0, row=2)
 
-        lbl_legend = tk.Label(frm_mapLegend, width=SBWidth,  bg='gray', text='Map Legend')
+        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
+                              bg='gray', text='Map Legend')
         lbl_legend.grid(column=0, row=0, sticky='ew')
 
-        lbl_legend = tk.Label(frm_mapLegend, width=SBWidth,  bg='light gray', text='Vehicle')
+        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
+                              bg='light gray', text='Vehicle')
         lbl_legend.grid(column=0, row=1, sticky='ew')
 
-        lbl_legend = tk.Label(frm_mapLegend, width=SBWidth,  bg='light gray', text='Target')
+        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
+                              bg='light gray', text='Target')
         lbl_legend.grid(column=0, row=2, sticky='ew')
 
         # SYSTEM SETTINGS
-        frm_sysSettings = CollapseFrame(frm_sideControl, 'System Settings')
-        frm_sysSettings.grid(column=0, row=3, sticky='new')
-
-        self.frm_targHolder = tk.Frame(master=frm_sysSettings.frame, width=SBWidth-2)
-        self.frm_targHolder.grid(row=4, column=0, columnspan=2, sticky='new')
-
-        def addTarget():
-            addTargetWindow = tk.Toplevel(self)
-
-            addTargetWindow.title('Add Target')
-            frm_targetSettings = tk.Frame(master=addTargetWindow)
-            frm_targetSettings.pack(fill=tk.BOTH)
-
-            lbl_targetName = tk.Label(frm_targetSettings, text='Target Name:')
-            lbl_targetName.grid(row=0, column=0, sticky='new')
-
-            entr_targetName = tk.Entry(frm_targetSettings, textvariable=self.targNameEntry, width = SBWidth)
-            entr_targetName.grid(row=0, column=1, sticky='new')
-
-            lbl_targetFreq = tk.Label(frm_targetSettings, text='Target Frequency:')
-            lbl_targetFreq.grid(row=1, column=0, sticky='new')
-
-            entr_targetFreq = tk.Entry(frm_targetSettings, textvariable=self.targFreqEntry, width = SBWidth)
-            entr_targetFreq.grid(row=1, column=1, sticky='new')
-
-            def submit():
-                invalidFreqWindow = None
-                name = self.targNameEntry.get()
-                freq = self.targFreqEntry.get()
-                curCntrFreq = self.__mavModel.options['center_freq']
-                curSampFreq = self.__mavModel.options['sampling_freq']
-
-                def exit():
-                    self.targFreqEntry.set('')
-                    invalidFreqWindow.destroy()
-
-                if (int(freq) < curCntrFreq - curSampFreq) or (int(freq) > curCntrFreq + curSampFreq):
-                    invalidFreqWindow = tk.Toplevel(self)
-                    invalidTxt = tk.Text(invalidFreqWindow)
-                    invalidTxt.insert(INSERT, "Please enter a valid frequency.")
-                    invalidTxt.pack()
-                    btn_exit = tk.Button(invalidFreqWindow, text="exit", command=exit)
-                    btn_exit.pack()
-                else: 
-                    lbl_newTarget = tk.Label(self.frm_targHolder, text=name, width=17)
-                    lbl_newTarget.grid(row=len(self.targEntries), column=0)
-                    newTargFreqEntry = StringVar()
-                    newTargFreqEntry.set(freq)
-                    entr_newTarget = tk.Entry(self.frm_targHolder, textvariable=newTargFreqEntry, width=8)
-                    entr_newTarget.grid(row=len(self.targEntries), column=1)
-
-                    self.targEntries[name] = newTargFreqEntry
-                    self.frm_targHolder.grid(row=4, column=0, columnspan=2, sticky='new')
-                    addTargetWindow.destroy()
-                    addTargetWindow.update()
-
-            btn_submit = tk.Button(addTargetWindow, text='submit', command=submit)
-            btn_submit.pack()
-
-        btn_addTarget = tk.Button(frm_sysSettings.frame, relief=tk.FLAT, text='Add Target',
-                command=addTarget)
-        btn_addTarget.grid(row=0, columnspan=2, sticky='new')
-
-        lbl_cntrFreq = tk.Label(frm_sysSettings.frame, text='Center Frequency')
-        lbl_cntrFreq.grid(row=1, column=0, sticky='new')
-
-        lbl_sampFreq = tk.Label(frm_sysSettings.frame, text='Sampling Frequency')
-        lbl_sampFreq.grid(row=2, column=0, sticky='new')
-
-        lbl_sdrGain = tk.Label(frm_sysSettings.frame, text='SDR Gain')
-        lbl_sdrGain.grid(row=3, column=0, sticky='new')
-
-        entr_cntrFreq = tk.Entry(frm_sysSettings.frame, textvariable=self.cntrFreqEntry, width=8)
-        entr_cntrFreq.grid(row=1, column=1, sticky='new')
-
-        entr_sampFreq = tk.Entry(frm_sysSettings.frame, textvariable=self.sampFreqEntry, width=8)
-        entr_sampFreq.grid(row=2, column=1, sticky='new')
-
-        entr_sdrGain = tk.Entry(frm_sysSettings.frame, textvariable=self.sdrGainEntry, width=8)
-        entr_sdrGain.grid(row=3, column=1, sticky='new')
-
-        def update():
-            cntrFreq = self.cntrFreqEntry.get()
-            sampFreq = self.sampFreqEntry.get()
-            optionsFlag = False #set to true if setOptions is necessary
-
-            setOptionsDict = {}
-            setOptionsDict['frequencies'] = []
-            for targetName in self.targEntries:
-                targetFreq = self.targEntries[targetName]
-                if(targetFreq.get() != ''):
-                    optionsFlag = True
-                    setOptionsDict['frequencies'].append(int(targetFreq.get()))
-            if cntrFreq != '':
-                optionsFlag = True
-                setOptionsDict['center_freq'] = int(cntrFreq)
-                lastCntrFreq = self.__mavModel.options['center_freq']
-                if int(cntrFreq) != lastCntrFreq:
-                    setOptionsDict['frequencies'] = []
-                    clearTargs()
-            if sampFreq != '':
-                optionsFlag = True
-                setOptionsDict['sampling_freq'] = int(sampFreq)
-                lastSampFreq = self.__mavModel.options['sampling_freq']
-                if int(sampFreq) != lastSampFreq:
-                    setOptionsDict['frequencies'] = []
-                    clearTargs()
-            if optionsFlag:
-                self.__mavModel.setOptions(setOptionsDict)
-
-            options = self.__mavModel.getOptions(5)
-            print("Done with getOptions call")
-            print("Here are the options: ")
-            for option in options:
-                print(option + ':' + str(options[option]))
-            if 'center_freq' in options:
-                self.cntrFreqEntry.set(str(options['center_freq']))
-            if 'sampling_freq' in options:
-                self.sampFreqEntry.set(str(options['sampling_freq']))
-            if 'sdrGain' in options:
-                self.sdrGainEntry.set(str(options['sdrGain']))
-
-            '''
-            for targetName, targetFreq in targEntries:
-                if targetName in options:
-                    targetFreq.delete(0,END)
-                    targetFreq.insert(0, str(options[targetName]))
-            '''
-
-        def clearTargs():
-            for i in self.frm_targHolder.grid_slaves():
-                i.grid_forget()
-            self.frm_targHolder.grid_forget()
-            setOptionsDict = {}
-            setOptionsDict['frequencies'] = []
-            self.__mavModel.setOptions(setOptionsDict)
-            self.targEntries = {}
-
-        btn_clearTargs = tk.Button(frm_sysSettings.frame, text='Clear Targets', command=clearTargs)
-        btn_clearTargs.grid(column=0, row=5, sticky='new')
-
-        btn_submit = tk.Button(frm_sysSettings.frame, text='Update', command=update)
-        btn_submit.grid(column=1, row=5, sticky='new')
-
-        btn_advSettings = tk.Button(frm_sysSettings.frame,
-                text='Expert & Debug Configuration', relief=tk.FLAT, command=self.__advancedSettings)
-        btn_advSettings.grid(column=0, columnspan=2, row=6)
+        self.systemSettingsWidget = SystemSettingsControl(
+            frm_sideControl, self)
+        self.systemSettingsWidget.grid(column=0, row=3, sticky='new')
 
         # START PAYLOAD RECORDING
-        btn_startRecord = tk.Button(frm_sideControl, width=SBWidth, textvariable=self.__missionStatusText, command=self.__startStopMission)
+        btn_startRecord = tk.Button(frm_sideControl, width=self.SBWidth,
+                                    textvariable=self.__missionStatusText, command=self.__startStopMission)
         btn_startRecord.grid(column=0, row=4, sticky='nsew')
-
-SBWidth=25
 
 class CollapseFrame(ttk.Frame):
     '''
     Helper class to deal with collapsible GUI components
     '''
-    def __init__(self, parent, labelText="label"):
+
+    def __init__(self, parent, labelText, width=25):
 
         ttk.Frame.__init__(self, parent)
 
@@ -771,18 +518,20 @@ class CollapseFrame(ttk.Frame):
         # this means these are private to class
         self.parent = parent
 
-        self.columnconfigure(0, weight = 1)
+        self.columnconfigure(0, weight=1)
 
         # Tkinter variable storing integer value
         self._variable = tk.IntVar()
 
-        self._button = ttk.Checkbutton(self, width=SBWidth, variable = self._variable,
-                            command = self._activate, text=labelText, style ="TMenubutton")
-        self._button.grid(row = 0, column = 0, sticky = "we")
+        self._button = ttk.Checkbutton(self, width=width, variable=self._variable,
+                                       command=self._activate, text=labelText, style="TMenubutton")
+        self._button.grid(row=0, column=0, sticky="we")
 
         collapseStyle = ttk.Style()
         collapseStyle.configure("TFrame", background="dark gray")
         self.frame = ttk.Frame(self, style="TFrame")
+
+        self._width = width
 
         # This will call activate function of class
         self._activate()
@@ -795,7 +544,7 @@ class CollapseFrame(ttk.Frame):
         elif self._variable.get():
             # increasing the frame area so new widgets
             # could reside in this container
-            self.frame.grid(row = 1, column = 0, columnspan = 1)
+            self.frame.grid(row=1, column=0, columnspan=1)
 
     def toggle(self):
         """Switches the label frame to the opposite state."""
@@ -805,10 +554,403 @@ class CollapseFrame(ttk.Frame):
     def updateText(self, newText="label"):
         self._button.config(text=newText)
 
+class SystemSettingsControl(CollapseFrame):
+    def __init__(self, parent, root: GCS):
+        CollapseFrame.__init__(self, parent, labelText='System Settings')
+        self.__parent = parent
+        self.__root = root
+
+        self.__innerFrame = None
+        self.frm_targHolder = None
+        self.targEntries = {}
+
+        self.optionVars = {
+            "TGT_frequencies": [],
+            "SDR_centerFreq": tk.IntVar(),
+            "SDR_samplingFreq": tk.IntVar(),
+            "SDR_gain": tk.DoubleVar(),
+            "DSP_pingWidth": tk.DoubleVar(),
+            "DSP_pingSNR": tk.DoubleVar(),
+            "DSP_pingMax": tk.DoubleVar(),
+            "DSP_pingMin": tk.DoubleVar(),
+            "GPS_mode": tk.IntVar(),
+            "GPS_device": tk.StringVar(),
+            "GPS_baud": tk.IntVar(),
+            "SYS_outputDir": tk.StringVar(),
+            "SYS_autostart": tk.BooleanVar(),
+        }
+        self.__createWidget()
+
+    def update(self):
+        CollapseFrame.update(self)
+        self.__createWidget()
+
+    def __createWidget(self):
+        if self.__innerFrame:
+            self.__innerFrame.destroy()
+        self.__innerFrame = tk.Frame(self.frame)
+        self.__innerFrame.grid(row=0, column=0, sticky='nesw')
+
+        lbl_cntrFreq = tk.Label(self.__innerFrame, text='Center Frequency')
+        lbl_cntrFreq.grid(row=1, column=0, sticky='new')
+
+        lbl_sampFreq = tk.Label(self.__innerFrame,
+                                text='Sampling Frequency')
+        lbl_sampFreq.grid(row=2, column=0, sticky='new')
+
+        lbl_sdrGain = tk.Label(self.__innerFrame, text='SDR Gain')
+        lbl_sdrGain.grid(row=3, column=0, sticky='new')
+
+        entr_cntrFreq = tk.Entry(
+            self.__innerFrame, textvariable=self.optionVars['SDR_centerFreq'], width=8)
+        entr_cntrFreq.grid(row=1, column=1, sticky='new')
+
+        entr_sampFreq = tk.Entry(
+            self.__innerFrame, textvariable=self.optionVars['SDR_samplingFreq'], width=8)
+        entr_sampFreq.grid(row=2, column=1, sticky='new')
+
+        entr_sdrGain = tk.Entry(self.__innerFrame,
+                                textvariable=self.optionVars['SDR_gain'], width=8)
+        entr_sdrGain.grid(row=3, column=1, sticky='new')
+
+        self.frm_targHolder = tk.Frame(
+            self.__innerFrame, width=self._width - 2)
+        self.frm_targHolder.grid(row=4, column=0, columnspan=2, sticky='new')
+
+        btn_addTarget = tk.Button(self.__innerFrame, relief=tk.FLAT, text='Add Target',
+                                  command=self.addTarget)
+        btn_addTarget.grid(row=0, columnspan=2, sticky='new')
+
+        rowIdx = 0
+        self.targEntries = {}
+        if self.__root._mavModel is not None:
+            for freq in self.__root._mavModel.getFrequencies(self.__root.defaultTimeout):
+                freqLabel = tk.Label(self.frm_targHolder,
+                                     text='Target %d' % (rowIdx + 1))
+                freqLabel.grid(row=rowIdx, column=0, sticky='ew')
+                freqVariable = tk.IntVar()
+                freqVariable.set(freq)
+                freqEntry = tk.Entry(self.frm_targHolder,
+                                     textvariable=freqVariable, validate='focusout',
+                                     validatecommand=lambda sv=freqVariable: self.validateFrequency(sv))
+                freqEntry.grid(row=rowIdx, column=1, sticky='ew')
+                self.targEntries[freq] = [freqVariable]
+                rowIdx += 1
+
+        btn_clearTargs = tk.Button(
+            self.__innerFrame, text='Clear Targets', command=self.clearTargets)
+        btn_clearTargs.grid(column=0, row=5, sticky='new')
+
+        btn_submit = tk.Button(self.__innerFrame,
+                               text='Update', command=self._updateButtonCallback)
+        btn_submit.grid(column=1, row=5, sticky='new')
+
+        btn_advSettings = tk.Button(self.__innerFrame,
+                                    text='Expert & Debug Configuration', relief=tk.FLAT, command=self.__advancedSettings)
+        btn_advSettings.grid(column=0, columnspan=2, row=6)
+
+    def clearTargets(self):
+        self.__root._mavModel.setFrequencies(
+            [], timeout=self.__root.defaultTimeout)
+        self.update()
+
+    def __advancedSettings(self):
+        ExpertSettingsDialog(self, self.optionVars)
+
+    def validateFrequency(self, var: tk.IntVar):
+        cntrFreq = self.__root._mavModel.getOption('SDR_centerFreq')
+        sampFreq = self.__root._mavModel.getOption('SDR_samplingFreq')
+        if abs(var.get() - cntrFreq) > sampFreq:
+            return False
+        return True
+
+    def _updateButtonCallback(self):
+        cntrFreq = self.optionVars['SDR_centerFreq'].get()
+        sampFreq = self.optionVars['SDR_samplingFreq'].get()
+
+        targetFrequencies = []
+        for targetName in self.targEntries:
+            if not self.validateFrequency(self.targEntries[targetName]):
+                # TODO: add validation message
+                pass
+            targetFreq = self.targEntries[targetName][0].get()
+            targetFrequencies.append(targetFreq)
+
+        self.__root._mavModel.setFrequencies(
+            targetFrequencies, self.__root.defaultTimeout)
+
+        if cntrFreq != '':
+            lastCntrFreq = self.__root._mavModel.getOption('SDR_centerFreq')
+            if int(cntrFreq) != lastCntrFreq:
+                self.clearTargets()
+        if sampFreq != '':
+            lastSampFreq = self.__root._mavModel.getOption(
+                'SDR_samplingFreq')
+            if int(sampFreq) != lastSampFreq:
+                self.clearTargets()
+
+        self.submitGUIOptionVars(0x00)
+
+        self.updateGUIOptionVars()
+
+    def updateGUIOptionVars(self, scope=0):
+        optionDict = self.__root._mavModel.getOptions(
+            scope, timeout=self.__root.defaultTimeout)
+        for optionName, optionValue in optionDict.items():
+            self.optionVars[optionName].set(optionValue)
+        self.update()
+
+    def submitGUIOptionVars(self, scope: int):
+        __baseOptionKeywords = ['SDR_centerFreq',
+                                'SDR_samplingFreq', 'SDR_gain']
+        __expOptionKeywords = ['DSP_pingWidth', 'DSP_pingSNR',
+                               'DSP_pingMax', 'DSP_pingMin', 'SYS_outputDir']
+        __engOptionKeywords = ['GPS_mode',
+                               'GPS_baud', 'GPS_device', 'SYS_autostart']
+
+        acceptedKeywords = []
+        if scope >= 0x00:
+            acceptedKeywords.extend(__baseOptionKeywords)
+        if scope >= 0x01:
+            acceptedKeywords.extend(__expOptionKeywords)
+        if scope >= 0xFF:
+            acceptedKeywords.extend(__engOptionKeywords)
+
+        options = {keyword: self.optionVars[keyword].get(
+        ) for keyword in acceptedKeywords}
+        self.__root._mavModel.setOptions(
+            timeout=self.__root.defaultTimeout, **options)
+
+    def addTarget(self):
+        cntrFreq = self.optionVars['SDR_centerFreq'].get()
+        sampFreq = self.optionVars['SDR_samplingFreq'].get()
+        addTargetWindow = AddTargetDialog(self, cntrFreq, sampFreq)
+
+        # TODO: remove name
+        name = addTargetWindow.name
+        freq = addTargetWindow.freq
+
+        if freq is None:
+            return
+
+        self.__root._mavModel.addFrequency(freq, self.__root.defaultTimeout)
+        self.update()
+
+class ExpertSettingsDialog(tk.Toplevel):
+    def __init__(self, parent: SystemSettingsControl, optionVars: dict):
+        tk.Toplevel.__init__(self, parent)
+        self.__parent = parent
+        self.optionVars = optionVars
+
+        # Configure member vars here
+        self.__parent.updateGUIOptionVars(0xFF)
+        # Modal window
+        self.transient(parent)
+        self.__createWidget()
+        self.wait_window(self)
+
+    def __createWidget(self):
+        self.title('Expert/Engineering Settings')
+        expSettingsFrame = tk.Frame(self)
+        expSettingsFrame.pack(fill=tk.BOTH)
+
+        lbl_pingWidth = tk.Label(
+            expSettingsFrame, text='Expected Ping Width(ms)')
+        lbl_pingWidth.grid(row=0, column=0, sticky='new')
+
+        lbl_minWidthMult = tk.Label(
+            expSettingsFrame, text='Min. Width Multiplier')
+        lbl_minWidthMult.grid(row=1, column=0, sticky='new')
+
+        lbl_maxWidthMult = tk.Label(
+            expSettingsFrame, text='Max. Width Multiplier')
+        lbl_maxWidthMult.grid(row=2, column=0, sticky='new')
+
+        lbl_minPingSNR = tk.Label(expSettingsFrame, text='Min. Ping SNR(dB)')
+        lbl_minPingSNR.grid(row=3, column=0, sticky='new')
+
+        lbl_GPSPort = tk.Label(expSettingsFrame, text='GPS Port')
+        lbl_GPSPort.grid(row=4, column=0, sticky='new')
+
+        lbl_GPSBaudRate = tk.Label(expSettingsFrame, text='GPS Baud Rate')
+        lbl_GPSBaudRate.grid(row=5, column=0, sticky='new')
+
+        lbl_outputDir = tk.Label(expSettingsFrame, text='Output Directory')
+        lbl_outputDir.grid(row=6, column=0, sticky='new')
+
+        lbl_GPSMode = tk.Label(expSettingsFrame, text='GPS Mode')
+        lbl_GPSMode.grid(row=7, column=0, sticky='new')
+
+        entr_pingWidth = tk.Entry(
+            expSettingsFrame, textvariable=self.optionVars['DSP_pingWidth'], width=8)
+        entr_pingWidth.grid(row=0, column=1, sticky='new')
+
+        entr_minWidthMult = tk.Entry(
+            expSettingsFrame, textvariable=self.optionVars['DSP_pingMin'], width=8)
+        entr_minWidthMult.grid(row=1, column=1, sticky='new')
+
+        entr_maxWidthMult = tk.Entry(
+            expSettingsFrame, textvariable=self.optionVars['DSP_pingMax'], width=8)
+        entr_maxWidthMult.grid(row=2, column=1, sticky='new')
+
+        entr_minPingSNR = tk.Entry(
+            expSettingsFrame, textvariable=self.optionVars['DSP_pingSNR'], width=8)
+        entr_minPingSNR.grid(row=3, column=1, sticky='new')
+
+        entr_GPSPort = tk.Entry(
+            expSettingsFrame, textvariable=self.optionVars['GPS_device'], width=8)
+        entr_GPSPort.grid(row=4, column=1, sticky='new')
+
+        entr_GPSBaudRate = tk.Entry(
+            expSettingsFrame, textvariable=self.optionVars['GPS_baud'], width=8)
+        entr_GPSBaudRate.grid(row=5, column=1, sticky='new')
+
+        entr_outputDir = tk.Entry(
+            expSettingsFrame, textvariable=self.optionVars['SYS_outputDir'], width=8)
+        entr_outputDir.grid(row=6, column=1, sticky='new')
+
+        entr_GPSMode = tk.Entry(
+            expSettingsFrame, textvariable=self.optionVars['GPS_mode'], width=8)
+        entr_GPSMode.grid(row=7, column=1, sticky='new')
+
+        btn_submit = tk.Button(self, text='submit', command=self.submit)
+        btn_submit.pack()
+
+    def validateParameters(self):
+        return True
+
+    def submit(self):
+        if not self.validateParameters():
+            return
+        self.__parent.submitGUIOptionVars(0xFF)
+
+        self.cancel()
+
+    def cancel(self):
+        self.__parent.focus_set()
+        self.destroy()
+        self.__parent.update()
+
+class AddTargetDialog(tk.Toplevel):
+    def __init__(self, parent, centerFrequency: int, samplingFrequency: int):
+        tk.Toplevel.__init__(self, parent)
+        self.__parent = parent
+        self.targNameEntry = tk.StringVar()
+        self.targFreqEntry = tk.IntVar()
+
+        self.__centerFreq = centerFrequency
+        self.__samplingFreq = samplingFrequency
+
+        self.name = None
+        self.freq = None
+
+        self.transient(parent)
+
+        self.__createWidget()
+
+        self.wait_window(self)
+
+    def __createWidget(self):
+        self.title('Add Target')
+        frm_targetSettings = tk.Frame(self)
+        frm_targetSettings.pack(fill=tk.BOTH)
+
+        lbl_targetName = tk.Label(frm_targetSettings, text='Target Name:')
+        lbl_targetName.grid(row=0, column=0, sticky='new')
+
+        entr_targetName = tk.Entry(
+            frm_targetSettings, textvariable=self.targNameEntry)
+        entr_targetName.grid(row=0, column=1, sticky='new')
+
+        lbl_targetFreq = tk.Label(
+            frm_targetSettings, text='Target Frequency:')
+        lbl_targetFreq.grid(row=1, column=0, sticky='new')
+
+        entr_targetFreq = tk.Entry(
+            frm_targetSettings, textvariable=self.targFreqEntry)
+        entr_targetFreq.grid(row=1, column=1, sticky='new')
+
+        btn_submit = tk.Button(self, text='submit', command=self.submit)
+        btn_submit.pack()
+
+        self.bind('<Escape>', self.cancel)
+
+    def validate(self):
+        return abs(self.targFreqEntry.get() - self.__centerFreq) <= self.__samplingFreq
+
+    def submit(self):
+        if not self.validate():
+            return
+        self.name = self.targNameEntry.get()
+        self.freq = self.targFreqEntry.get()
+        self.cancel()
+
+    def cancel(self):
+        self.__parent.focus_set()
+        self.destroy()
+
+class ConnectionDialog(tk.Toplevel):
+    def __init__(self, parent):
+        tk.Toplevel.__init__(self, parent)
+        self.__parent = parent
+        self.__portEntry = tk.IntVar()
+        self.__portEntry.set(9000)  # default value
+        self.port = None
+        self.comms = None
+        self.model = None
+
+        self.transient(parent)
+
+        self.__createWidget()
+
+        self.wait_window(self)
+
+    def __createWidget(self):
+        self.title('Connect Settings')
+
+        frm_conType = tk.Frame(master=self, width=350,
+                               height=400, bg='light gray')
+        frm_conType.pack(fill=tk.Y, side=tk.LEFT)
+
+        lbl_conType = tk.Label(frm_conType, text='Connection Type:')
+        lbl_conType.pack(fill=tk.X)
+
+        btn_TCP = tk.Checkbutton(frm_conType, text='TCP')
+        btn_TCP.pack(fill=tk.X)
+
+        frm_port = tk.Frame(master=self, width=500, height=400, bg='dark gray')
+        frm_port.pack(fill=tk.BOTH, side=tk.RIGHT)
+
+        lbl_port = tk.Label(frm_port, text='Port')
+        lbl_port.pack(fill=tk.BOTH)
+
+        entr_port = tk.Entry(frm_port, textvariable=self.__portEntry)
+        entr_port.pack(fill=tk.BOTH)
+
+        btn_submit = tk.Button(frm_port, text='Submit', command=self.__submit)
+        btn_submit.pack()
+
+        self.bind('<Escape>', self.__cancel)
+
+    def __submit(self):
+        try:
+            self.port = rctTransport.RCTTCPClient(
+                addr='127.0.0.1', port=self.__portEntry.get())
+            self.comms = rctComms.gcsComms(self.port)
+            self.model = rctCore.MAVModel(self.comms)
+            self.model.start()
+            self.__cancel()
+        except:
+            return
+
+    def __cancel(self):
+        self.__parent.focus_set()
+        self.destroy()
+
 if __name__ == '__main__':
-    logName = dt.datetime.now().strftime('%Y.%m.%d.%H.%M.%S.log')
-    logName = 'log.log'
+    logName = dt.datetime.now().strftime('%Y.%m.%d.%H.%M.%S_gcs.log')
     logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
     ch = logging.StreamHandler(sys.stdout)
     ch.setLevel(logging.WARNING)
     formatter = logging.Formatter(
@@ -818,6 +960,8 @@ if __name__ == '__main__':
     ch = logging.FileHandler(logName)
     ch.setLevel(logging.DEBUG)
     ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
     app = GCS()
     app.mainloop()
     app.quit()
