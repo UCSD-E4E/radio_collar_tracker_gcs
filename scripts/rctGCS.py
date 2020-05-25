@@ -670,9 +670,10 @@ class SystemSettingsControl(CollapseFrame):
 
         targetFrequencies = []
         for targetName in self.targEntries:
-            if not self.validateFrequency(self.targEntries[targetName]):
-                # TODO: add validation message
-                pass
+            if not self.validateFrequency(self.targEntries[targetName][0]):
+                tkm.showerror(
+                title="Invalid Target Frequency", message="Target frequency " + str(self.targEntries[targetName][0].get()) + " is invalid. Please enter another value.")
+                return
             targetFreq = self.targEntries[targetName][0].get()
             targetFrequencies.append(targetFreq)
 
@@ -880,6 +881,8 @@ class AddTargetDialog(tk.Toplevel):
 
     def submit(self):
         if not self.validate():
+            tkm.showerror(
+            title="Invalid Target Frequency", message="You have entered an invalid target frequency. Please try again.")
             return
         self.name = self.targNameEntry.get()
         self.freq = self.targFreqEntry.get()
