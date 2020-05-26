@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 05/25/20  NH  Fixed validate frequency call
 # 05/20/20  NH  Fixed window close action, added function to handle registering
 #                 callbacks when connection established, removed unused
 #                 callbacks, added advanced settings dialog, fixed logging
@@ -674,7 +675,7 @@ class SystemSettingsControl(CollapseFrame):
 
         targetFrequencies = []
         for targetName in self.targEntries:
-            if not self.validateFrequency(self.targEntries[targetName]):
+            if not self.validateFrequency(self.targEntries[targetName][0]):
                 # TODO: add validation message
                 pass
             targetFreq = self.targEntries[targetName][0].get()
