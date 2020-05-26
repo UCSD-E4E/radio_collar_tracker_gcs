@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 05/25/20  NH  Added getter for pings for LocationEstimator and DataManager
 # 05/18/20  NH  Added logic to convert rctPing to/from rctPingPacket
 # 05/05/20  NH  Added estimator
 # 04/25/20  NH  Moved rctPings to own module
@@ -104,7 +105,19 @@ class DataManager:
         return estimator.getEstimate()
 
     def getFrequencies(self):
+        '''
+        Returns a list of the transmitters detected so far
+        '''
         return list(self.__estimators.keys())
+
+    def getPings(self, frequency: int):
+        '''
+        Returns a list of the pings associated with the specified frequency
+        :param frequency:    Transmitter frequency to get pings for
+        :type frequency:    int
+        '''
+        estimator = self.__estimators[frequency]
+        return estimator.getPings()
 
 
 class LocationEstimator:
@@ -190,3 +203,6 @@ class LocationEstimator:
 
     def _getComparator(self):
         pass
+
+    def getPings(self):
+        return self.__pings

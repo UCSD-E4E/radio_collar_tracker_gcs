@@ -20,6 +20,8 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 05/25/20  NH  Added docstring to new events, added callback to process pings,
+#                 added type hint to setFrequencies
 # 05/20/20  NH  Fixed logging message in MAVmodel.setOptions
 # 05/19/20  NH  Removed rctOptions skeleton, added cache bits for options,
 #                 renamed rctCore.__options to rctCore.PP_options, fixed
@@ -140,6 +142,10 @@ class Events(Enum):
     Exception - Callback when an exception message is received
     GetFreqs  - Callback when the payload broadcasts a set of frequencies
     GetOptions - Callback when the payload broadcasts its parameters
+    NoHeartbeat - Callback when no heartbeat has been received for GC_HeartbeatWatchdogTime seconds
+    NewPing - Callback when new ping is received
+    NewEstimate - Callback when new estimate is generated
+
     '''
     Heartbeat = auto(),
     Exception = auto(),
@@ -238,6 +244,8 @@ class MAVModel:
             rctComms.EVENTS.COMMAND_ACK, self.__processAck)
         self.__rx.registerCallback(
             rctComms.EVENTS.GENERAL_NO_HEARTBEAT, self.__processNoHeartbeat)
+        self.__rx.registerCallback(
+            rctComms.EVENTS.DATA_PING, self.__processPing)
 
     def start(self, guiTickCallback=None):
         '''
@@ -395,7 +403,7 @@ class MAVModel:
         for callback in self.__callbacks[Events.Exception]:
             callback()
 
-    def setFrequencies(self, freqs, timeout):
+    def setFrequencies(self, freqs: list, timeout):
         '''
         Sends the command to set the specified PRX_frequencies
         :param freqs: Frequencies to set

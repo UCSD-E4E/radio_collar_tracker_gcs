@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 05/25/20  NH  Fixed validate frequency call
 # 05/24/20  AG  Added error messages during target frequency validation.
 # 05/20/20  NH  Fixed window close action, added function to handle registering
 #                 callbacks when connection established, removed unused

@@ -20,6 +20,8 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 05/23/20  NH  Moved heartbeat watchdog timeout to parameter
+# 05/21/20  NH  Refactored options information into own class
 # 05/20/20  NH  Fixed SYS_autostart type in SETOPT command, added exception
 #                 logging to both receivers
 # 05/18/20  NH  Implemented binary data protocol, moved droneComms to rctComms,
@@ -81,6 +83,33 @@ class COMMAND_ID(enum.Enum):
     START = 0x07
     STOP = 0x09
     UPGRADE = 0x0B
+
+
+class OPTIONS_SCOPE:
+    BASE_OPTIONS = 0x00
+    EXP_OPTIONS = 0x01
+    ENG_OPTIONS = 0xFF
+
+    _baseOptionKeywords = ['SDR_centerFreq', 'SDR_samplingFreq', 'SDR_gain']
+    _expOptionKeywords = ['DSP_pingWidth', 'DSP_pingSNR',
+                          'DSP_pingMax', 'DSP_pingMin', 'SYS_outputDir']
+    _engOptionKeywords = ['GPS_mode',
+                          'GPS_baud', 'GPS_device', 'SYS_autostart']
+
+    _keywordTypes = {
+        'SDR_centerFreq': (int, '<L', 4),
+        'SDR_samplingFreq': (int, '<L', 4),
+        'SDR_gain': ((int, float), '<f', 4),
+        'DSP_pingWidth': ((int, float), '<f', 4),
+        'DSP_pingSNR': ((int, float), '<f', 4),
+        'DSP_pingMax': ((int, float), '<f', 4),
+        'DSP_pingMin': ((int, float), '<f', 4),
+        'SYS_outputDir': (str, 's', 2),
+        'GPS_mode': (int, '<B', 1),
+        'GPS_baud': (int, '<L', 4),
+        'GPS_device': (str, 's', 2),
+        'SYS_autostart': (bool, '<?', 1)
+    }
 
 
 class rctBinaryPacket:
@@ -264,39 +293,16 @@ class rctFrequenciesPacket(rctBinaryPacket):
 
 
 class rctOptionsPacket(rctBinaryPacket):
-    BASE_OPTIONS = 0x00
-    EXP_OPTIONS = 0x01
-    ENG_OPTIONS = 0xFF
-
-    __baseOptionKeywords = ['SDR_centerFreq', 'SDR_samplingFreq', 'SDR_gain']
-    __expOptionKeywords = ['DSP_pingWidth', 'DSP_pingSNR',
-                           'DSP_pingMax', 'DSP_pingMin', 'SYS_outputDir']
-    __engOptionKeywords = ['GPS_mode',
-                           'GPS_baud', 'GPS_device', 'SYS_autostart']
-
-    __keywordTypes = {
-        'SDR_centerFreq': (int, '<L', 4),
-        'SDR_samplingFreq': (int, '<L', 4),
-        'SDR_gain': ((int, float), '<f', 4),
-        'DSP_pingWidth': ((int, float), '<f', 4),
-        'DSP_pingSNR': ((int, float), '<f', 4),
-        'DSP_pingMax': ((int, float), '<f', 4),
-        'DSP_pingMin': ((int, float), '<f', 4),
-        'SYS_outputDir': (str, 's', 2),
-        'GPS_mode': (int, '<B', 1),
-        'GPS_baud': (int, '<L', 4),
-        'GPS_device': (str, 's', 2),
-        'SYS_autostart': (bool, '<?', 1)
-    }
 
     def __init__(self, scope: int, **kwargs):
-        if scope == self.BASE_OPTIONS:
-            acceptedKeywords = self.__baseOptionKeywords
-        elif scope == self.EXP_OPTIONS:
-            acceptedKeywords = self.__baseOptionKeywords + self.__expOptionKeywords
-        elif scope == self.ENG_OPTIONS:
-            acceptedKeywords = self.__baseOptionKeywords + \
-                self.__expOptionKeywords + self.__engOptionKeywords
+        if scope == OPTIONS_SCOPE.BASE_OPTIONS:
+            acceptedKeywords = OPTIONS_SCOPE._baseOptionKeywords
+        elif scope == OPTIONS_SCOPE.EXP_OPTIONS:
+            acceptedKeywords = OPTIONS_SCOPE._baseOptionKeywords + \
+                OPTIONS_SCOPE._expOptionKeywords
+        elif scope == OPTIONS_SCOPE.ENG_OPTIONS:
+            acceptedKeywords = OPTIONS_SCOPE._baseOptionKeywords + \
+                OPTIONS_SCOPE._expOptionKeywords + OPTIONS_SCOPE._engOptionKeywords
         else:
             raise RuntimeError('Unrecognized scope')
 
@@ -307,11 +313,11 @@ class rctOptionsPacket(rctBinaryPacket):
         self.scope = scope
         for keyword in acceptedKeywords:
             assert(isinstance(kwargs[keyword],
-                              self.__keywordTypes[keyword][0]))
+                              OPTIONS_SCOPE._keywordTypes[keyword][0]))
             self.options[keyword] = kwargs[keyword]
-            if self.__keywordTypes[keyword][1] != 's':
+            if OPTIONS_SCOPE._keywordTypes[keyword][1] != 's':
                 self._payload += struct.pack(
-                    self.__keywordTypes[keyword][1], kwargs[keyword])
+                    OPTIONS_SCOPE._keywordTypes[keyword][1], kwargs[keyword])
             else:
                 self._payload += struct.pack('<H', len(kwargs[keyword]))
                 self._payload += kwargs[keyword].encode('ascii')
@@ -330,15 +336,15 @@ class rctOptionsPacket(rctBinaryPacket):
         _, scope = struct.unpack('<BB', payload[0x0000:0x0002])
         idx = 0x0002
         options = {}
-        if scope >= cls.BASE_OPTIONS:
-            for keyword in cls.__baseOptionKeywords:
-                fmt = cls.__keywordTypes[keyword]
+        if scope >= OPTIONS_SCOPE.BASE_OPTIONS:
+            for keyword in OPTIONS_SCOPE._baseOptionKeywords:
+                fmt = OPTIONS_SCOPE._keywordTypes[keyword]
                 options[keyword], = struct.unpack(
                     fmt[1], payload[idx:idx + fmt[2]])
                 idx += fmt[2]
-        if scope >= cls.EXP_OPTIONS:
-            for keyword in cls.__expOptionKeywords:
-                fmt = cls.__keywordTypes[keyword]
+        if scope >= OPTIONS_SCOPE.EXP_OPTIONS:
+            for keyword in OPTIONS_SCOPE._expOptionKeywords:
+                fmt = OPTIONS_SCOPE._keywordTypes[keyword]
                 if fmt[1] != 's':
                     options[keyword], = struct.unpack(
                         fmt[1], payload[idx:idx + fmt[2]])
@@ -348,9 +354,9 @@ class rctOptionsPacket(rctBinaryPacket):
                     options[keyword] = payload[idx +
                                                2:idx + strlen + 2].decode()
                     idx += 2 + strlen
-        if scope >= cls.ENG_OPTIONS:
-            for keyword in cls.__engOptionKeywords:
-                fmt = cls.__keywordTypes[keyword]
+        if scope >= OPTIONS_SCOPE.ENG_OPTIONS:
+            for keyword in OPTIONS_SCOPE._engOptionKeywords:
+                fmt = OPTIONS_SCOPE._keywordTypes[keyword]
                 if fmt[1] != 's':
                     options[keyword], = struct.unpack(
                         fmt[1], payload[idx:idx + fmt[2]])
@@ -533,9 +539,6 @@ class rctSETFCommand(rctBinaryPacket):
 
 
 class rctGETOPTCommand(rctBinaryPacket):
-    BASE_OPTIONS = 0x00
-    EXP_OPTIONS = 0x01
-    ENG_OPTIONS = 0xFF
 
     def __init__(self, scope: int):
         self._pclass = 0x05
@@ -559,39 +562,16 @@ class rctGETOPTCommand(rctBinaryPacket):
 
 
 class rctSETOPTCommand(rctBinaryPacket):
-    BASE_OPTIONS = 0x00
-    EXP_OPTIONS = 0x01
-    ENG_OPTIONS = 0xFF
-
-    __baseOptionKeywords = ['SDR_centerFreq', 'SDR_samplingFreq', 'SDR_gain']
-    __expOptionKeywords = ['DSP_pingWidth', 'DSP_pingSNR',
-                           'DSP_pingMax', 'DSP_pingMin', 'SYS_outputDir']
-    __engOptionKeywords = ['GPS_mode',
-                           'GPS_baud', 'GPS_device', 'SYS_autostart']
-
-    __keywordTypes = {
-        'SDR_centerFreq': (int, '<L', 4),
-        'SDR_samplingFreq': (int, '<L', 4),
-        'SDR_gain': ((int, float), '<f', 4),
-        'DSP_pingWidth': ((int, float), '<f', 4),
-        'DSP_pingSNR': ((int, float), '<f', 4),
-        'DSP_pingMax': ((int, float), '<f', 4),
-        'DSP_pingMin': ((int, float), '<f', 4),
-        'SYS_outputDir': (str, 's', 2),
-        'GPS_mode': (int, '<B', 1),
-        'GPS_baud': (int, '<L', 4),
-        'GPS_device': (str, 's', 2),
-        'SYS_autostart': (bool, '<?', 1)
-    }
 
     def __init__(self, scope: int, **kwargs):
-        if scope >= self.BASE_OPTIONS:
-            acceptedKeywords = self.__baseOptionKeywords
-        if scope >= self.EXP_OPTIONS:
-            acceptedKeywords = self.__baseOptionKeywords + self.__expOptionKeywords
-        if scope >= self.ENG_OPTIONS:
-            acceptedKeywords = self.__baseOptionKeywords + \
-                self.__expOptionKeywords + self.__engOptionKeywords
+        if scope >= OPTIONS_SCOPE.BASE_OPTIONS:
+            acceptedKeywords = OPTIONS_SCOPE._baseOptionKeywords
+        if scope >= OPTIONS_SCOPE.EXP_OPTIONS:
+            acceptedKeywords = OPTIONS_SCOPE._baseOptionKeywords + \
+                OPTIONS_SCOPE._expOptionKeywords
+        if scope >= OPTIONS_SCOPE.ENG_OPTIONS:
+            acceptedKeywords = OPTIONS_SCOPE._baseOptionKeywords + \
+                OPTIONS_SCOPE._expOptionKeywords + OPTIONS_SCOPE._engOptionKeywords
 
         self._pclass = 0x05
         self._pid = 0x05
@@ -600,11 +580,11 @@ class rctSETOPTCommand(rctBinaryPacket):
         self.scope = scope
         for keyword in acceptedKeywords:
             assert(isinstance(kwargs[keyword],
-                              self.__keywordTypes[keyword][0]))
+                              OPTIONS_SCOPE._keywordTypes[keyword][0]))
             self.options[keyword] = kwargs[keyword]
-            if self.__keywordTypes[keyword][1] != 's':
+            if OPTIONS_SCOPE._keywordTypes[keyword][1] != 's':
                 self._payload += struct.pack(
-                    self.__keywordTypes[keyword][1], kwargs[keyword])
+                    OPTIONS_SCOPE._keywordTypes[keyword][1], kwargs[keyword])
             else:
                 self._payload += struct.pack('<H', len(kwargs[keyword]))
                 self._payload += kwargs[keyword].encode('ascii')
@@ -623,15 +603,15 @@ class rctSETOPTCommand(rctBinaryPacket):
         _, scope = struct.unpack('<BB', payload[0x0000:0x0002])
         idx = 0x0002
         options = {}
-        if scope >= cls.BASE_OPTIONS:
-            for keyword in cls.__baseOptionKeywords:
-                fmt = cls.__keywordTypes[keyword]
+        if scope >= OPTIONS_SCOPE.BASE_OPTIONS:
+            for keyword in OPTIONS_SCOPE._baseOptionKeywords:
+                fmt = OPTIONS_SCOPE._keywordTypes[keyword]
                 options[keyword], = struct.unpack(
                     fmt[1], payload[idx:idx + fmt[2]])
                 idx += fmt[2]
-        if scope >= cls.EXP_OPTIONS:
-            for keyword in cls.__expOptionKeywords:
-                fmt = cls.__keywordTypes[keyword]
+        if scope >= OPTIONS_SCOPE.EXP_OPTIONS:
+            for keyword in OPTIONS_SCOPE._expOptionKeywords:
+                fmt = OPTIONS_SCOPE._keywordTypes[keyword]
                 if fmt[1] != 's':
                     options[keyword], = struct.unpack(
                         fmt[1], payload[idx:idx + fmt[2]])
@@ -641,9 +621,9 @@ class rctSETOPTCommand(rctBinaryPacket):
                     options[keyword] = payload[idx +
                                                2:idx + strlen + 2].decode()
                     idx += 2 + strlen
-        if scope >= cls.ENG_OPTIONS:
-            for keyword in cls.__engOptionKeywords:
-                fmt = cls.__keywordTypes[keyword]
+        if scope >= OPTIONS_SCOPE.ENG_OPTIONS:
+            for keyword in OPTIONS_SCOPE._engOptionKeywords:
+                fmt = OPTIONS_SCOPE._keywordTypes[keyword]
                 if fmt[1] != 's':
                     options[keyword], = struct.unpack(
                         fmt[1], payload[idx:idx + fmt[2]])
@@ -799,7 +779,7 @@ class gcsComms:
     '''
     __BUFFER_LEN = 1024
 
-    def __init__(self, port: rctTransport.RCTAbstractTransport):
+    def __init__(self, port: rctTransport.RCTAbstractTransport, GC_HeartbeatWatchdogTime=30):
         '''
         Initializes the UDP interface on the specified port.  Also specifies a
         filename to use as a logfile, which defaults to no log.
@@ -824,9 +804,11 @@ class gcsComms:
             EVENTS.GENERAL_UNKNOWN.value: [],
         }
 
+        self.GC_HeartbeatWatchdogTime = GC_HeartbeatWatchdogTime
+
         self.__parser = rctBinaryPacketFactory()
 
-    def waitForHeartbeat(self, guiTick=None, timeout: int=30):
+    def waitForHeartbeat(self, guiTick=None, timeout: int=None):
         '''
         Waits to receive a heartbeat packet.  Returns a tuple containing the
         MAV's IP address and port number as a single tuple, and the contents of
@@ -836,7 +818,8 @@ class gcsComms:
         :param timeout: Seconds to wait before timing out
         :type timeout: Integer
         '''
-        assert(isinstance(timeout, (int)))
+        if timeout is None:
+            timeout = self.GC_HeartbeatWatchdogTime
         for _ in range(timeout):
             try:
                 data, addr = self.sock.receive(1024, 1)
@@ -884,7 +867,7 @@ class gcsComms:
             except TimeoutError:
                 pass
 
-            if (dt.datetime.now() - self.__lastHeartbeat).total_seconds() > 30:
+            if (dt.datetime.now() - self.__lastHeartbeat).total_seconds() > self.GC_HeartbeatWatchdogTime:
                 self.__log.warning(
                     "No heartbeats, last heartbeat at %s" % self.__lastHeartbeat)
                 for callback in self.__packetMap[EVENTS.GENERAL_NO_HEARTBEAT.value]:

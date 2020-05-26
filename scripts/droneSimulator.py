@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 05/23/20  NH  Fixed simulator run/stop actions
 # 05/20/20  NH  Added droneSim.reset to facilitate simulator reset, fixed
 #                 logging setup
 # 05/19/20  NH  Renamed droneSim.__options to droneSim.PP_options to provide
@@ -102,7 +103,7 @@ class droneSim:
         }
 
         # SM - Simulator Mission parameters
-        self.SM_missionRun = False
+        self.SM_missionRun = True
 
         self.SM_utmZoneNum = 11
         self.SM_utmZone = 'S'
@@ -209,7 +210,7 @@ class droneSim:
         }
 
         # SM - Simulator Mission parameters
-        self.SM_missionRun = False
+        self.SM_missionRun = True
 
         self.SM_utmZoneNum = 11
         self.SM_utmZone = 'S'
@@ -376,14 +377,10 @@ class droneSim:
 
     def __doStartMission(self, packet: rctComms.rctSTARTCommand, addr: str):
         self.SS_payloadRunning = True
-        self.SM_missionRun = True
         self.__ackCommand(packet)
-        self.__missionThread = threading.Thread(target=self.doMission)
-        self.__missionThread.start()
 
     def __doStopMission(self, packet: rctComms.rctSTOPCommand, addr: str):
         self.SS_payloadRunning = False
-        self.__missionThread.join()
         self.__ackCommand(packet)
 
     def __doSetFrequency(self, packet: rctComms.rctSETFCommand, addr: str):
@@ -572,7 +569,7 @@ if __name__ == '__main__':
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
     ch = logging.StreamHandler(sys.stdout)
-    ch.setLevel(logging.INFO)
+    ch.setLevel(logging.ERROR)
     formatter = logging.Formatter(
         '%(asctime)s.%(msecs)03d: %(levelname)s:%(name)s: %(message)s', datefmt='%Y-%M-%d %H:%m:%S')
     ch.setFormatter(formatter)

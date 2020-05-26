@@ -105,3 +105,10 @@ droneSim.transmitPosition()
 droneSim.doMission(returnOnEnd:bool)
 droneSim.calculatePingMeasurement()
 ```
+
+###Executing a Mission
+```
+bash$ ipython -i droneSimulator.py -- --protocol tcp
+ipython>>> sim.start()
+ipython>>> sim.doMission()
+```

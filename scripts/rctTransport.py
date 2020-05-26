@@ -20,6 +20,7 @@
 #
 # DATE      WHO DESCRIPTION
 # -----------------------------------------------------------------------------
+# 05/25/20  NH  Started docstrings
 # 05/20/20  NH  Fixed select condition in TCP clients
 # 05/18/20  NH  Removed unused enumerations
 # 04/26/20  NH  Added TCP Server and Client
@@ -35,6 +36,9 @@ import os
 
 
 class RCTAbstractTransport(abc.ABC):
+    '''
+    Abstract transport class - all transport types should inherit from this 
+    '''
     @abc.abstractmethod
     def __init__(self):
         pass
