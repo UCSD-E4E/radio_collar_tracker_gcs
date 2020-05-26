@@ -21,6 +21,7 @@
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
 # 05/25/20  NH  Fixed validate frequency call
+# 05/24/20  AG  Added error messages during target frequency validation.
 # 05/20/20  NH  Fixed window close action, added function to handle registering
 #                 callbacks when connection established, removed unused
 #                 callbacks, added advanced settings dialog, fixed logging
@@ -60,7 +61,6 @@ from matplotlib.backends.backend_tkagg import (
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 
-
 class GCS(tk.Tk):
     '''
     Ground Control Station GUI
@@ -86,7 +86,6 @@ class GCS(tk.Tk):
         self.innerFreqFrame = None
         self.freqElements = []
         self.targEntries = {}
-
         self.__createWidgets()
         for button in self._buttons:
             button.config(state='disabled')
@@ -507,7 +506,6 @@ class GCS(tk.Tk):
                                     textvariable=self.__missionStatusText, command=self.__startStopMission)
         btn_startRecord.grid(column=0, row=4, sticky='nsew')
 
-
 class CollapseFrame(ttk.Frame):
     '''
     Helper class to deal with collapsible GUI components
@@ -557,7 +555,6 @@ class CollapseFrame(ttk.Frame):
 
     def updateText(self, newText="label"):
         self._button.config(text=newText)
-
 
 class SystemSettingsControl(CollapseFrame):
     def __init__(self, parent, root: GCS):
@@ -676,8 +673,9 @@ class SystemSettingsControl(CollapseFrame):
         targetFrequencies = []
         for targetName in self.targEntries:
             if not self.validateFrequency(self.targEntries[targetName][0]):
-                # TODO: add validation message
-                pass
+                tkm.showerror(
+                title="Invalid Target Frequency", message="Target frequency " + str(self.targEntries[targetName][0].get()) + " is invalid. Please enter another value.")
+                return
             targetFreq = self.targEntries[targetName][0].get()
             targetFrequencies.append(targetFreq)
 
@@ -740,7 +738,6 @@ class SystemSettingsControl(CollapseFrame):
 
         self.__root._mavModel.addFrequency(freq, self.__root.defaultTimeout)
         self.update()
-
 
 class ExpertSettingsDialog(tk.Toplevel):
     def __init__(self, parent: SystemSettingsControl, optionVars: dict):
@@ -837,7 +834,6 @@ class ExpertSettingsDialog(tk.Toplevel):
         self.destroy()
         self.__parent.update()
 
-
 class AddTargetDialog(tk.Toplevel):
     def __init__(self, parent, centerFrequency: int, samplingFrequency: int):
         tk.Toplevel.__init__(self, parent)
@@ -887,6 +883,8 @@ class AddTargetDialog(tk.Toplevel):
 
     def submit(self):
         if not self.validate():
+            tkm.showerror(
+            title="Invalid Target Frequency", message="You have entered an invalid target frequency. Please try again.")
             return
         self.name = self.targNameEntry.get()
         self.freq = self.targFreqEntry.get()
@@ -895,7 +893,6 @@ class AddTargetDialog(tk.Toplevel):
     def cancel(self):
         self.__parent.focus_set()
         self.destroy()
-
 
 class ConnectionDialog(tk.Toplevel):
     def __init__(self, parent):
@@ -954,7 +951,6 @@ class ConnectionDialog(tk.Toplevel):
     def __cancel(self):
         self.__parent.focus_set()
         self.destroy()
-
 
 if __name__ == '__main__':
     logName = dt.datetime.now().strftime('%Y.%m.%d.%H.%M.%S_gcs.log')
