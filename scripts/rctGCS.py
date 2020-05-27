@@ -45,14 +45,16 @@ import rctComms
 import rctCore
 from tkinter.filedialog import askopenfilename
 import os
-from PIL import Image, ImageTk
 from matplotlib.backends.backend_tkagg import (
     FigureCanvasTkAgg, NavigationToolbar2Tk)
-from matplotlib.backend_bases import key_press_handler
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
-import rasterio as rio
-from rasterio.plot import show
+import numpy as np
+from mpl_toolkits.basemap import Basemap
+import math
+import urllib.request
+import io
+import georaster
 
 class GCS(tk.Tk):
     '''
@@ -74,6 +76,7 @@ class GCS(tk.Tk):
         self.cntrFreqEntry = StringVar()
         self.sampFreqEntry = StringVar()
         self.sdrGainEntry = StringVar()
+        self.missionDisplay = StringVar()
         self.__createWidgets()
         for button in self.__buttons:
             button.config(state='disabled')
@@ -83,6 +86,8 @@ class GCS(tk.Tk):
             rctCore.Events.Exception, self.__handleRemoteException)
         self.__mavModel.registerCallback(
             rctCore.Events.GetFreqs, self.__setFreqsFromRemote)
+        self.__mavModel.registerCallback(
+            rctCore.Events.Heartbeat, self.__heartbeatCallback)
 
     def start(self):
         '''
@@ -125,6 +130,10 @@ class GCS(tk.Tk):
         self.__startThread = threading.Thread(target=self.start)
         self.__startThread.start()
         tk.Tk.mainloop(self, n=n)
+
+    def __heartbeatCallback(self):
+        if (self.__mavModel.swStatus != 0):
+            self.missionDisplay.set('Start Recording')
 
     def __startCommand(self):
         '''
@@ -390,6 +399,57 @@ class GCS(tk.Tk):
         btn_submit = tk.Button(settingsWindow, text='submit', command=submit)
         btn_submit.pack()
 
+    def __loadMapFile(self, frm_mapSpacer):
+        filename = askopenfilename()
+        print(filename)
+        fig = Figure(figsize=(5, 4), dpi=100)
+
+
+        '''
+        canvas1 = FigureCanvasTkAgg(fig, master=frm_mapSpacer)
+        canvas1.draw()
+        canvas1.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1, padx=10, pady=5)
+
+        canvas1._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=1, padx=10, pady=5)
+        '''
+        fig = plt.figure(figsize=(5,5))
+
+        f = Figure(figsize=(4,4), dpi=100)
+
+        
+        my_image = georaster.SingleBandRaster(filename, load_data=False)
+        
+        minx, maxx, miny, maxy = my_image.extent
+        
+        a = fig.add_subplot(111)
+
+        mapSpace = 1
+
+        m = Basemap( projection='cyl', \
+                    llcrnrlon=minx-mapSpace, \
+                    llcrnrlat=miny-mapSpace, \
+                    urcrnrlon=maxx+mapSpace, \
+                    urcrnrlat=maxy+mapSpace, \
+                    resolution='h', ax=a)
+
+        m.drawcoastlines(color="gray")
+        m.fillcontinents(color='beige')
+        m.shadedrelief()
+
+        canvas = FigureCanvasTkAgg(fig, master=frm_mapSpacer)
+        canvas.draw()
+        canvas.get_tk_widget().pack(side='top', fill='both', expand=0)
+
+        toolbar = NavigationToolbar2Tk( canvas, frm_mapSpacer )
+        toolbar.update()
+        canvas._tkcanvas.pack(side='top', fill='both', expand=0)
+
+        
+        image = georaster.SingleBandRaster( filename, \
+                                load_data=(minx, maxx, miny, maxy), \
+                                latlon=True)
+    
+        plt.imshow(image.r, extent=(minx, maxx, miny, maxy), zorder=10, alpha=0.8)
 
 
     def __createWidgets(self):
@@ -422,47 +482,20 @@ class GCS(tk.Tk):
         frm_mapGrid.pack(fill=tk.BOTH, side=tk.LEFT)
         frm_mapGrid.grid_columnconfigure(0, weight=1)
         frm_mapGrid.grid_rowconfigure(0, weight=1)
-        frm_mapSpacer = tk.Frame(master=frm_mapGrid, bg='gray', height=400, width=450)
+        frm_mapSpacer = tk.Frame(master=frm_mapGrid, bg='gray', height=548, width=800)
+        frm_mapSpacer.pack_propagate(0)
         frm_mapSpacer.grid(column=1,row=1) 
-        dirName = os.path.dirname(__file__)
-        path=os.path.join(dirName, '../../map.jpg')
-        load = Image.open(path)
-        render = ImageTk.PhotoImage(load)
-        img = Label(frm_mapSpacer, image=render)
-        img.image = render
-        img.pack(fill=tk.BOTH, expand=1)
 
         frm_displayTools = CollapseFrame(frm_sideControl, 'Data Display Tools')
         frm_displayTools.grid(column=0, row=2, sticky='n')
 
-        def __selectMapFile():
-            img.destroy()
-            filename = askopenfilename()
-            print(filename)
-            fig = Figure(figsize=(5, 4), dpi=100)
 
-            canvas1 = FigureCanvasTkAgg(fig, master=frm_mapSpacer)
-            canvas1.draw()
-            canvas1.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1, padx=10, pady=5)
 
-            canvas1._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=1, padx=10, pady=5)
-
-            ax = fig.add_subplot(111)
-
-            with rio.open(filename) as src_plot:
-                show(src_plot, ax=ax, cmap='gist_gray')
-                plt.close()
-                ax.spines["top"].set_visible(False)
-                ax.spines["right"].set_visible(False)
-                ax.spines["left"].set_visible(False)
-                ax.spines["bottom"].set_visible(False)
-                canvas1.draw()
-
-        btn_loadMap = Button(frm_displayTools.frame, command=__selectMapFile, relief=tk.FLAT, width=SBWidth, text ="Load Map")
+        btn_loadMap = Button(frm_displayTools.frame, command=lambda: self.__loadMapFile(frm_mapSpacer), relief=tk.FLAT, width=SBWidth, text ="Load Map")
         btn_loadMap.grid(column=0, row=0, sticky='new')
 
-        btn_export = Button(frm_displayTools.frame, relief=tk.FLAT, width=SBWidth, text ="Export")
-        btn_export.grid(column=0, row=2, sticky='new')
+#        btn_export = Button(frm_displayTools.frame, relief=tk.FLAT, width=SBWidth, text ="Export", command=__openStreetMaps)
+ #       btn_export.grid(column=0, row=2, sticky='new')
 
 
         # MAP OPTIONS
@@ -630,7 +663,8 @@ class GCS(tk.Tk):
         btn_advSettings.grid(column=0, columnspan=2, row=6)
 
         # START PAYLOAD RECORDING
-        btn_startRecord = tk.Button(frm_sideControl, width=SBWidth, text='Start Recording')
+        self.missionDisplay.set(str("Not Connected"))
+        btn_startRecord = tk.Button(frm_sideControl, width=SBWidth, text=self.missionDisplay.get())
         btn_startRecord.grid(column=0, row=4, sticky='nsew')
 
 SBWidth=25
