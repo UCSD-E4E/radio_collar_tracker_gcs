@@ -21,6 +21,7 @@
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
 # 05/25/20  NH  Fixed validate frequency call
+# 05/24/20  ML  Implemented ability to load map, refactored map functions
 # 05/24/20  AG  Added error messages during target frequency validation.
 # 05/20/20  NH  Fixed window close action, added function to handle registering
 #                 callbacks when connection established, removed unused
@@ -696,17 +697,15 @@ class SystemSettingsControl(CollapseFrame):
                                     text='Expert & Debug Configuration', relief=tk.FLAT, command=self.__advancedSettings)
         btn_advSettings.grid(column=0, columnspan=2, row=6)
 
-<<<<<<< HEAD
         # START PAYLOAD RECORDING
         self.missionDisplay.set(str("Not Connected"))
         btn_startRecord = tk.Button(frm_sideControl, width=SBWidth, text=self.missionDisplay.get())
         btn_startRecord.grid(column=0, row=4, sticky='nsew')
-=======
+
     def clearTargets(self):
         self.__root._mavModel.setFrequencies(
             [], timeout=self.__root.defaultTimeout)
         self.update()
->>>>>>> v1.0a
 
     def __advancedSettings(self):
         ExpertSettingsDialog(self, self.optionVars)
