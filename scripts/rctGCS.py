@@ -95,19 +95,10 @@ class GCS(tk.Tk):
         self.cntrFreqEntry = StringVar()
         self.sampFreqEntry = StringVar()
         self.sdrGainEntry = StringVar()
-        self.missionDisplay = StringVar()
         self.targEntries = {}
         self.__createWidgets()
         for button in self._buttons:
             button.config(state='disabled')
-        self.__mavModel.registerCallback(
-            rctCore.Events.Heartbeat, self.__updateStatus)
-        self.__mavModel.registerCallback(
-            rctCore.Events.Exception, self.__handleRemoteException)
-        self.__mavModel.registerCallback(
-            rctCore.Events.GetFreqs, self.__setFreqsFromRemote)
-        self.__mavModel.registerCallback(
-            rctCore.Events.Heartbeat, self.__heartbeatCallback)
         self.protocol('WM_DELETE_WINDOW', self.__windowClose)
 
     def __registerModelCallbacks(self):
@@ -502,7 +493,7 @@ class GCS(tk.Tk):
 
 
         btn_loadMap = Button(frm_displayTools.frame, command=lambda: self.__loadMapFile(frm_mapSpacer), 
-                relief=tk.FLAT, width=SBWidth, text ="Load Map")
+                relief=tk.FLAT, width=self.SBWidth, text ="Load Map")
         btn_loadMap.grid(column=0, row=0, sticky='new')
 
 
@@ -697,10 +688,6 @@ class SystemSettingsControl(CollapseFrame):
                                     text='Expert & Debug Configuration', relief=tk.FLAT, command=self.__advancedSettings)
         btn_advSettings.grid(column=0, columnspan=2, row=6)
 
-        # START PAYLOAD RECORDING
-        self.missionDisplay.set(str("Not Connected"))
-        btn_startRecord = tk.Button(frm_sideControl, width=SBWidth, text=self.missionDisplay.get())
-        btn_startRecord.grid(column=0, row=4, sticky='nsew')
 
     def clearTargets(self):
         self.__root._mavModel.setFrequencies(
