@@ -243,6 +243,7 @@ class GCS(tk.Tk):
         self._systemConnectionTab.updateText("System: Connected")
         self.__registerModelCallbacks()
         self.systemSettingsWidget.updateGUIOptionVars()
+        self.componentStatusWidget.updateGUIOptionVars()
 
     def __advancedSettings(self):
         '''
@@ -404,12 +405,14 @@ class GCS(tk.Tk):
                text="Connect", command=self.__handleConnectInput).grid(column=0, row=0, sticky='new')
 
         # COMPONENTS TAB
-        frm_components = CollapseFrame(frm_sideControl, 'Components')
-        frm_components.grid(column=0, row=1, sticky='new')
+        self.componentStatusWidget = ComponentStatusDisplay(frm_sideControl, self)
+        self.componentStatusWidget.grid(column=0, row=1, sticky='new')
 
+        '''
         lbl_componentNotif = tk.Label(
-            frm_components.frame, width=self.SBWidth, text='Vehicle not connected')
+            self.componentStatusWidget.frame, width=self.SBWidth, text='Vehicle not connected')
         lbl_componentNotif.grid(column=0, row=0, sticky='new')
+        '''
 
         # DATA DISPLAY TOOLS
         frm_mapGrid = tk.Frame(master=self)
@@ -555,6 +558,59 @@ class CollapseFrame(ttk.Frame):
 
     def updateText(self, newText="label"):
         self._button.config(text=newText)
+
+class ComponentStatusDisplay(CollapseFrame):
+    def __init__(self, parent, root: GCS):
+        CollapseFrame.__init__(self, parent, labelText='Components')
+        self.__parent = parent
+        self.__root = root
+
+        self.__innerFrame = None
+
+        self.statusVars = {
+            "STS_sdrStatus": tk.StringVar(),
+            "STS_dirStatus": tk.StringVar(),
+            "STS_gpsStatus": tk.StringVar(),
+            "STS_sysStatus": tk.StringVar(),
+            "STS_swStatus": tk.StringVar(),
+        }
+
+        self.__createWidget()
+
+    def update(self):
+        CollapseFrame.update(self)
+        self.__createWidget()
+
+    def __createWidget(self):
+        if self.__innerFrame:
+            self.__innerFrame.destroy()
+        self.__innerFrame = tk.Frame(self.frame)
+        self.__innerFrame.grid(row=0, column=0, sticky='nesw')
+
+        lbl_sdr_status = tk.Label(self.__innerFrame, text='SDR Status')
+        lbl_sdr_status.grid(row=1, column=0, sticky='new')
+
+        lbl_dir_status = tk.Label(self.__innerFrame, text='Storage Status')
+        lbl_dir_status.grid(row=2, column=0, sticky='new')
+
+        lbl_gps_status = tk.Label(self.__innerFrame, text='GPS Status')
+        lbl_gps_status.grid(row=3, column=0, sticky='new')
+
+        entr_sdr_status = tk.Entry(self.__innerFrame, state='disabled', textvariable=self.statusVars['STS_sdrStatus'], width=8)
+        entr_sdr_status.grid(row=1, column=1, sticky='new')
+
+        entr_dir_status = tk.Entry(self.__innerFrame, state='disabled', textvariable=self.statusVars['STS_dirStatus'], width=8)
+        entr_dir_status.grid(row=2, column=1, sticky='new')
+
+        entr_gps_status = tk.Entry(self.__innerFrame, state='disabled', textvariable=self.statusVars['STS_gpsStatus'], width=8)
+        entr_gps_status.grid(row=3, column=1, sticky='new')
+
+    def updateGUIOptionVars(self, scope=0):
+        varDict = self.__root._mavModel.state
+        for varName, varValue in varDict.items():
+            self.statusVars[varName].set(str(varValue))
+        self.update()
+
 
 class SystemSettingsControl(CollapseFrame):
     def __init__(self, parent, root: GCS):
