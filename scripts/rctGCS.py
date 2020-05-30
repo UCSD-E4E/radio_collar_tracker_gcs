@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 05/29/20  ML  refactored MapControl 
 # 05/25/20  NH  Fixed validate frequency call
 # 05/24/20  ML  Implemented ability to load map, refactored map functions
 # 05/24/20  AG  Added error messages during target frequency validation.
@@ -92,10 +93,8 @@ class GCS(tk.Tk):
         self.__missionStatusText.set("Start Recording")
         self.innerFreqFrame = None
         self.freqElements = []
-        self.cntrFreqEntry = StringVar()
-        self.sampFreqEntry = StringVar()
-        self.sdrGainEntry = StringVar()
         self.targEntries = {}
+        self.mapControl = None
         self.__createWidgets()
         for button in self._buttons:
             button.config(state='disabled')
@@ -398,58 +397,6 @@ class GCS(tk.Tk):
         btn_submit = tk.Button(settingsWindow, text='submit', command=submit)
         btn_submit.pack()
 
-    def __loadMapFile(self, frm_mapSpacer):
-        filename = askopenfilename()
-        print(filename)
-        fig = Figure(figsize=(5, 4), dpi=100)
-
-
-        '''
-        canvas1 = FigureCanvasTkAgg(fig, master=frm_mapSpacer)
-        canvas1.draw()
-        canvas1.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1, padx=10, pady=5)
-
-        canvas1._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=1, padx=10, pady=5)
-        '''
-        fig = plt.figure(figsize=(5,5))
-
-        f = Figure(figsize=(4,4), dpi=100)
-
-        
-        my_image = georaster.SingleBandRaster(filename, load_data=False)
-        
-        minx, maxx, miny, maxy = my_image.extent
-        
-        a = fig.add_subplot(111)
-
-        mapSpace = 1
-
-        m = Basemap( projection='cyl', \
-                    llcrnrlon=minx-mapSpace, \
-                    llcrnrlat=miny-mapSpace, \
-                    urcrnrlon=maxx+mapSpace, \
-                    urcrnrlat=maxy+mapSpace, \
-                    resolution='h', ax=a)
-
-        m.drawcoastlines(color="gray")
-        m.fillcontinents(color='beige')
-        m.shadedrelief()
-
-        canvas = FigureCanvasTkAgg(fig, master=frm_mapSpacer)
-        canvas.draw()
-        canvas.get_tk_widget().pack(side='top', fill='both', expand=0)
-
-        toolbar = NavigationToolbar2Tk( canvas, frm_mapSpacer )
-        toolbar.update()
-        canvas._tkcanvas.pack(side='top', fill='both', expand=0)
-
-        
-        image = georaster.SingleBandRaster( filename, \
-                                load_data=(minx, maxx, miny, maxy), \
-                                latlon=True)
-    
-        plt.imshow(image.r, extent=(minx, maxx, miny, maxy), zorder=10, alpha=0.8)
-
 
     def __createWidgets(self):
         '''
@@ -479,59 +426,8 @@ class GCS(tk.Tk):
         lbl_componentNotif.grid(column=0, row=0, sticky='new')
 
         # DATA DISPLAY TOOLS
-        frm_mapGrid = tk.Frame(master=self)
-        frm_mapGrid.pack(fill=tk.BOTH, side=tk.LEFT)
-        frm_mapGrid.grid_columnconfigure(0, weight=1)
-        frm_mapGrid.grid_rowconfigure(0, weight=1)
-        frm_mapSpacer = tk.Frame(master=frm_mapGrid, bg='gray', height=548, width=800)
-        frm_mapSpacer.pack_propagate(0)
-        frm_mapSpacer.grid(column=1,row=1) 
-
-        frm_displayTools = CollapseFrame(frm_sideControl, 'Data Display Tools')
-        frm_displayTools.grid(column=0, row=2, sticky='n')
-
-
-
-        btn_loadMap = Button(frm_displayTools.frame, command=lambda: self.__loadMapFile(frm_mapSpacer), 
-                relief=tk.FLAT, width=self.SBWidth, text ="Load Map")
-        btn_loadMap.grid(column=0, row=0, sticky='new')
-
-
-        btn_export = Button(frm_displayTools.frame,
-                            relief=tk.FLAT, width=self.SBWidth, text="Export")
-        btn_export.grid(column=0, row=2, sticky='new')
-
-        # MAP OPTIONS
-        frm_mapOptions = tk.Frame(master=frm_mapGrid, width=self.SBWidth)
-        frm_mapOptions.grid(column=0, row=0)
-
-        lbl_mapOptions = tk.Label(
-            frm_mapOptions, bg='gray', width=self.SBWidth, text='Map Options')
-        lbl_mapOptions.grid(column=0, row=0, sticky='ew')
-
-        btn_setSearchArea = tk.Button(frm_mapOptions,  bg='light gray', width=self.SBWidth,
-                                      relief=tk.FLAT, text='Set Search Area')
-        btn_setSearchArea.grid(column=0, row=1, sticky='ew')
-
-        btn_cacheMap = tk.Button(frm_mapOptions, width=self.SBWidth,  bg='light gray',
-                                 relief=tk.FLAT, text='Cache Map')
-        btn_cacheMap.grid(column=0, row=2)
-
-        # MAP LEGEND
-        frm_mapLegend = tk.Frame(master=frm_mapGrid, width=self.SBWidth)
-        frm_mapLegend.grid(column=0, row=2)
-
-        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
-                              bg='gray', text='Map Legend')
-        lbl_legend.grid(column=0, row=0, sticky='ew')
-
-        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
-                              bg='light gray', text='Vehicle')
-        lbl_legend.grid(column=0, row=1, sticky='ew')
-
-        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
-                              bg='light gray', text='Target')
-        lbl_legend.grid(column=0, row=2, sticky='ew')
+        self.mapControl = MapControl(frm_sideControl, self)
+        self.mapControl.grid(column=0, row=2, sticky='n')
 
         # SYSTEM SETTINGS
         self.systemSettingsWidget = SystemSettingsControl(
@@ -989,6 +885,119 @@ class ConnectionDialog(tk.Toplevel):
     def __cancel(self):
         self.__parent.focus_set()
         self.destroy()
+
+
+class MapControl(CollapseFrame):    
+    SBWidth = 25
+    def __init__(self, parent, root: GCS):
+        CollapseFrame.__init__(self, parent, labelText='Map Display Tools')
+        self.__parent = parent
+        self.__root = root
+
+        self.__mapFrame = None
+
+        self.__createWidgets()
+
+
+    def __createWidgets(self):
+        frm_mapGrid = tk.Frame(master=self.__root)
+        frm_mapGrid.pack(fill=tk.BOTH, side=tk.LEFT)
+        frm_mapGrid.grid_columnconfigure(0, weight=1)
+        frm_mapGrid.grid_rowconfigure(0, weight=1)
+        self.__mapFrame = tk.Frame(master=frm_mapGrid, bg='gray', height=548, width=800)
+        self.__mapFrame.pack_propagate(0)
+        self.__mapFrame.grid(column=1,row=1) 
+
+
+
+
+        btn_loadMap = Button(self.frame, command=self.__loadMapFile, 
+                relief=tk.FLAT, width=self.SBWidth, text ="Load Map")
+        btn_loadMap.grid(column=0, row=0, sticky='new')
+
+
+        btn_export = Button(self.frame,
+                            relief=tk.FLAT, width=self.SBWidth, text="Export")
+        btn_export.grid(column=0, row=2, sticky='new')
+
+        # MAP OPTIONS
+        frm_mapOptions = tk.Frame(master=frm_mapGrid, width=self.SBWidth)
+        frm_mapOptions.grid(column=0, row=0)
+
+        lbl_mapOptions = tk.Label(
+            frm_mapOptions, bg='gray', width=self.SBWidth, text='Map Options')
+        lbl_mapOptions.grid(column=0, row=0, sticky='ew')
+
+        btn_setSearchArea = tk.Button(frm_mapOptions,  bg='light gray', width=self.SBWidth,
+                                      relief=tk.FLAT, text='Set Search Area')
+        btn_setSearchArea.grid(column=0, row=1, sticky='ew')
+
+        btn_cacheMap = tk.Button(frm_mapOptions, width=self.SBWidth,  bg='light gray',
+                                 relief=tk.FLAT, text='Cache Map')
+        btn_cacheMap.grid(column=0, row=2)
+
+        # MAP LEGEND
+        frm_mapLegend = tk.Frame(master=frm_mapGrid, width=self.SBWidth)
+        frm_mapLegend.grid(column=0, row=2)
+
+        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
+                              bg='gray', text='Map Legend')
+        lbl_legend.grid(column=0, row=0, sticky='ew')
+
+        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
+                              bg='light gray', text='Vehicle')
+        lbl_legend.grid(column=0, row=1, sticky='ew')
+
+        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
+                              bg='light gray', text='Target')
+        lbl_legend.grid(column=0, row=2, sticky='ew')
+
+    def __loadMapFile(self):
+
+        filename = askopenfilename()
+        print(filename)
+
+        self.__clearMap()
+
+        fig = plt.figure(figsize=(5,5))
+        
+        my_image = georaster.SingleBandRaster(filename, load_data=False)
+        
+        minx, maxx, miny, maxy = my_image.extent
+        
+        a = fig.add_subplot(111)
+
+        mapSpace = 1
+
+        m = Basemap( projection='cyl', \
+                    llcrnrlon=minx-mapSpace, \
+                    llcrnrlat=miny-mapSpace, \
+                    urcrnrlon=maxx+mapSpace, \
+                    urcrnrlat=maxy+mapSpace, \
+                    resolution='h', ax=a)
+
+        m.drawcoastlines(color="gray")
+        m.fillcontinents(color='beige')
+        m.shadedrelief()
+
+        canvas = FigureCanvasTkAgg(fig, master=self.__mapFrame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(side='top', fill='both', expand=0)
+
+        toolbar = NavigationToolbar2Tk( canvas, self.__mapFrame )
+        toolbar.update()
+        canvas._tkcanvas.pack(side='top', fill='both', expand=0)
+
+        
+        image = georaster.SingleBandRaster( filename, \
+                                load_data=(minx, maxx, miny, maxy), \
+                                latlon=True)
+    
+        plt.imshow(image.r, extent=(minx, maxx, miny, maxy), zorder=10, alpha=0.8)
+
+    def __clearMap(self):
+        for child in self.__mapFrame.winfo_children():
+            child.destroy()
 
 if __name__ == '__main__':
     logName = dt.datetime.now().strftime('%Y.%m.%d.%H.%M.%S_gcs.log')
