@@ -64,9 +64,6 @@ from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.basemap import Basemap
-import math
-import urllib.request
-import io
 import georaster
 
 class GCS(tk.Tk):

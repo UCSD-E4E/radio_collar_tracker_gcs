@@ -11,6 +11,7 @@ utm = "*"
 simplekml = "*"
 scipy = "*"
 matplotlib = "*"
+georaster = "*"
 
 [requires]
 python_version = "3.6"
