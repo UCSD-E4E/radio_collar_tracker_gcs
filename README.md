@@ -4,6 +4,14 @@ from v1.0.  Working branch v1.0a, becomes v2.0 on release
 
 ## Dependencies
 1.	python3-tk
+2.  libgeos-dev
+3.  libgdal-dev
+
+## Installation on Ubuntu (18.04+)
+1.  `apt-get install -y python3-tk libgeos-dev libgdal-dev=2.2.3+dfsg-2`
+2.  `pip3 install pipenv`
+3.  `pipenv install`
+
 
 ## Setting up simulator for GCS
 1.  `> ssh -L 9002:localhost:9002 rct-ui@e4e-brix.dynamic.ucsd.edu`

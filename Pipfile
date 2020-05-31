@@ -12,6 +12,7 @@ simplekml = "*"
 scipy = "*"
 matplotlib = "*"
 georaster = "*"
+pygdal = "==2.2.3.6"
 
 [requires]
 python_version = "3.6"
