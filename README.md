@@ -44,24 +44,25 @@ Essentially, start the simulator on the payload, start the UDP forwarding on the
 2.  Run `conda env create -f environment.yml`
 3.  Install Eclipse 2020-03 for C/C++ Developers
 4.  Open Eclipse.  Set the workspace to the `radio_collar_tracker_gcs` project root.
-5.  Install PyDev in Eclipse
+5.  Install PyDev in Eclipse if not already installed
     1. `Help`/`Install New Software...`
     2. Work with `http://www.pydev.org/updates`
     3. Select `PyDev`
-6.  Create a new project using File/New/Project...
-7.  Create a new PyDev Project
-8.  Set the project name to `scripts`
-9.  Click `Please configure an interpreter before proceeding`
-10. Click `Manual config`
-11. Click `Browse for python/pypy exe`
-12. Navigate to the location of the environment created in step 2
-    a. In Windows, this is likely to be `C:\Users\${username}\.conda\envs\rctGCS\python.exe`
-13. Set the `Interpreter Name` to `rctGCS`
-14. When asked to select folders to be added to the SYSTEM pythonpath, simply click `OK`
-15. Ensure the checkbox labelled `Load conda env vars before run?` is checked.
-16. Click `Apply`, then `Apply and Close`
+6.  Configure a new interpreter by going to `Window`/`Preferences`/`PyDev`/`Interpreters`/`Python Interpreters`
+7.  Click `Browse for python/pypy exe`
+8.  Navigate to the location of the environment created in step 2
+    a.  In Windows, this is likely to be `C:\Users\${username}\.conda\envs\rctGCS\python.exe`
+    b.  In Ubuntu, this is likely to be `/home/${username}/anaconda3/envs/rctGCS/bin/python`
+9.  Set the `Interpreter Name` to `rctGCS` and click `OK`
+10. When asked to select folders to be added to the SYSTEM pythonpath, simply click `OK`
+11. Ensure the checkbox labelled `Load conda env vars before run?` is checked.
+12. Click `Apply and Close`
+13. Import a new project using `File`/`Import...`
+14. Select `Existing Projects into Workspace` under `General`
+15. Set the root directory to the workspace directory
+16. Ensure that the `scripts` project is selected
 17. Click `Finish`
-18. When asked to `Open the PyDev Perspective`, click `Open Perspective`
+18. Close the Welcome page
 19. Configure the run configurations by clicking `Run`/`Run Configurations...`:
     a.  rctGCS.py
         1)  Create a new `Python Run` launch configuration
