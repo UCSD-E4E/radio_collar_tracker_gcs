@@ -28,3 +28,4 @@ oprofile_data
 doxygen-doc
 **.svg
 .ipynb_checkpoints/
+/.metadata/
