@@ -10,6 +10,10 @@ from v1.0.  Working branch v1.0a, becomes v2.0 on release
 ## Running `rctGCS`
 -   Windows:
     1.  Run `rctGCS.bat` by double clicking or running from command line
+-   Ubuntu:
+    1.  From the command line, run `conda activate rctGCS`
+    2.  Navigate to the `scripts` folder.
+    3.  Run `python rctGCS.py`
     
 ## Setting up simulator for GCS
 1.  `> ssh -L 9002:localhost:9002 rct-ui@e4e-brix.dynamic.ucsd.edu`
@@ -63,14 +67,6 @@ Essentially, start the simulator on the payload, start the UDP forwarding on the
 16. Ensure that the `scripts` project is selected
 17. Click `Finish`
 18. Close the Welcome page
-19. Configure the run configurations by clicking `Run`/`Run Configurations...`:
-    a.  rctGCS.py
-        1)  Create a new `Python Run` launch configuration
-        2)  Set the project to `scripts`
-        3)  Set the `Main Module` to `${workspace_loc:scripts/rctGCS.py}`
-        4)  Set the name to `rctGCS`
-        6)  Click `Apply`
-        7)  Click `Close`
 
 ### Adding Packages
 1.  Open `Windows`/`Preferences`/`PyDev`/`Interpreters`/`Python Interpreters`
