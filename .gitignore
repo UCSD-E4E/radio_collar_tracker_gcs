@@ -27,5 +27,5 @@ callgrind.out.*
 oprofile_data
 doxygen-doc
 **.svg
-Pipfile.lock
 .ipynb_checkpoints/
+/.metadata/
