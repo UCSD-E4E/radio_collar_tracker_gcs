@@ -45,7 +45,8 @@
 ###############################################################################
 
 import tkinter as tk
-
+from tkinterhtml import HtmlFrame
+import urllib.request
 import datetime as dt
 import threading
 import logging
@@ -65,6 +66,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.basemap import Basemap
 import georaster
+import folium
+from cefpython3 import cefpython as cef
+import ctypes
+import platform
 
 class GCS(tk.Tk):
     '''
@@ -892,8 +897,11 @@ class MapControl(CollapseFrame):
         self.__root = root
 
         self.__mapFrame = None
+        self.__latEntry = StringVar()
+        self.__lonEntry = StringVar()
 
         self.__createWidgets()
+
 
 
     def __createWidgets(self):
@@ -901,25 +909,43 @@ class MapControl(CollapseFrame):
         frm_mapGrid.pack(fill=tk.BOTH, side=tk.LEFT)
         frm_mapGrid.grid_columnconfigure(0, weight=1)
         frm_mapGrid.grid_rowconfigure(0, weight=1)
-        self.__mapFrame = tk.Frame(master=frm_mapGrid, bg='gray', height=548, width=800)
+        self.__mapFrame = tk.Frame(master=frm_mapGrid, bg='gray', height=500, width=600)
         self.__mapFrame.pack_propagate(0)
-        self.__mapFrame.grid(column=1,row=1) 
-
-
-
-
-        btn_loadMap = Button(self.frame, command=self.__loadMapFile, 
-                relief=tk.FLAT, width=self.SBWidth, text ="Load Map")
+        self.__mapFrame.pack() 
+        btn_loadMap = Button(self.frame, command=self.__loadMapFile, anchor='w',
+                relief=tk.FLAT, width=self.SBWidth, text =" Load Map")
         btn_loadMap.grid(column=0, row=0, sticky='new')
 
 
-        btn_export = Button(self.frame,
-                            relief=tk.FLAT, width=self.SBWidth, text="Export")
-        btn_export.grid(column=0, row=2, sticky='new')
+        btn_export = Button(self.frame, anchor='w',
+                            relief=tk.FLAT, width=self.SBWidth, text=" Export")
+        btn_export.grid(column=0, row=3, sticky='new')
+        '''
+        firm_loadWebMap = CollapseFrame(self.frame, labelText='Load WebMap')
+        frm_loadWebMap.grid(column=0, row=2, sticky='new')
+
+        frm_loadWebMap.frame.pack_propagate(0)
+        frm_loadWebMap.frame.config(width=self.SBWidth)
+
+        lbl_lat = tk.Label(frm_loadWebMap.frame, text='Latitude')
+        lbl_lat.grid(column=0, row=0, sticky='new')
+
+        latEntry = tk.Entry(frm_loadWebMap.frame, textvariable=self.__latEntry, width=19)
+        latEntry.grid(column=1, row=0, sticky='new')
+
+        lbl_lon = tk.Label(frm_loadWebMap.frame, text='Longitude')
+        lbl_lon.grid(column=0, row=1, sticky='new')
+
+        lonEntry = tk.Entry(frm_loadWebMap.frame, textvariable=self.__lonEntry, width=19)
+        lonEntry.grid(column=1, row=1, sticky='new')
+        '''
+        #btn_loadWebMap = Button(frm_loadWebMap.frame, command=self.__loadWebMap,
+        #                    relief=tk.FLAT, text="Load")
+        #btn_loadWebMap.grid(column=1, row=2, sticky='new')
 
         # MAP OPTIONS
         frm_mapOptions = tk.Frame(master=frm_mapGrid, width=self.SBWidth)
-        frm_mapOptions.grid(column=0, row=0)
+        frm_mapOptions.pack(side=tk.TOP)
 
         lbl_mapOptions = tk.Label(
             frm_mapOptions, bg='gray', width=self.SBWidth, text='Map Options')
@@ -935,7 +961,7 @@ class MapControl(CollapseFrame):
 
         # MAP LEGEND
         frm_mapLegend = tk.Frame(master=frm_mapGrid, width=self.SBWidth)
-        frm_mapLegend.grid(column=0, row=2)
+        frm_mapLegend.pack(side=tk.BOTTOM)
 
         lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
                               bg='gray', text='Map Legend')
@@ -949,12 +975,20 @@ class MapControl(CollapseFrame):
                               bg='light gray', text='Target')
         lbl_legend.grid(column=0, row=2, sticky='ew')
 
+    def __loadWebMap(self):
+        self.__clearMap()
+        self.__mapFrame.destroy()
+        lat = float(self.__latEntry.get())
+        lon = float(self.__lonEntry.get())
+        self.__mapFrame = WebMap(self.__root, lat, lon)
+
+
     def __loadMapFile(self):
 
         filename = askopenfilename()
         print(filename)
 
-        self.__clearMap()
+        #self.__clearMap()
 
         fig = plt.figure(figsize=(5,5))
         
@@ -995,6 +1029,144 @@ class MapControl(CollapseFrame):
     def __clearMap(self):
         for child in self.__mapFrame.winfo_children():
             child.destroy()
+        #self.__mapFrame.destroy()
+        #self.__mapFrame = tk.Frame(master=self.__root, bg='gray', height=500, width=600)
+        #self.__mapFrame.pack_propagate(0)
+        #self.__mapFrame.pack() 
+
+class NE(tk.Frame):
+
+    def __init__(self, root, lat, lon):
+        self.browser_frame = None
+
+        print(lat)
+        print(lon)
+        #LDN_COORDINATES = (lat, lon)
+        #LDN_COORDINATES = (51.5074, 0.1278)
+        #myMap = folium.Map(location=LDN_COORDINATES, zoom_start=7)
+        #myMap.save("index.html")
+
+        # Root
+        root.geometry("1000x500")
+        tk.Grid.rowconfigure(root, 0, weight=1)
+        tk.Grid.columnconfigure(root, 0, weight=1)
+
+        # MapFrame
+        tk.Frame.__init__(self, root)
+        self.master.protocol("WM_DELETE_WINDOW", self.on_close)
+
+        tk.Grid.rowconfigure(self, 0, weight=0)
+        tk.Grid.columnconfigure(self, 0, weight=0)
+
+        # BrowserFrame
+        self.browser_frame = BrowserFrame(self)
+        self.browser_frame.grid(row=1, column=0,
+                                sticky=(tk.N + tk.S + tk.E + tk.W))
+        tk.Grid.rowconfigure(self, 1, weight=1)
+        tk.Grid.columnconfigure(self, 0, weight=1)
+
+        # Pack MainFrame
+        self.pack(fill=tk.BOTH, expand=tk.YES)
+
+
+    def on_close(self):
+        if self.browser_frame:
+            self.browser_frame.on_root_close()
+        self.master.destroy()
+
+    def get_browser(self):
+        if self.browser_frame:
+            return self.browser_frame.browser
+        return None
+
+    def get_browser_frame(self):
+        if self.browser_frame:
+            return self.browser_frame
+        return None
+
+class WebMap(tk.Frame):
+    # Fix for PyCharm hints warnings
+    WindowUtils = cef.WindowUtils()
+
+    # Platforms
+    WINDOWS = (platform.system() == "Windows")
+    LINUX = (platform.system() == "Linux")
+    MAC = (platform.system() == "Darwin")
+    IMAGE_EXT = ".png" if tk.TkVersion > 8.5 else ".gif"
+
+    def __init__(self, root, lat, lon):
+        # Root
+        root.geometry("1000x500")
+        tk.Grid.rowconfigure(root, 0, weight=1)
+        tk.Grid.columnconfigure(root, 0, weight=1)
+
+        # MapFrame
+        tk.Frame.__init__(self, root)
+        self.master.protocol("WM_DELETE_WINDOW", self.on_root_close)
+        self.closing = False
+        self.browser = None
+        self.bind("<Configure>", self.on_configure)
+        self.focus_set()
+
+    def embed_browser(self):
+        window_info = cef.WindowInfo()
+        rect = [0, 0, self.winfo_width(), self.winfo_height()]
+        window_info.SetAsChild(self.get_window_handle(), rect)
+        self.browser = cef.CreateBrowserSync(window_info,
+                                             url="file:///index.html") #todo
+        assert self.browser
+        self.message_loop_work()
+
+    def get_window_handle(self):
+        if self.winfo_id() > 0:
+            return self.winfo_id()
+        elif MAC:
+            # On Mac window id is an invalid negative value (Issue #308).
+            # This is kind of a dirty hack to get window handle using
+            # PyObjC package. If you change structure of windows then you
+            # need to do modifications here as well.
+            # noinspection PyUnresolvedReferences
+            from AppKit import NSApp
+            # noinspection PyUnresolvedReferences
+            import objc
+            # Sometimes there is more than one window, when application
+            # didn't close cleanly last time Python displays an NSAlert
+            # window asking whether to Reopen that window.
+            # noinspection PyUnresolvedReferences
+            return objc.pyobjc_id(NSApp.windows()[-1].contentView())
+        else:
+            raise Exception("Couldn't obtain window handle")
+
+    def message_loop_work(self):
+        cef.MessageLoopWork()
+        self.after(10, self.message_loop_work)
+
+    def on_configure(self, _):
+        if not self.browser:
+            self.embed_browser()
+
+
+    def on_mainframe_configure(self, width, height):
+        if self.browser:
+            if WINDOWS:
+                ctypes.windll.user32.SetWindowPos(
+                    self.browser.GetWindowHandle(), 0,
+                    0, 0, width, height, 0x0002)
+            elif LINUX:
+                self.browser.SetBounds(0, 0, width, height)
+            self.browser.NotifyMoveOrResizeStarted()
+
+
+    def on_root_close(self):
+        if self.browser:
+            self.browser.CloseBrowser(True)
+            self.clear_browser_references()
+        self.destroy()
+
+    def clear_browser_references(self):
+        # Clear browser references that you keep anywhere in your
+        # code. All references must be cleared for CEF to shutdown cleanly.
+        self.browser = None
 
 if __name__ == '__main__':
     logName = dt.datetime.now().strftime('%Y.%m.%d.%H.%M.%S_gcs.log')
@@ -1012,5 +1184,7 @@ if __name__ == '__main__':
     logger.addHandler(ch)
 
     app = GCS()
+    #cef.Initialize()
     app.mainloop()
+    #cef.Shutdown()
     app.quit()
