@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 06/17/20  ML  Implemented ability to load webmap from OSM based on coordinates
 # 05/29/20  ML  refactored MapControl 
 # 05/25/20  NH  Fixed validate frequency call
 # 05/24/20  ML  Implemented ability to load map, refactored map functions
@@ -909,7 +910,7 @@ class MapControl(CollapseFrame):
         frm_mapGrid.pack(fill=tk.BOTH, side=tk.LEFT)
         frm_mapGrid.grid_columnconfigure(0, weight=1)
         frm_mapGrid.grid_rowconfigure(0, weight=1)
-        self.__mapFrame = tk.Frame(master=frm_mapGrid, bg='gray', height=500, width=600)
+        self.__mapFrame = tk.Frame(master=self.__root, bg='gray', height=548, width=800)
         self.__mapFrame.pack_propagate(0)
         self.__mapFrame.pack() 
         btn_loadMap = Button(self.frame, command=self.__loadMapFile, anchor='w',
@@ -920,8 +921,8 @@ class MapControl(CollapseFrame):
         btn_export = Button(self.frame, anchor='w',
                             relief=tk.FLAT, width=self.SBWidth, text=" Export")
         btn_export.grid(column=0, row=3, sticky='new')
-        '''
-        firm_loadWebMap = CollapseFrame(self.frame, labelText='Load WebMap')
+        
+        frm_loadWebMap = CollapseFrame(self.frame, labelText='Load WebMap')
         frm_loadWebMap.grid(column=0, row=2, sticky='new')
 
         frm_loadWebMap.frame.pack_propagate(0)
@@ -938,10 +939,10 @@ class MapControl(CollapseFrame):
 
         lonEntry = tk.Entry(frm_loadWebMap.frame, textvariable=self.__lonEntry, width=19)
         lonEntry.grid(column=1, row=1, sticky='new')
-        '''
-        #btn_loadWebMap = Button(frm_loadWebMap.frame, command=self.__loadWebMap,
-        #                    relief=tk.FLAT, text="Load")
-        #btn_loadWebMap.grid(column=1, row=2, sticky='new')
+        
+        btn_loadWebMap = Button(frm_loadWebMap.frame, command=self.__loadWebMap,
+                            relief=tk.FLAT, text="Load")
+        btn_loadWebMap.grid(column=1, row=2, sticky='new')
 
         # MAP OPTIONS
         frm_mapOptions = tk.Frame(master=frm_mapGrid, width=self.SBWidth)
@@ -988,7 +989,7 @@ class MapControl(CollapseFrame):
         filename = askopenfilename()
         print(filename)
 
-        #self.__clearMap()
+        self.__clearMap()
 
         fig = plt.figure(figsize=(5,5))
         
@@ -1029,22 +1030,23 @@ class MapControl(CollapseFrame):
     def __clearMap(self):
         for child in self.__mapFrame.winfo_children():
             child.destroy()
-        #self.__mapFrame.destroy()
-        #self.__mapFrame = tk.Frame(master=self.__root, bg='gray', height=500, width=600)
-        #self.__mapFrame.pack_propagate(0)
-        #self.__mapFrame.pack() 
+        self.__mapFrame.destroy()
+        self.__mapFrame = tk.Frame(master=self.__root, bg='gray', height=548, width=800)
+        self.__mapFrame.pack_propagate(0)
+        self.__mapFrame.pack() 
 
-class NE(tk.Frame):
+class WebMap(tk.Frame):
 
     def __init__(self, root, lat, lon):
         self.browser_frame = None
 
         print(lat)
         print(lon)
-        #LDN_COORDINATES = (lat, lon)
+        LDN_COORDINATES = (lat, lon)
         #LDN_COORDINATES = (51.5074, 0.1278)
-        #myMap = folium.Map(location=LDN_COORDINATES, zoom_start=7)
-        #myMap.save("index.html")
+        folmap = folium.Map(location=LDN_COORDINATES, zoom_start=7)
+        self.html_string = folmap.get_root().render()
+        folmap.save("index.html")
 
         # Root
         root.geometry("1000x500")
@@ -1053,7 +1055,6 @@ class NE(tk.Frame):
 
         # MapFrame
         tk.Frame.__init__(self, root)
-        self.master.protocol("WM_DELETE_WINDOW", self.on_close)
 
         tk.Grid.rowconfigure(self, 0, weight=0)
         tk.Grid.columnconfigure(self, 0, weight=0)
@@ -1069,11 +1070,6 @@ class NE(tk.Frame):
         self.pack(fill=tk.BOTH, expand=tk.YES)
 
 
-    def on_close(self):
-        if self.browser_frame:
-            self.browser_frame.on_root_close()
-        self.master.destroy()
-
     def get_browser(self):
         if self.browser_frame:
             return self.browser_frame.browser
@@ -1084,7 +1080,7 @@ class NE(tk.Frame):
             return self.browser_frame
         return None
 
-class WebMap(tk.Frame):
+class BrowserFrame(tk.Frame):
     # Fix for PyCharm hints warnings
     WindowUtils = cef.WindowUtils()
 
@@ -1094,19 +1090,11 @@ class WebMap(tk.Frame):
     MAC = (platform.system() == "Darwin")
     IMAGE_EXT = ".png" if tk.TkVersion > 8.5 else ".gif"
 
-    def __init__(self, root, lat, lon):
-        # Root
-        root.geometry("1000x500")
-        tk.Grid.rowconfigure(root, 0, weight=1)
-        tk.Grid.columnconfigure(root, 0, weight=1)
+    def __init__(self, master):
 
-        # MapFrame
-        tk.Frame.__init__(self, root)
-        self.master.protocol("WM_DELETE_WINDOW", self.on_root_close)
-        self.closing = False
+        tk.Frame.__init__(self, master)
         self.browser = None
         self.bind("<Configure>", self.on_configure)
-        self.focus_set()
 
     def embed_browser(self):
         window_info = cef.WindowInfo()
@@ -1157,11 +1145,6 @@ class WebMap(tk.Frame):
             self.browser.NotifyMoveOrResizeStarted()
 
 
-    def on_root_close(self):
-        if self.browser:
-            self.browser.CloseBrowser(True)
-            self.clear_browser_references()
-        self.destroy()
 
     def clear_browser_references(self):
         # Clear browser references that you keep anywhere in your
@@ -1184,7 +1167,7 @@ if __name__ == '__main__':
     logger.addHandler(ch)
 
     app = GCS()
-    #cef.Initialize()
+    cef.Initialize()
     app.mainloop()
-    #cef.Shutdown()
+    cef.Shutdown()
     app.quit()
