@@ -98,6 +98,7 @@ class GCS(tk.Tk):
         self.freqElements = []
         self.targEntries = {}
         self.mapControl = None
+        self.testFrame = None
         self.__createWidgets()
         for button in self._buttons:
             button.config(state='disabled')
@@ -412,6 +413,8 @@ class GCS(tk.Tk):
         frm_sideControl.pack(anchor=tk.NW, side=tk.RIGHT)
         frm_sideControl.grid_columnconfigure(0, weight=1)
         frm_sideControl.grid_rowconfigure(0, weight=1)
+        frm_sideControl.focus_get()
+        self.testFrame = frm_sideControl
 
         # SYSTEM TAB
         self._systemConnectionTab = CollapseFrame(
@@ -900,6 +903,7 @@ class MapControl(CollapseFrame):
         self.__mapFrame = None
         self.__latEntry = StringVar()
         self.__lonEntry = StringVar()
+        self.__zoomEntry = StringVar()
 
         self.__createWidgets()
 
@@ -939,11 +943,19 @@ class MapControl(CollapseFrame):
 
         lonEntry = tk.Entry(frm_loadWebMap.frame, textvariable=self.__lonEntry, width=19)
         lonEntry.grid(column=1, row=1, sticky='new')
+
+        lbl_zoom = tk.Label(frm_loadWebMap.frame, text='Zoom')
+        lbl_zoom.grid(column=0, row=2, sticky='new')
+
+        zoomEntry = tk.Entry(frm_loadWebMap.frame, textvariable=self.__zoomEntry, width=19)
+        zoomEntry.grid(column=1, row=2, sticky='new')
+
         
         btn_loadWebMap = Button(frm_loadWebMap.frame, command=self.__loadWebMap,
                             relief=tk.FLAT, text="Load")
-        btn_loadWebMap.grid(column=1, row=2, sticky='new')
+        btn_loadWebMap.grid(column=1, row=3, sticky='new')
 
+        #TODO: Move Map options and map legend to separate control class
         # MAP OPTIONS
         frm_mapOptions = tk.Frame(master=frm_mapGrid, width=self.SBWidth)
         frm_mapOptions.pack(side=tk.TOP)
@@ -978,28 +990,57 @@ class MapControl(CollapseFrame):
 
     def __loadWebMap(self):
         self.__clearMap()
-        self.__mapFrame.destroy()
         lat = float(self.__latEntry.get())
         lon = float(self.__lonEntry.get())
-        self.__mapFrame = WebMap(self.__root, lat, lon)
+        zoom = int(self.__zoomEntry.get())
+        self.__mapFrame = WebMap(self.__root, lat, lon, zoom)
 
 
     def __loadMapFile(self):
-
-        filename = askopenfilename()
-        print(filename)
-
         self.__clearMap()
+        self.__mapFrame = StaticMap(self.__root)
+
+
+    def __clearMap(self):
+        for child in self.__mapFrame.winfo_children():
+            child.destroy()
+        self.__mapFrame.destroy()
+
+class StaticMap(tk.Frame):
+    def __init__(self, master):
+        tk.Frame.__init__(self, master)
+        self.__filename = None
+        self.__master = master
+        self.__master.geometry("1000x580")
+
+        self.config(bg='gray', height=548, width=800)
+        self.pack_propagate(0)
+        self.pack() 
+
+        #Map Space controls starting zoom on raster image
+        # Larger space = larger amount of surrounding map shown
+        self.__mapSpace = 1
+
+        self.__getFileName()
+        self.__displayMap()
+
+
+    def __getFileName(self):
+        self.__filename = askopenfilename()
+        print(self.__filename)
+
+
+    def __displayMap(self): 
 
         fig = plt.figure(figsize=(5,5))
         
-        my_image = georaster.SingleBandRaster(filename, load_data=False)
+        my_image = georaster.SingleBandRaster(self.__filename, load_data=False)
         
         minx, maxx, miny, maxy = my_image.extent
         
         a = fig.add_subplot(111)
 
-        mapSpace = 1
+        mapSpace = self.__mapSpace
 
         m = Basemap( projection='cyl', \
                     llcrnrlon=minx-mapSpace, \
@@ -1012,74 +1053,88 @@ class MapControl(CollapseFrame):
         m.fillcontinents(color='beige')
         m.shadedrelief()
 
-        canvas = FigureCanvasTkAgg(fig, master=self.__mapFrame)
+        canvas = FigureCanvasTkAgg(fig, master=self)
         canvas.draw()
         canvas.get_tk_widget().pack(side='top', fill='both', expand=0)
 
-        toolbar = NavigationToolbar2Tk( canvas, self.__mapFrame )
+        toolbar = NavigationToolbar2Tk( canvas, self )
         toolbar.update()
         canvas._tkcanvas.pack(side='top', fill='both', expand=0)
 
         
-        image = georaster.SingleBandRaster( filename, \
+        image = georaster.SingleBandRaster( self.__filename, \
                                 load_data=(minx, maxx, miny, maxy), \
                                 latlon=True)
     
         plt.imshow(image.r, extent=(minx, maxx, miny, maxy), zorder=10, alpha=0.8)
 
-    def __clearMap(self):
-        for child in self.__mapFrame.winfo_children():
-            child.destroy()
-        self.__mapFrame.destroy()
-        self.__mapFrame = tk.Frame(master=self.__root, bg='gray', height=548, width=800)
-        self.__mapFrame.pack_propagate(0)
-        self.__mapFrame.pack() 
 
+'''
+    Helper Class to facilititate displaying online web maps
+'''
 class WebMap(tk.Frame):
 
-    def __init__(self, root, lat, lon):
+    def __init__(self, root, lat, lon, zoom):
         self.browser_frame = None
+        self.html_string = ""
 
         print(lat)
         print(lon)
         LDN_COORDINATES = (lat, lon)
-        #LDN_COORDINATES = (51.5074, 0.1278)
-        folmap = folium.Map(location=LDN_COORDINATES, zoom_start=7)
-        self.html_string = folmap.get_root().render()
-        folmap.save("index.html")
 
-        # Root
-        root.geometry("1000x500")
-        tk.Grid.rowconfigure(root, 0, weight=1)
-        tk.Grid.columnconfigure(root, 0, weight=1)
+        #Generate html for webmap
+        self.__buildMap(LDN_COORDINATES, zoom)
 
-        # MapFrame
+        # Initialize WebMapFrame
         tk.Frame.__init__(self, root)
+        #self.master.focus_force() # <- added
+
+        # Root size must be manually set in order for map to show
+        root.geometry("1000x500")
 
         tk.Grid.rowconfigure(self, 0, weight=0)
         tk.Grid.columnconfigure(self, 0, weight=0)
 
-        # BrowserFrame
+        self.bind("<Configure>", self.on_configure)
+        self.bind("<FocusOut>", self._on_focus_out)
+        self.bind("<FocusIn>", self._on_focus_in)
+
+        # Pack MainFrame
+        self.pack(fill=tk.BOTH, expand=tk.YES)
+        self.lower(belowThis=None)
+        self.__displayMap()
+
+
+
+
+    def on_configure(self, event):
+        if self.browser_frame:
+            width = event.width
+            height = event.height
+            self.browser_frame.on_mainframe_configure(width, height)
+
+    def _on_focus_in(self, _):
+        self.master.focus_force() # <- added
+
+    def _on_focus_out(self, _):
+        self.master.focus_force() # <- added
+
+    def __buildMap(self, LDN_COORDINATES, zoom):
+        folmap = folium.Map(location=LDN_COORDINATES, zoom_start=zoom)
+        self.html_string = folmap.get_root().render()
+        folmap.save("index.html")
+
+    def __displayMap(self):
         self.browser_frame = BrowserFrame(self)
         self.browser_frame.grid(row=1, column=0,
                                 sticky=(tk.N + tk.S + tk.E + tk.W))
         tk.Grid.rowconfigure(self, 1, weight=1)
         tk.Grid.columnconfigure(self, 0, weight=1)
 
-        # Pack MainFrame
-        self.pack(fill=tk.BOTH, expand=tk.YES)
 
-
-    def get_browser(self):
-        if self.browser_frame:
-            return self.browser_frame.browser
-        return None
-
-    def get_browser_frame(self):
-        if self.browser_frame:
-            return self.browser_frame
-        return None
-
+'''
+    Helper Class to WebMap that holds the browser to display html content
+'''
 class BrowserFrame(tk.Frame):
     # Fix for PyCharm hints warnings
     WindowUtils = cef.WindowUtils()
@@ -1095,20 +1150,26 @@ class BrowserFrame(tk.Frame):
         tk.Frame.__init__(self, master)
         self.browser = None
         self.bind("<Configure>", self.on_configure)
+        self.bind("<FocusIn>", self.on_focus_in)
+        self.bind("<FocusOut>", self.on_focus_out)
+        self.focus_set()
+        self.lower(belowThis=None)
 
     def embed_browser(self):
         window_info = cef.WindowInfo()
-        rect = [0, 0, self.winfo_width(), self.winfo_height()]
+        rect = [0, 0, self.winfo_width()-50, self.winfo_height()-50]
         window_info.SetAsChild(self.get_window_handle(), rect)
         self.browser = cef.CreateBrowserSync(window_info,
                                              url="file:///index.html") #todo
         assert self.browser
+        self.browser.SetClientHandler(FocusHandler(self))
+        self.master.master.focus_force() # <- added
         self.message_loop_work()
 
     def get_window_handle(self):
         if self.winfo_id() > 0:
             return self.winfo_id()
-        elif MAC:
+        elif self.MAC:
             # On Mac window id is an invalid negative value (Issue #308).
             # This is kind of a dirty hack to get window handle using
             # PyObjC package. If you change structure of windows then you
@@ -1133,23 +1194,65 @@ class BrowserFrame(tk.Frame):
         if not self.browser:
             self.embed_browser()
 
+    def on_focus_in(self, _):
+        logger.debug("BrowserFrame.on_focus_in")
+        if self.browser:
+            self.browser.SetFocus(True)
+        self.master.master.focus_set()
+
+    def on_focus_out(self, _):
+        print("BrowserFrame.on_focus_out")
+        """For focus problems see Issue #255 and Issue #535. """
+        if self.LINUX and self.browser:
+            self.browser.SetFocus(False)
+        self.master.master.focus_set()
+
 
     def on_mainframe_configure(self, width, height):
         if self.browser:
-            if WINDOWS:
+            if self.WINDOWS:
                 ctypes.windll.user32.SetWindowPos(
                     self.browser.GetWindowHandle(), 0,
-                    0, 0, width, height, 0x0002)
-            elif LINUX:
-                self.browser.SetBounds(0, 0, width, height)
-            self.browser.NotifyMoveOrResizeStarted()
-
-
+                    0, 0, width-50, height, 0x0002)
+            elif self.LINUX:
+                self.browser.SetBounds(0, 0, width-50, height)
 
     def clear_browser_references(self):
         # Clear browser references that you keep anywhere in your
         # code. All references must be cleared for CEF to shutdown cleanly.
         self.browser = None
+
+
+class FocusHandler(object):
+    """For focus problems see Issue #255 and Issue #535. """
+    # Fix for PyCharm hints warnings
+    WindowUtils = cef.WindowUtils()
+
+    # Platforms
+    WINDOWS = (platform.system() == "Windows")
+    LINUX = (platform.system() == "Linux")
+    MAC = (platform.system() == "Darwin")
+    IMAGE_EXT = ".png" if tk.TkVersion > 8.5 else ".gif"
+
+    def __init__(self, browser_frame):
+        self.browser_frame = browser_frame
+
+    def OnTakeFocus(self, next_component, **_):
+        logger.debug("FocusHandler.OnTakeFocus, next={next}"
+                     .format(next=next_component))
+
+    def OnSetFocus(self, source, **_):
+        logger.debug("FocusHandler.OnSetFocus, source={source}"
+                     .format(source=source))
+        if self.LINUX:
+            return False
+        else:
+            return True
+
+    def OnGotFocus(self, **_):
+        logger.debug("FocusHandler.OnGotFocus")
+        if self.LINUX:
+            self.browser_frame.focus_set()
 
 if __name__ == '__main__':
     logName = dt.datetime.now().strftime('%Y.%m.%d.%H.%M.%S_gcs.log')
