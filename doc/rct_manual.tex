@@ -392,6 +392,77 @@
 			\item Set the local port to 14550 (default).
 		\end{enumerate}
 \appendix
+\chapter{Operating the Ground Control Software}
+	\section{Connecting to the Payload}
+		\begin{enumerate}
+			\item With the GCS open, locate the series of drop-downs in the right-most column of the user interface.
+			\item Expand the drop-down titled "System: Not Connected".
+			\item Click on the button labeled "Connect".
+			\item In the resulting pop-up window (titled "Connect Settings"), enter the port number the payload is located at. The default value should already be populated. 
+			\item Highlight the TCP checkbox.
+			\item Click on the button labeled "Submit".
+			\item Confirm that the label on the same drop-down you expanded earlier now says "System: Connected".
+		\end{enumerate}
+	\section{Configuring the Payload}
+		\subsection{Center Frequency, Sampling Frequency, and SDR Gain}
+			\begin{enumerate}
+				\item With the GCS open and connected to the payload, locate the series of drop-downs in the right-most column of the user interface.
+				\item Expand the drop-down labeled "System Settings".
+				\item The current values of the payload's center frequency, sampling frequency, and SDR gain are displayed. Edit any values to the desired values.
+				\item Once finished editing, click on the button labeled "Update". 
+				\item Confirm that the new values displayed in the drop-down are the new desired values.
+			\end{enumerate}
+		\subsection{Adding Target Frequencies}
+			\begin{enumerate}
+				\item With the GCS open and connected to the payload, locate the series of drop-downs in the right-most column of the user interface.
+				\item Expand the drop-down labeled "System Settings".
+				\item Click on the button labeled "Add Target" located above the center frequency display.
+				\item In the resulting pop-up window (titled "Add Target"), enter the desired target name. If no target name is desired, leave the field blank and the target frequency will be assigned a generic name.
+				\item Enter the value of the desired target frequency. The system will only accept a valid target frequency within the following range: [center frequency - sampling frequency, center frequency + sampling frequency]. 
+				\item Click on the button labeled "submit". If an invalid frequency is entered, the system will prompt for a new target frequency value. Simply alter the value of the target frequency and click submit once again.
+				\item Confirm that the new target frequency is displayed under the drop-down titled "System Settings" (it should be located under the SDR Gain field).
+				\item Click on the button labeled "Update" contained within the "System Settings" drop-down.
+			\end{enumerate}
+		\subsection{Deleting Target Frequencies}
+			\begin{enumerate}
+				\item With the GCS open and connected to the payload, locate the series of drop-downs in the right-most column of the user interface.
+				\item Expand the drop-down labeled "System Settings".
+				\item Click on the button labeled "Clear Targets". This will clear all of the target frequencies entered.
+				\item Confirm that no target frequencies remain in the drop-down. 
+				\item Click on the button labeled "Update".
+			\end{enumerate}
+		\subsection{Expert and Debug Configuration}
+			The Expert and Debug configuration panel is useful if there are desired values to be configured on the payload that are not addressed in the previous sections.
+			\begin{enumerate}
+				\item With the GCS open and connected to the payload, locate the series of drop-downs in the right-most column of the user interface.
+				\item Expand the drop-down labeled "System Settings".
+				\item Click on the button labeled "Expert \& Debug Configuration".
+				\item In the resulting pop-up window (titled "Expert/Engineering Settings), enter the new desired values for the fields displayed.
+				\item Once done editing, click on the button labeled "submit".
+			\end{enumerate}
+	\section{Checking on the Payload Status}
+		The payload has four possible states: 
+		\begin{enumerate}
+			\item Not Connected: At least one of the components of the payload is not ready to record.
+			\item Idle: All components of the payload are ready.
+			\item Running: The payload is recording.
+			\item Stopping: The payload is in the process of ending the recording.
+			\item Failed: At least one of the components of the payload has failed.
+		\end{enumerate}
+		To check on the status of the payload:
+		\begin{enumerate}
+			\item With the GCS open and connected to the payload, locate the series of drop-downs in the right-most column of the user interface.
+			\item Expand the drop-down labeled "Components".
+			\item The entry next to "Status" is the current status of the payload.
+			\item If additional information about the status of individual components within the payload is desired, refer to the following subsection.
+		\end{enumerate}
+		\subsection{Checking the Status of Individual Components Within Payload}
+			\begin{enumerate}
+				\item With the GCS open and connected to the payload, locate the series of drop-downs in the right-most column of the user interface.
+				\item Expand the drop-down labeled "Components".
+				\item Now expand the drop-down labeled "Component Statuses".
+				\item Five individual component statuses will be displayed here.
+			\end{enumerate}		
 \chapter{Reference Card}
 \begin{landscape}
 		\begin{multicols}{3}
