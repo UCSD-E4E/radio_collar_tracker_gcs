@@ -390,65 +390,111 @@
 				\end{figure}
 			\item Click the ``CONNECT'' button.
 			\item Set the local port to 14550 (default).
-		\end{enumerate}
-\appendix
+		\end{enumerate}	
+		
 \chapter{Operating the Ground Control Software}
 	\section{Connecting to the Payload}
 		\begin{enumerate}
 			\item With the GCS open, locate the series of drop-downs in the right-most column of the user interface.
-			\item Expand the drop-down titled "System: Not Connected".
-			\item Click on the button labeled "Connect".
-			\item In the resulting pop-up window (titled "Connect Settings"), enter the port number the payload is located at. The default value should already be populated. 
+			\item Expand the drop-down titled ``System: Not Connected''.
+			\item Click on the button labeled ``Connect''.
+			\item In the resulting pop-up window (titled ``Connect Settings''), enter the port number the payload is located at. The default value should already be populated. 
 			\item Highlight the TCP checkbox.
-			\item Click on the button labeled "Submit".
-			\item Confirm that the label on the same drop-down you expanded earlier now says "System: Connected".
+			\item Click on the button labeled ``Submit''.
+			\item Confirm that the label on the same drop-down you expanded earlier now says ``System: Connected''.
 		\end{enumerate}
 	\section{Configuring the Payload}
 		\subsection{Center Frequency, Sampling Frequency, and SDR Gain}
 			\begin{enumerate}
 				\item With the GCS open and connected to the payload, locate the series of drop-downs in the right-most column of the user interface.
-				\item Expand the drop-down labeled "System Settings".
+				\item Expand the drop-down labeled ``System Settings''.
 				\item The current values of the payload's center frequency, sampling frequency, and SDR gain are displayed. Edit any values to the desired values.
-				\item Once finished editing, click on the button labeled "Update". 
+				\item Once finished editing, click on the button labeled ``Update''. 
 				\item Confirm that the new values displayed in the drop-down are the new desired values.
 			\end{enumerate}
+			The following is a reference table explaining what each of these values signifies:
+			\begin{center}
+			\begin{tabular}{||c c c||}
+			\hline
+			Value & Meaning & Units\\ [0.5ex]
+			\hline\hline
+			Center Frequency & SDR center frequency. & Hz \\
+			\hline
+			Sampling Frequency & SDR sampling frequency. & Hz \\
+			\hline
+			SDR Gain & SDR gain. Higher values mean more attenuation. & N/A \\ [1ex]
+			\hline
+			\end{tabular}
+		\end{center}
 		\subsection{Adding Target Frequencies}
 			\begin{enumerate}
 				\item With the GCS open and connected to the payload, locate the series of drop-downs in the right-most column of the user interface.
-				\item Expand the drop-down labeled "System Settings".
-				\item Click on the button labeled "Add Target" located above the center frequency display.
-				\item In the resulting pop-up window (titled "Add Target"), enter the desired target name. If no target name is desired, leave the field blank and the target frequency will be assigned a generic name.
-				\item Enter the value of the desired target frequency. The system will only accept a valid target frequency within the following range: [center frequency - sampling frequency, center frequency + sampling frequency]. 
-				\item Click on the button labeled "submit". If an invalid frequency is entered, the system will prompt for a new target frequency value. Simply alter the value of the target frequency and click submit once again.
-				\item Confirm that the new target frequency is displayed under the drop-down titled "System Settings" (it should be located under the SDR Gain field).
-				\item Click on the button labeled "Update" contained within the "System Settings" drop-down.
+				\item Expand the drop-down labeled ``System Settings''.
+				\item Click on the button labeled ``Add Target'' located above the center frequency display.
+				\item In the resulting pop-up window (titled ``Add Target''), enter the desired target name. If no target name is desired, leave the field blank and the target frequency will be assigned a generic name.
+				\item Enter the value of the desired target frequency. The system will only accept a valid target frequency within the following range: [$S_c - S_s , S_c + S_s$] where $S_c$ is the center frequency and $S_s$ is the sampling frequency. 
+				\item Click on the button labeled ``submit''. If an invalid frequency is entered, the system will prompt for a new target frequency value. Simply alter the value of the target frequency and click submit once again.
+				\item Confirm that the new target frequency is displayed under the drop-down titled ``System Settings'' (it should be located under the SDR Gain field).
 			\end{enumerate}
 		\subsection{Deleting Target Frequencies}
 			\begin{enumerate}
 				\item With the GCS open and connected to the payload, locate the series of drop-downs in the right-most column of the user interface.
-				\item Expand the drop-down labeled "System Settings".
-				\item Click on the button labeled "Clear Targets". This will clear all of the target frequencies entered.
+				\item Expand the drop-down labeled ``System Settings''.
+				\item Click on the button labeled ``Clear Targets''. This will clear all of the target frequencies entered.
 				\item Confirm that no target frequencies remain in the drop-down. 
-				\item Click on the button labeled "Update".
 			\end{enumerate}
 		\subsection{Expert and Debug Configuration}
 			The Expert and Debug configuration panel is useful if there are desired values to be configured on the payload that are not addressed in the previous sections.
 			\begin{enumerate}
 				\item With the GCS open and connected to the payload, locate the series of drop-downs in the right-most column of the user interface.
-				\item Expand the drop-down labeled "System Settings".
-				\item Click on the button labeled "Expert \& Debug Configuration".
-				\item In the resulting pop-up window (titled "Expert/Engineering Settings), enter the new desired values for the fields displayed.
-				\item Once done editing, click on the button labeled "submit".
+				\item Expand the drop-down labeled ``System Settings''.
+				\item Click on the button labeled ``Expert \& Debug Configuration''.
+				\item In the resulting pop-up window (titled ``Expert/Engineering Settings''), enter the new desired values for the fields displayed.
+				\item Once done editing, click on the button labeled ``submit''.
 			\end{enumerate}
+			The following is a reference table containing additional information about each of the Expert \& Debug settings.
+			\begin{center}
+			\begin{tabular}{||c c||}
+			\hline
+			Value & Meaning\\ [0.5ex]
+			\hline\hline
+			Expected Ping Width & Normal ping width (ms). \\
+			\hline
+			Min. Width Multiplier & Minimum acceptable ping width multiplier. \\
+			\hline
+			Max. Width Multiplier & Maximum acceptable ping width multiplier.\\
+			\hline
+			Min. Ping SNR & Minimum acceptable ping signal to noise ratio (dB). \\
+			\hline
+			GPS Port & Path to GPS serial port.\\
+			\hline
+			GPS Baud Rate & GPS serial port baud rate.\\
+			\hline
+			Output Directory & Location where are SDR record info is outputted.\\
+			\hline
+			GPS Mode & GPS test mode.\\ [1ex]
+			\hline
+			\end{tabular}
+		\end{center}
 	\section{Checking on the Payload Status}
 		The payload has four possible states: 
-		\begin{enumerate}
-			\item Not Connected: At least one of the components of the payload is not ready to record.
-			\item Idle: All components of the payload are ready.
-			\item Running: The payload is recording.
-			\item Stopping: The payload is in the process of ending the recording.
-			\item Failed: At least one of the components of the payload has failed.
-		\end{enumerate}
+		\begin{center}
+			\begin{tabular}{||c c||}
+			\hline
+			State & Meaning\\ [0.5ex]
+			\hline\hline
+			Not Connected & At least one of the components of the payload is not ready to record. \\
+			\hline
+			Idle & All components of the payload are ready. \\
+			\hline
+			Running & The payload is recording. \\
+			\hline
+			Stopping & The payload is in the process of ending the recording. \\
+			\hline
+			Failed & At least one of the components of the payload has failed. \\ [1ex]
+			\hline
+			\end{tabular}
+		\end{center}
 		To check on the status of the payload:
 		\begin{enumerate}
 			\item With the GCS open and connected to the payload, locate the series of drop-downs in the right-most column of the user interface.
@@ -462,7 +508,103 @@
 				\item Expand the drop-down labeled "Components".
 				\item Now expand the drop-down labeled "Component Statuses".
 				\item Five individual component statuses will be displayed here.
-			\end{enumerate}		
+			\end{enumerate}
+			Here are the statuses for each of the individual components and what they mean: \\
+			SDR States:
+			\begin{center}
+			\begin{tabular}{||c c||}
+			\hline
+			State & Meaning\\ [0.5ex]
+			\hline\hline
+			Searching for Devices & TODO: Write explanation here. \\
+			\hline
+			Recycling & TODO: Write explanation here.\\
+			\hline
+			Initializing SDR & TODO: Write explanation here. \\
+			\hline
+			Ready & TODO: Write explanation here.\\
+			\hline
+			Failed & TODO: Write explanation here.\\ [1ex]
+			\hline
+			\end{tabular}
+			\end{center}
+				
+			Directory States:
+			\begin{center}
+			\begin{tabular}{||c c||}
+			\hline
+			State & Meaning\\ [0.5ex]
+			\hline\hline
+			Searching & TODO: Write explanation here. \\
+			\hline
+			Checking for Mount & TODO: Write explanation here.\\
+			\hline
+			Checking for Space & TODO: Write explanation here. \\
+			\hline
+			Recycling & TODO: Write explanation here.\\
+			\hline
+			Ready & TODO: Write explanation here.\\
+			\hline
+			Failed & TODO: Write explanation here.\\ [1ex]
+			\hline
+			\end{tabular}
+			\end{center}
+			
+			GPS States:
+			\begin{center}
+			\begin{tabular}{||c c||}
+			\hline
+			State & Meaning\\ [0.5ex]
+			\hline\hline
+			Getting TTY Device & TODO: Write explanation here. \\
+			\hline
+			Waiting for Message & TODO: Write explanation here.\\
+			\hline
+			Recycling & TODO: Write explanation here. \\
+			\hline
+			Ready & TODO: Write explanation here.\\
+			\hline
+			Failed & TODO: Write explanation here.\\ [1ex]
+			\hline
+			\end{tabular}
+			\end{center}
+			
+			System States:
+			\begin{center}
+			\begin{tabular}{||c c||}
+			\hline
+			State & Meaning\\ [0.5ex]
+			\hline\hline
+			Initializing & TODO: Write explanation here. \\
+			\hline
+			Ready for Start & TODO: Write explanation here.\\
+			\hline
+			Starting & TODO: Write explanation here. \\
+			\hline
+			Running & TODO: Write explanation here.\\
+			\hline
+			Stopping & TODO: Write explanation here.\\
+			\hline
+			Failed & TODO: Write explanation here.\\ [1ex]
+			\hline
+			\end{tabular}
+			\end{center}
+			
+			Software States:
+			\begin{center}
+			\begin{tabular}{||c c||}
+			\hline
+			State & Meaning\\ [0.5ex]
+			\hline\hline
+			ON & TODO: Write explanation here. \\
+			\hline
+			OFF & TODO: Write explanation here.\\
+			\hline
+			NULL & TODO: Write explanation here.\\ [1ex]
+			\hline
+			\end{tabular}
+			\end{center}
+\appendix		
 \chapter{Reference Card}
 \begin{landscape}
 		\begin{multicols}{3}
