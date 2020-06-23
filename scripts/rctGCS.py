@@ -46,7 +46,6 @@
 ###############################################################################
 
 import tkinter as tk
-from tkinterhtml import HtmlFrame
 import urllib.request
 import datetime as dt
 import threading
@@ -1087,7 +1086,6 @@ class WebMap(tk.Frame):
 
         # Initialize WebMapFrame
         tk.Frame.__init__(self, root)
-        #self.master.focus_force() # <- added
 
         # Root size must be manually set in order for map to show
         root.geometry("1000x500")
@@ -1097,7 +1095,7 @@ class WebMap(tk.Frame):
 
         self.bind("<Configure>", self.on_configure)
         self.bind("<FocusOut>", self._on_focus_out)
-        self.bind("<FocusIn>", self._on_focus_in)
+        #self.bind("<FocusIn>", self._on_focus_in)
 
         # Pack MainFrame
         self.pack(fill=tk.BOTH, expand=tk.YES)
@@ -1113,8 +1111,6 @@ class WebMap(tk.Frame):
             height = event.height
             self.browser_frame.on_mainframe_configure(width, height)
 
-    def _on_focus_in(self, _):
-        self.master.focus_force() # <- added
 
     def _on_focus_out(self, _):
         self.master.focus_force() # <- added
@@ -1198,14 +1194,13 @@ class BrowserFrame(tk.Frame):
         logger.debug("BrowserFrame.on_focus_in")
         if self.browser:
             self.browser.SetFocus(True)
-        self.master.master.focus_set()
 
     def on_focus_out(self, _):
         print("BrowserFrame.on_focus_out")
         """For focus problems see Issue #255 and Issue #535. """
         if self.LINUX and self.browser:
             self.browser.SetFocus(False)
-        self.master.master.focus_set()
+        self.master.master.focus_force()
 
 
     def on_mainframe_configure(self, width, height):
