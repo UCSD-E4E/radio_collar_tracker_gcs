@@ -393,7 +393,19 @@
 		\end{enumerate}	
 		
 \chapter{Operating the Ground Control Software}
+	\begin{figure}[ht]
+		\centering
+		\caption{Interactive Drop-Downs for this Section}
+		\includegraphics[width=\textwidth]{right_column_dropdowns.jpg}
+		\label{fig:right_column_dd}
+	\end{figure}
 	\section{Connecting to the Payload}
+		\begin{figure}[htb]
+			\centering
+			\caption{Connect Drop-Down}
+			\includegraphics[scale=0.5]{connect_button.jpg}
+			\label{fig:connect_button}
+		\end{figure}
 		\begin{enumerate}
 			\item With the GCS open, locate the series of drop-downs in the right-most column of the user interface.
 			\item Expand the drop-down titled ``System: Not Connected''.
@@ -405,6 +417,12 @@
 		\end{enumerate}
 	\section{Configuring the Payload}
 		\subsection{Center Frequency, Sampling Frequency, and SDR Gain}
+			\begin{figure}[htb]
+				\centering
+				\caption{System-Settings Drop-Down}
+				\includegraphics[scale=0.5]{system_settings_dd.jpg}
+				\label{fig:system_settings_dd}
+			\end{figure}
 			\begin{enumerate}
 				\item With the GCS open and connected to the payload, locate the series of drop-downs in the right-most column of the user interface.
 				\item Expand the drop-down labeled ``System Settings''.
@@ -413,7 +431,9 @@
 				\item Confirm that the new values displayed in the drop-down are the new desired values.
 			\end{enumerate}
 			The following is a reference table explaining what each of these values signifies:
-			\begin{center}
+			\begin{table}[htb]
+			\centering
+			\caption{Payload system settings and their respective meanings.}
 			\begin{tabular}{||c c c||}
 			\hline
 			Value & Meaning & Units\\ [0.5ex]
@@ -422,21 +442,33 @@
 			\hline
 			Sampling Frequency & SDR sampling frequency. & Hz \\
 			\hline
-			SDR Gain & SDR gain. Higher values mean more attenuation. & N/A \\ [1ex]
+			SDR Gain & SDR gain. Higher values mean more attenuation. & dB \\ [1ex]
 			\hline
 			\end{tabular}
-		\end{center}
+			\end{table}
 		\subsection{Adding Target Frequencies}
+			\begin{figure}[htb]
+				\centering
+				\caption{Add Target Frequency Button}
+				\includegraphics[scale=0.5]{add_target_btn.jpg}
+				\label{fig:add_target_btn}
+			\end{figure}
 			\begin{enumerate}
 				\item With the GCS open and connected to the payload, locate the series of drop-downs in the right-most column of the user interface.
 				\item Expand the drop-down labeled ``System Settings''.
 				\item Click on the button labeled ``Add Target'' located above the center frequency display.
 				\item In the resulting pop-up window (titled ``Add Target''), enter the desired target name. If no target name is desired, leave the field blank and the target frequency will be assigned a generic name.
-				\item Enter the value of the desired target frequency. The system will only accept a valid target frequency within the following range: [$S_c - S_s , S_c + S_s$] where $S_c$ is the center frequency and $S_s$ is the sampling frequency. 
+				\item Enter the value of the desired target frequency. The system will only accept a valid target frequency within the following range: [$F_c - F_s , F_c + F_s$] where $F_c$ is the center frequency and $F_s$ is the sampling frequency. 
 				\item Click on the button labeled ``submit''. If an invalid frequency is entered, the system will prompt for a new target frequency value. Simply alter the value of the target frequency and click submit once again.
 				\item Confirm that the new target frequency is displayed under the drop-down titled ``System Settings'' (it should be located under the SDR Gain field).
 			\end{enumerate}
 		\subsection{Deleting Target Frequencies}
+			\begin{figure}[htb]
+				\centering
+				\caption{Delete Target Frequencies Button}
+				\includegraphics[scale=0.5]{delete_targets_btn.jpg}
+				\label{fig:delete_targets_btn}
+			\end{figure}
 			\begin{enumerate}
 				\item With the GCS open and connected to the payload, locate the series of drop-downs in the right-most column of the user interface.
 				\item Expand the drop-down labeled ``System Settings''.
@@ -445,6 +477,12 @@
 			\end{enumerate}
 		\subsection{Expert and Debug Configuration}
 			The Expert and Debug configuration panel is useful if there are desired values to be configured on the payload that are not addressed in the previous sections.
+			\begin{figure}[htb]
+				\centering
+				\caption{Expert and Debug Configuration Button}
+				\includegraphics[scale=0.5]{expert_debug.jpg}
+				\label{fig:expert_debug}
+			\end{figure}
 			\begin{enumerate}
 				\item With the GCS open and connected to the payload, locate the series of drop-downs in the right-most column of the user interface.
 				\item Expand the drop-down labeled ``System Settings''.
@@ -453,7 +491,9 @@
 				\item Once done editing, click on the button labeled ``submit''.
 			\end{enumerate}
 			The following is a reference table containing additional information about each of the Expert \& Debug settings.
-			\begin{center}
+			\begin{table}[htb]
+			\centering
+			\caption{Expert system settings and their respective meanings.}
 			\begin{tabular}{||c c||}
 			\hline
 			Value & Meaning\\ [0.5ex]
@@ -475,10 +515,18 @@
 			GPS Mode & GPS test mode.\\ [1ex]
 			\hline
 			\end{tabular}
-		\end{center}
+			\end{table}
 	\section{Checking on the Payload Status}
+		\begin{figure}[htb]
+			\centering
+			\caption{Component Status Drop-Down}
+			\includegraphics[scale=0.5]{component_status_dd.jpg}
+			\label{fig:component_status_dd}
+		\end{figure}
 		The payload has four possible states: 
-		\begin{center}
+		\begin{table}[htb]
+			\centering
+			\caption{System statuses and their respective meanings.}
 			\begin{tabular}{||c c||}
 			\hline
 			State & Meaning\\ [0.5ex]
@@ -494,7 +542,7 @@
 			Failed & At least one of the components of the payload has failed. \\ [1ex]
 			\hline
 			\end{tabular}
-		\end{center}
+		\end{table}
 		To check on the status of the payload:
 		\begin{enumerate}
 			\item With the GCS open and connected to the payload, locate the series of drop-downs in the right-most column of the user interface.
@@ -502,7 +550,13 @@
 			\item The entry next to "Status" is the current status of the payload.
 			\item If additional information about the status of individual components within the payload is desired, refer to the following subsection.
 		\end{enumerate}
-		\subsection{Checking the Status of Individual Components Within Payload}
+		\section{Checking the Status of Individual Components Within Payload}
+			\begin{figure}[htb]
+				\centering
+				\caption{Individual Component Status Drop-Down}
+				\includegraphics[scale=0.5]{ind_comp_statuses_dd.jpg}
+				\label{fig:ind_comp_statuses_dd}
+			\end{figure}
 			\begin{enumerate}
 				\item With the GCS open and connected to the payload, locate the series of drop-downs in the right-most column of the user interface.
 				\item Expand the drop-down labeled "Components".
@@ -510,8 +564,10 @@
 				\item Five individual component statuses will be displayed here.
 			\end{enumerate}
 			Here are the statuses for each of the individual components and what they mean: \\
-			SDR States:
-			\begin{center}
+			
+			\begin{table}[htb]
+			\centering
+			\caption{SDR statuses and their respective meanings.}
 			\begin{tabular}{||c c||}
 			\hline
 			State & Meaning\\ [0.5ex]
@@ -527,10 +583,8 @@
 			Failed & TODO: Write explanation here.\\ [1ex]
 			\hline
 			\end{tabular}
-			\end{center}
-				
-			Directory States:
-			\begin{center}
+			
+			\caption{Directory statuses and their respective meanings.}
 			\begin{tabular}{||c c||}
 			\hline
 			State & Meaning\\ [0.5ex]
@@ -548,10 +602,8 @@
 			Failed & TODO: Write explanation here.\\ [1ex]
 			\hline
 			\end{tabular}
-			\end{center}
 			
-			GPS States:
-			\begin{center}
+			\caption{GPS statuses and their respective meanings.}
 			\begin{tabular}{||c c||}
 			\hline
 			State & Meaning\\ [0.5ex]
@@ -567,10 +619,8 @@
 			Failed & TODO: Write explanation here.\\ [1ex]
 			\hline
 			\end{tabular}
-			\end{center}
 			
-			System States:
-			\begin{center}
+			\caption{System statuses and their respective meanings.}
 			\begin{tabular}{||c c||}
 			\hline
 			State & Meaning\\ [0.5ex]
@@ -588,10 +638,8 @@
 			Failed & TODO: Write explanation here.\\ [1ex]
 			\hline
 			\end{tabular}
-			\end{center}
 			
-			Software States:
-			\begin{center}
+			\caption{Software statuses and their respective meanings.}
 			\begin{tabular}{||c c||}
 			\hline
 			State & Meaning\\ [0.5ex]
@@ -603,7 +651,8 @@
 			NULL & TODO: Write explanation here.\\ [1ex]
 			\hline
 			\end{tabular}
-			\end{center}
+			
+			\end{table}
 \appendix		
 \chapter{Reference Card}
 \begin{landscape}
