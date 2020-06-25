@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 06/25/20  AG  Added more dictionaries to component status display.
 # 06/19/20  AG  Added component status display and sub-display.
 # 05/29/20  ML  refactored MapControl 
 # 05/25/20  NH  Fixed validate frequency call
@@ -584,6 +585,20 @@ class ComponentStatusDisplay(CollapseFrame):
             "RCT_STATES.finish": {'text': 'SYS: Stopping', 'bg': 'blue'},
             "RCT_STATES.fail": {'text': 'SYS: Failed!', 'bg': 'red'},
         }
+        
+        self.swMap = {
+            '0': {'text': 'SW: OFF', 'bg': 'yellow'},
+            '1': {'text': 'SW: ON', 'bg': 'green'},
+        }
+        
+        self.compDicts = {
+            "STS_sdrStatus": self.sdrMap,
+            "STS_dirStatus": self.dirMap,
+            "STS_gpsStatus": self.gpsMap,
+            "STS_sysStatus": self.sysMap,
+            "STS_swStatus": self.swMap,
+        }
+            
         self.__parent = parent
         self.__root = root
 
@@ -641,37 +656,14 @@ class ComponentStatusDisplay(CollapseFrame):
 
     def updateGUIOptionVars(self, scope=0):
         varDict = self.__root._mavModel.state
-
         for varName, varValue in varDict.items():
             print(varName)
-            if varName == "STS_sdrStatus":
-                try:
-                    self.statusLabels[varName].config(text=self.sdrMap[str(varValue)]['text'], bg=self.sdrMap[str(varValue)]['bg'])
-                except KeyError:
-                    self.statusLabels[varName].config(text='SDR: NULL', bg='red')
-            elif varName == "STS_dirStatus":
-                try:
-                    self.statusLabels[varName].config(text=self.dirMap[str(varValue)]['text'], bg=self.dirMap[str(varValue)]['bg'])
-                except KeyError:
-                    self.statusLabels[varName].config(text='DIR: NULL', bg='red')
-            elif varName == "STS_gpsStatus":
-                try:
-                    self.statusLabels[varName].config(text=self.gpsMap[str(varValue)]['text'], bg=self.gpsMap[str(varValue)]['bg'])
-                except KeyError:
-                    self.statusLabels[varName].config(text='GPS: NULL', bg='red')
-            elif varName == "STS_sysStatus":
-                try:
-                    self.statusLabels[varName].config(text=self.sysMap[str(varValue)]['text'], bg=self.sysMap[str(varValue)]['bg'])
-                except KeyError:
-                    self.statusLabels[varName].config(text='SYS: NULL', bg='red')
-            elif varName == "STS_swStatus":
-                if varValue == 0:
-                    self.statusLabels[varName].config(text='SW: OFF', bg='yellow')
-                elif varValue == 1:
-                    self.statusLabels[varName].config(text='SW: ON', bg='green')
-                else:
-                    self.statusLabels[varName].config(text='SW: NULL', bg='red')
-                    
+            try:
+                configDict = self.compDicts[varName]
+                configOpts = configDict[str(varValue)]
+                self.statusLabels[varName].config(text=configOpts['text'], bg=configOpts['bg'])
+            except KeyError:
+                continue
 
 class SystemSettingsControl(CollapseFrame):
     def __init__(self, parent, root: GCS):
