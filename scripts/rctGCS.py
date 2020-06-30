@@ -435,11 +435,14 @@ class GCS(tk.Tk):
         self.systemSettingsWidget = SystemSettingsControl(
             frm_sideControl, self)
         self.systemSettingsWidget.grid(column=0, row=3, sticky='new')
+        
+        self.upgradeDisplay = UpgradeDisplay(frm_sideControl, self)
+        self.upgradeDisplay.grid(column=0, row=4, sticky='n')
 
         # START PAYLOAD RECORDING
         btn_startRecord = tk.Button(frm_sideControl, width=self.SBWidth,
                                     textvariable=self.__missionStatusText, command=self.__startStopMission)
-        btn_startRecord.grid(column=0, row=4, sticky='nsew')
+        btn_startRecord.grid(column=0, row=5, sticky='nsew')
 
 class CollapseFrame(ttk.Frame):
     '''
@@ -490,6 +493,52 @@ class CollapseFrame(ttk.Frame):
 
     def updateText(self, newText="label"):
         self._button.config(text=newText)
+        
+class UpgradeDisplay(CollapseFrame):
+    def __init__(self, parent, root: GCS):
+        CollapseFrame.__init__(self, parent, labelText='Upgrade Software')
+        
+        self.__parent = parent
+        self.__root = root
+
+        self.__innerFrame = None
+
+        self.filename = StringVar()
+        
+        self.__createWidget()
+        
+    def update(self):
+        CollapseFrame.update(self)
+        self.updateGUIOptionVars()
+        
+    def __createWidget(self):
+        if self.__innerFrame:
+            self.__innerFrame.destroy()
+        self.__innerFrame = tk.Frame(self.frame)
+        self.__innerFrame.grid(row=0, column=0, sticky='nesw')
+        
+        file_lbl = tk.Label(self.__innerFrame, text='Selected File:')
+        file_lbl.grid(row=1, column=0, sticky='new')
+        
+        file_entry = tk.Entry(self.__innerFrame, textvariable=self.filename, width=8)
+        file_entry.grid(row=1, column=1, sticky='new')
+
+        browse_file_btn = tk.Button(self.__innerFrame, text='Browse for Upgrade File', command=self.fileDialogue)
+        browse_file_btn.grid(row=2, column=0, sticky='new')
+        
+        upgrade_btn = tk.Button(self.__innerFrame, text='Upgrade', command=self.sendUpgradeFile)
+        upgrade_btn.grid(row=3, column=0, sticky='new')
+        
+    def fileDialogue(self):
+        self.filename.set(str(askopenfilename()))
+        
+    def sendUpgradeFile(self):
+        file = open(self.filename.get(), "rb")
+        byteStream = file.read()
+        self.__root._mavModel.sendUpgradePacket(byteStream)
+        
+    def updateGUIOptionVars(self):
+        pass
 
 class StatusDisplay(CollapseFrame):
     def __init__(self, parent, root: GCS):

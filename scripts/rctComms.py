@@ -397,7 +397,32 @@ class rctUpgradeStatusPacket(rctBinaryPacket):
         _, state, strlen = struct.unpack('<BBH', payload[0x0000: 0x0004])
         msg = payload[0x0004:0x0004 + strlen].decode()
         return rctUpgradeStatusPacket(state, msg)
-
+    
+class rctUpgradePacket(rctBinaryPacket):
+    
+    def __init__(self, numPacket, numTotal, fileBytes):
+        self._pclass = 0x03
+        self._pid = 0x02
+        self.numPacket = hex(numPacket)
+        self.numTotal = hex(numTotal)
+        self.fileBytes = fileBytes
+        self._payload = struct.pack('<BHHH', 0x01, numPacket, numTotal, len(fileBytes) + fileBytes) #TODO: fix this encoding
+    
+    @classmethod
+    def matches(cls, packetClass: int, packetID: int):
+        return packetClass == 0x03 and packetID == 0x02
+    
+    @classmethod
+    def from_bytes(cls, packet: bytes):
+        header = packet[0:6]
+        payload = packet[6:-2]
+        _, _, pcls, pid, _ = struct.unpack("<BBBBH", header)
+        if not cls.matches(pcls, pid):
+            raise RuntimeError("Incorrect packet type")
+        #TODO: fix decoding
+        _, numPacket, numTotal, bytesLen = struct.unpack('<BHHHH', payload[0x0000: 0x0007])
+        fileBytes = payload[0x0007:0x0007 + bytesLen]
+        return rctUpgradePacket(numPacket, numTotal, fileBytes)
 
 class rctPingPacket(rctBinaryPacket):
     def __init__(self, lat: float, lon: float, alt: float, txp: float, txf: int, timestamp: dt.datetime = None):
