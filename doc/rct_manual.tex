@@ -426,7 +426,7 @@
 			\begin{enumerate}
 				\item With the GCS open and connected to the payload, locate the series of drop-downs in the right-most column of the user interface.
 				\item Expand the drop-down labeled ``System Settings''.
-				\item The current values of the payload's center frequency, sampling frequency, and SDR gain are displayed. Edit any values to the desired values. Refer to table 7.1 for more information about these values.
+				\item The current values of the payload's center frequency, sampling frequency, and SDR gain are displayed. Edit any values to the desired values. Refer to table ~\ref{tab:syssettings} for more information about these values.
 				\item Once finished editing, click on the button labeled ``Update''. 
 				\item Confirm that the new values displayed in the drop-down are the new desired values.
 			\end{enumerate}
@@ -434,6 +434,7 @@
 			\begin{table}[htb]
 			\centering
 			\caption{Payload system settings and their respective meanings.}
+			\label{tab:syssettings}
 			\begin{tabular}{||c c c||}
 			\hline
 			Value & Meaning & Units\\ [0.5ex]
@@ -487,13 +488,14 @@
 				\item With the GCS open and connected to the payload, locate the series of drop-downs in the right-most column of the user interface.
 				\item Expand the drop-down labeled ``System Settings''.
 				\item Click on the button labeled ``Expert \& Debug Configuration''.
-				\item In the resulting pop-up window (titled ``Expert/Engineering Settings''), enter the new desired values for the fields displayed. To learn about what these fields mean, refer to table 7.2.
+				\item In the resulting pop-up window (titled ``Expert/Engineering Settings''), enter the new desired values for the fields displayed. To learn about what these fields mean, refer to table ~\ref{tab:expertsettings}.
 				\item Once done editing, click on the button labeled ``submit''.
 			\end{enumerate}
 			The following is a reference table containing additional information about each of the Expert \& Debug settings.
 			\begin{table}[htb]
 			\centering
 			\caption{Expert system settings and their respective meanings.}
+			\label{tab:expertsettings}
 			\begin{tabular}{||c c||}
 			\hline
 			Value & Meaning\\ [0.5ex]
@@ -523,10 +525,11 @@
 			\includegraphics[scale=0.5]{component_status_dd.jpg}
 			\label{fig:component_status_dd}
 		\end{figure}
-		The payload has five possible states (refer to table 7.3 to learn about these states): 
+		The payload has five possible states (refer to table ~\ref{tab:sysstates} to learn about these states): 
 		\begin{table}[htb]
 			\centering
 			\caption{System statuses and their respective meanings.}
+			\label{tab:sysstates}
 			\begin{tabular}{||c c||}
 			\hline
 			State & Meaning\\ [0.5ex]
@@ -547,7 +550,7 @@
 		\begin{enumerate}
 			\item With the GCS open and connected to the payload, locate the series of drop-downs in the right-most column of the user interface.
 			\item Expand the drop-down labeled ``Components''.
-			\item The entry next to ``Status'' is the current status of the payload. Refer to table 7.3 to interpret this status.
+			\item The entry next to ``Status'' is the current status of the payload. Refer to table ~\ref{tab:sysstates} to interpret this status.
 			\item If additional information about the status of individual components within the payload is desired, refer to the following subsection.
 		\end{enumerate}
 		\section{Checking the Status of Individual Components Within Payload}
@@ -561,13 +564,14 @@
 				\item With the GCS open and connected to the payload, locate the series of drop-downs in the right-most column of the user interface.
 				\item Expand the drop-down labeled ``Components''.
 				\item Now expand the drop-down labeled ``Component Statuses''.
-				\item Five individual component statuses will be displayed here. Refer to tables 7.4 through 7.8 to interpret these statuses.
+				\item Five individual component statuses will be displayed here. Refer to tables ~\ref{tab:sdrstates} through ~\ref{tab:swstates} to interpret these statuses.
 			\end{enumerate}
 			Here are the statuses for each of the individual components and what they mean: \\
 			
 			\begin{table}[htb]
 			\centering
 			\caption{SDR statuses and their respective meanings.}
+			\label{tab:sdrstates}
 			\begin{tabular}{||c c||}
 			\hline
 			State & Meaning\\ [0.5ex]
@@ -640,6 +644,7 @@
 			\end{tabular}
 			
 			\caption{Software statuses and their respective meanings.}
+			\label{tab:swstates}
 			\begin{tabular}{||c c||}
 			\hline
 			State & Meaning\\ [0.5ex]
