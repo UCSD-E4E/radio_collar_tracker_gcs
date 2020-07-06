@@ -20,6 +20,8 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 06/25/20  AG  Added more dictionaries to component status display.
+# 06/19/20  AG  Added component status display and sub-display.
 # 05/29/20  ML  refactored MapControl 
 # 05/25/20  NH  Fixed validate frequency call
 # 05/24/20  ML  Implemented ability to load map, refactored map functions
@@ -253,6 +255,7 @@ class GCS(tk.Tk):
         self._systemConnectionTab.updateText("System: Connected")
         self.__registerModelCallbacks()
         self.systemSettingsWidget.updateGUIOptionVars()
+        self.statusWidget.updateGUIOptionVars()
 
     def __advancedSettings(self):
         '''
@@ -415,12 +418,14 @@ class GCS(tk.Tk):
                text="Connect", command=self.__handleConnectInput).grid(column=0, row=0, sticky='new')
 
         # COMPONENTS TAB
-        frm_components = CollapseFrame(frm_sideControl, 'Components')
-        frm_components.grid(column=0, row=1, sticky='new')
+        self.statusWidget = StatusDisplay(frm_sideControl, self)
+        self.statusWidget.grid(column=0, row=1, sticky='new')
 
+        '''
         lbl_componentNotif = tk.Label(
-            frm_components.frame, width=self.SBWidth, text='Vehicle not connected')
+            self.statusWidget.frame, width=self.SBWidth, text='Vehicle not connected')
         lbl_componentNotif.grid(column=0, row=0, sticky='new')
+        '''
 
         # DATA DISPLAY TOOLS
         self.mapControl = MapControl(frm_sideControl, self)
@@ -430,11 +435,14 @@ class GCS(tk.Tk):
         self.systemSettingsWidget = SystemSettingsControl(
             frm_sideControl, self)
         self.systemSettingsWidget.grid(column=0, row=3, sticky='new')
+        
+        self.upgradeDisplay = UpgradeDisplay(frm_sideControl, self)
+        self.upgradeDisplay.grid(column=0, row=4, sticky='n')
 
         # START PAYLOAD RECORDING
         btn_startRecord = tk.Button(frm_sideControl, width=self.SBWidth,
                                     textvariable=self.__missionStatusText, command=self.__startStopMission)
-        btn_startRecord.grid(column=0, row=4, sticky='nsew')
+        btn_startRecord.grid(column=0, row=5, sticky='nsew')
 
 class CollapseFrame(ttk.Frame):
     '''
@@ -485,6 +493,226 @@ class CollapseFrame(ttk.Frame):
 
     def updateText(self, newText="label"):
         self._button.config(text=newText)
+        
+class UpgradeDisplay(CollapseFrame):
+    def __init__(self, parent, root: GCS):
+        CollapseFrame.__init__(self, parent, labelText='Upgrade Software')
+        
+        self.__parent = parent
+        self.__root = root
+
+        self.__innerFrame = None
+
+        self.filename = StringVar()
+        
+        self.__createWidget()
+        
+    def update(self):
+        CollapseFrame.update(self)
+        self.updateGUIOptionVars()
+        
+    def __createWidget(self):
+        if self.__innerFrame:
+            self.__innerFrame.destroy()
+        self.__innerFrame = tk.Frame(self.frame)
+        self.__innerFrame.grid(row=0, column=0, sticky='nesw')
+        
+        file_lbl = tk.Label(self.__innerFrame, text='Selected File:')
+        file_lbl.grid(row=1, column=0, sticky='new')
+        
+        file_entry = tk.Entry(self.__innerFrame, textvariable=self.filename, width=8)
+        file_entry.grid(row=1, column=1, sticky='new')
+
+        browse_file_btn = tk.Button(self.__innerFrame, text='Browse for Upgrade File', command=self.fileDialogue)
+        browse_file_btn.grid(row=2, column=0, sticky='new')
+        
+        upgrade_btn = tk.Button(self.__innerFrame, text='Upgrade', command=self.sendUpgradeFile)
+        upgrade_btn.grid(row=3, column=0, sticky='new')
+        
+    def fileDialogue(self):
+        self.filename.set(str(askopenfilename()))
+        
+    def sendUpgradeFile(self):
+        file = open(self.filename.get(), "rb")
+        byteStream = file.read()
+        self.__root._mavModel.sendUpgradePacket(byteStream)
+        
+    def updateGUIOptionVars(self):
+        pass
+
+class StatusDisplay(CollapseFrame):
+    def __init__(self, parent, root: GCS):
+        CollapseFrame.__init__(self, parent, labelText='Components')
+        
+        self.__parent = parent
+        self.__root = root
+        self.componentStatusWidget = None
+
+        self.__innerFrame = None
+
+        self.statusLabel = None
+
+        self.__createWidget()
+
+    def update(self):
+        CollapseFrame.update(self)
+        self.updateGUIOptionVars()
+
+    def __createWidget(self):
+        if self.__innerFrame:
+            self.__innerFrame.destroy()
+        self.__innerFrame = tk.Frame(self.frame)
+        self.__innerFrame.grid(row=0, column=0, sticky='nesw')
+
+        lbl_overall_status = tk.Label(self.__innerFrame, text='Status:')
+        lbl_overall_status.grid(row=1, column=0, sticky='new')
+
+        entr_overall_status = tk.Label(self.__innerFrame, text='')
+        entr_overall_status.grid(row=1, column=1, sticky='new')
+        
+        self.componentStatusWidget = ComponentStatusDisplay(parent=self.frame, root=self.__root)
+        self.componentStatusWidget.grid(column=0, row=2, sticky='new')
+
+        self.statusLabel = entr_overall_status
+
+    def updateGUIOptionVars(self, scope=0):
+        varDict = self.__root._mavModel.state
+
+        sdr_status = varDict["STS_sdrStatus"]
+        dir_status = varDict["STS_dirStatus"]
+        gps_status = varDict["STS_gpsStatus"]
+        sys_status = varDict["STS_sysStatus"]
+        sw_status = varDict["STS_swStatus"]
+
+        if sys_status == "RCT_STATES.finish":
+            self.statusLabel.config(text='Stopping', bg='red')
+        elif sdr_status == "SDR_INIT_STATES.fail" or dir_status == "OUTPUT_DIR_STATES.fail" or gps_status == "GPS_STATES.fail" or sys_status == "RCT_STATES.fail" or (sw_status != 0 and sw_status != 1):
+            self.statusLabel.config(text='Failed', bg='red')
+        elif sys_status == "RCT_STATES.start" or sys_status == "RCT_STATES.wait_end":
+            self.statusLabel.config(text='Running', bg='green')
+        elif sdr_status == "SDR_INIT_STATES.rdy" and dir_status == "OUTPUT_DIR_STATES.rdy" and gps_status == "EXTS_STATES.rdy" and sys_status == "RCT_STATES.wait_start" and sw_status == 1:
+            self.statusLabel.config(text='Idle', bg='yellow')
+        else:
+            self.statusLabel.config(text='Not Connected', bg='yellow')
+            
+        self.componentStatusWidget.update()
+
+class ComponentStatusDisplay(CollapseFrame):
+    def __init__(self, parent, root: GCS):
+        CollapseFrame.__init__(self, parent, labelText='Component Statuses')
+        self.sdrMap = {
+            "SDR_INIT_STATES.find_devices": {'text': 'SDR: Searching for devices', 'bg':'yellow'},
+            "SDR_INIT_STATES.wait_recycle": {'text':'SDR: Recycling!', 'bg':'yellow'},
+            "SDR_INIT_STATES.usrp_probe": {'text':'SDR: Initializing SDR', 'bg':'yellow'},
+            "SDR_INIT_STATES.rdy": {'text':'SDR: Ready', 'bg':'green'},
+            "SDR_INIT_STATES.fail": {'text':'SDR: Failed!', 'bg':'red'}
+        }
+
+        self.dirMap = {
+            "OUTPUT_DIR_STATES.get_output_dir": {'text':'DIR: Searching', 'bg':'yellow'},
+            "OUTPUT_DIR_STATES.check_output_dir": {'text':'DIR: Checking for mount', 'bg':'yellow'},
+            "OUTPUT_DIR_STATES.check_space": {'text':'DIR: Checking for space', 'bg':'yellow'},
+            "OUTPUT_DIR_STATES.wait_recycle": {'text':'DIR: Recycling!', 'bg':'yellow'},
+            "OUTPUT_DIR_STATES.rdy": {'text':'DIR: Ready', 'bg':'green'},
+            "OUTPUT_DIR_STATES.fail": {'text':'DIR: Failed!', 'bg':'red'},
+        }
+
+        self.gpsMap = {
+            "EXTS_STATES.get_tty": {'text': 'GPS: Getting TTY Device', 'bg': 'yellow'},
+            "EXTS_STATES.get_msg": {'text': 'GPS: Waiting for message', 'bg': 'yellow'},
+            "EXTS_STATES.wait_recycle": {'text': 'GPS: Recycling', 'bg': 'yellow'},
+            "EXTS_STATES.rdy": {'text': 'GPS: Ready', 'bg': 'green'},
+            "EXTS_STATES.fail": {'text': 'GPS: Failed!', 'bg': 'red'}
+        }
+
+        self.sysMap = {
+            "RCT_STATES.init": {'text': 'SYS: Initializing', 'bg': 'yellow'},
+            "RCT_STATES.wait_init": {'text': 'SYS: Initializing', 'bg': 'yellow'},
+            "RCT_STATES.wait_start": {'text': 'SYS: Ready for start', 'bg': 'green'},
+            "RCT_STATES.start": {'text': 'SYS: Starting', 'bg': 'blue'},
+            "RCT_STATES.wait_end": {'text': 'SYS: Running', 'bg': 'blue'},
+            "RCT_STATES.finish": {'text': 'SYS: Stopping', 'bg': 'blue'},
+            "RCT_STATES.fail": {'text': 'SYS: Failed!', 'bg': 'red'},
+        }
+        
+        self.swMap = {
+            '0': {'text': 'SW: OFF', 'bg': 'yellow'},
+            '1': {'text': 'SW: ON', 'bg': 'green'},
+        }
+        
+        self.compDicts = {
+            "STS_sdrStatus": self.sdrMap,
+            "STS_dirStatus": self.dirMap,
+            "STS_gpsStatus": self.gpsMap,
+            "STS_sysStatus": self.sysMap,
+            "STS_swStatus": self.swMap,
+        }
+            
+        self.__parent = parent
+        self.__root = root
+
+        self.__innerFrame = None
+
+        self.statusLabels = {}
+
+        self.__createWidget()
+
+    def update(self):
+        CollapseFrame.update(self)
+        self.updateGUIOptionVars()
+
+    def __createWidget(self):
+        if self.__innerFrame:
+            self.__innerFrame.destroy()
+        self.__innerFrame = tk.Frame(self.frame)
+        self.__innerFrame.grid(row=0, column=0, sticky='nesw')
+
+        lbl_sdr_status = tk.Label(self.__innerFrame, text='SDR Status')
+        lbl_sdr_status.grid(row=1, column=0, sticky='new')
+
+        lbl_dir_status = tk.Label(self.__innerFrame, text='Storage Status')
+        lbl_dir_status.grid(row=2, column=0, sticky='new')
+
+        lbl_gps_status = tk.Label(self.__innerFrame, text='GPS Status')
+        lbl_gps_status.grid(row=3, column=0, sticky='new')
+
+        lbl_sys_status = tk.Label(self.__innerFrame, text='System Status')
+        lbl_sys_status.grid(row=4, column=0, sticky='new')
+
+        lbl_sw_status = tk.Label(self.__innerFrame, text='Software Status')
+        lbl_sw_status.grid(row=5, column=0, sticky='new')
+
+        entr_sdr_status = tk.Label(self.__innerFrame, text='')
+        entr_sdr_status.grid(row=1, column=1, sticky='new')
+
+        entr_dir_status = tk.Label(self.__innerFrame, text='')
+        entr_dir_status.grid(row=2, column=1, sticky='new')
+
+        entr_gps_status = tk.Label(self.__innerFrame, text='')
+        entr_gps_status.grid(row=3, column=1, sticky='new')
+
+        entr_sys_status = tk.Label(self.__innerFrame, text='')
+        entr_sys_status.grid(row=4, column=1, sticky='new')
+
+        entr_sw_status = tk.Label(self.__innerFrame, text='')
+        entr_sw_status.grid(row=5, column=1, sticky='new')
+
+        self.statusLabels["STS_sdrStatus"] = entr_sdr_status
+        self.statusLabels["STS_dirStatus"] = entr_dir_status
+        self.statusLabels["STS_gpsStatus"] = entr_gps_status
+        self.statusLabels["STS_sysStatus"] = entr_sys_status
+        self.statusLabels["STS_swStatus"] = entr_sw_status
+
+    def updateGUIOptionVars(self, scope=0):
+        varDict = self.__root._mavModel.state
+        for varName, varValue in varDict.items():
+            print(varName)
+            try:
+                configDict = self.compDicts[varName]
+                configOpts = configDict[str(varValue)]
+                self.statusLabels[varName].config(text=configOpts['text'], bg=configOpts['bg'])
+            except KeyError:
+                continue
 
 class SystemSettingsControl(CollapseFrame):
     def __init__(self, parent, root: GCS):
