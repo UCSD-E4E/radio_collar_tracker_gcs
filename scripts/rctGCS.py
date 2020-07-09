@@ -1,82 +1,24 @@
-#!/usr/bin/env python3
-###############################################################################
-#     Radio Collar Tracker Ground Control Software
-#     Copyright (C) 2020  Nathan Hui
-#
-#     This program is free software: you can redistribute it and/or modify
-#     it under the terms of the GNU General Public License as published by
-#     the Free Software Foundation, either version 3 of the License, or
-#     (at your option) any later version.
-#
-#     This program is distributed in the hope that it will be useful,
-#     but WITHOUT ANY WARRANTY; without even the implied warranty of
-#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#     GNU General Public License for more details.
-#
-#     You should have received a copy of the GNU General Public License
-#     along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-###############################################################################
-#
-# DATE      WHO Description
-# -----------------------------------------------------------------------------
-# 06/17/20  ML  Implemented ability to load webmap from OSM based on coordinates
-# 05/29/20  ML  refactored MapControl 
-# 05/25/20  NH  Fixed validate frequency call
-# 05/24/20  ML  Implemented ability to load map, refactored map functions
-# 05/24/20  AG  Added error messages during target frequency validation.
-# 05/20/20  NH  Fixed window close action, added function to handle registering
-#                 callbacks when connection established, removed unused
-#                 callbacks, added advanced settings dialog, fixed logging
-# 05/19/20  NH  Removed PIL, rasterio, refactored options, connectionDialog,
-#                 AddTargetDialog, SystemSettingsControl, fixed exit behavior,
-# 05/18/20  NH  Updated API for core
-# 05/17/20  AG  Finished implementing start/stop recording button
-# 05/17/20  AG  Added setting target frequencies and system connection text updates.
-# 05/13/20  AG  Added ability to set and receive expert debug options
-# 05/09/20  ML  Added ability to add/clear target frequencies
-# 05/05/20  AG  Tied options entries to string vars
-# 05/03/20  ML  Added Expert Settings popup, Added the ability to load TIFF img
-# 05/03/20  AG  Added TCP connection and update options functionalities
-# 04/26/20  NH  Updated API, switched from UDP to TCP
-# 04/20/20  NH  Updated API and imports
-# 04/17/20  NH  Updated imports and MAVModel API
-# 02/15/20  NH  Initial commit
-#
-###############################################################################
-
-import tkinter as tk
-import urllib.request
 import datetime as dt
-import threading
+import time
 import logging
-from tkinter import ttk
-from tkinter import messagebox as tkm
 import sys
-from tkinter import *
 import rctTransport
 import rctComms
 import rctCore
-from tkinter.filedialog import askopenfilename
-import os
-from matplotlib.backends.backend_tkagg import (
-    FigureCanvasTkAgg, NavigationToolbar2Tk)
-from matplotlib.figure import Figure
-import matplotlib.pyplot as plt
-import numpy as np
-from mpl_toolkits.basemap import Basemap
 import georaster
 import folium
-from cefpython3 import cefpython as cef
-import ctypes
-import platform
+from folium import raster_layers
+from PyQt5.QtCore import *
+from PyQt5.QtWebEngineWidgets import *
+from PyQt5.QtWidgets import *
+from PyQt5.QtGui import *
 
-class GCS(tk.Tk):
+class GCS(QMainWindow):
     '''
     Ground Control Station GUI
     '''
 
-    SBWidth = 25
+    SBWidth = 500
 
     defaultTimeout = 5
 
@@ -91,8 +33,10 @@ class GCS(tk.Tk):
         self._mavModel = None
         self._buttons = []
         self._systemConnectionTab = None
-        self.__missionStatusText = StringVar()
-        self.__missionStatusText.set("Start Recording")
+        self.systemSettingWidget = None
+        #self.__missionStatusText = StringVar()
+        #self.__missionStatusText.set("Start Recording")
+        self.__missionStatusText = "Start Recording"
         self.innerFreqFrame = None
         self.freqElements = []
         self.targEntries = {}
@@ -101,7 +45,7 @@ class GCS(tk.Tk):
         self.__createWidgets()
         for button in self._buttons:
             button.config(state='disabled')
-        self.protocol('WM_DELETE_WINDOW', self.__windowClose)
+        #self.protocol('WM_DELETE_WINDOW', self.__windowClose)
 
     def __registerModelCallbacks(self):
         #         self._mavModel.registerCallback(
@@ -115,7 +59,6 @@ class GCS(tk.Tk):
         :param n:
         :type n:
         '''
-        tk.Tk.mainloop(self, n=n)
 
     def __heartbeatCallback(self):
         if (self.__mavModel.swStatus != 0):
@@ -137,23 +80,41 @@ class GCS(tk.Tk):
         '''
         for button in self._buttons:
             button.config(state='disabled')
-        tkm.showerror(
-            title="RCT GCS", message="No Heartbeats Received")
+        dialog = QMessageBox()
+        dialog.setIcon(QMessageBox.Critical)
+        dialog.setText("No Heartbeats Received")
+        dialog.addButton(QMessageBox.Ok)
+        dialog.exec()
 
     def __handleRemoteException(self):
         '''
         Internal callback for an exception message
         '''
-        tkm.showerror(title='RCT GCS', message='An exception has occured!\n%s\n%s' % (
+        dialog = QMessageBox()
+        dialog.setIcon(QMessageBox.Critical)
+        dialog.setText('An exception has occured!\n%s\n%s' % (
             self._mavModel.lastException[0], self._mavModel.lastException[1]))
+        dialog.addButton(QMessageBox.Ok)
+        dialog.exec()
 
     def __startStopMission(self):
         # State machine for start recording -> stop recording
+        '''
         if self.__missionStatusText.get() == 'Start Recording':
             self.__missionStatusText.set('Stop Recording')
             self._mavModel.startMission(timeout=self.defaultTimeout)
         else:
             self.__missionStatusText.set('Start Recording')
+            self._mavModel.stopMission(timeout=self.defaultTimeout)
+        '''
+        if self._mavModel == None:
+            return
+
+        if self.__missionStatusText == 'Start Recording':
+            self.__missionStatusText ='Stop Recording'
+            self._mavModel.startMission(timeout=self.defaultTimeout)
+        else:
+            self.__missionStatusText = 'Start Recording'
             self._mavModel.stopMission(timeout=self.defaultTimeout)
 
     def __updateStatus(self):
@@ -235,6 +196,15 @@ class GCS(tk.Tk):
         else:
             self.swStatusLabel.config(text='SW: NULL', bg='red')
 
+
+    def closeEvent(self, event):
+        '''
+        Internal callback for window close
+        '''
+        if self._mavModel is not None:
+            self._mavModel.stop()
+        super().closeEvent(event)
+            
     def __windowClose(self):
         '''
         Internal callback for window close
@@ -249,6 +219,8 @@ class GCS(tk.Tk):
         Internal callback to open Connect Settings
         '''
         connectionDialog = ConnectionDialog(self)
+        connectionDialog.exec_()
+
 
         self._rctPort = connectionDialog.comms
         self._mavReceiver = connectionDialog.comms
@@ -264,358 +236,343 @@ class GCS(tk.Tk):
         '''
         Internal callback to open Connect Settings
         '''
-        settingsWindow = tk.Toplevel(self)
 
-        settingsWindow.title('Connect Settings')
-        frm_advSettings = tk.Frame(master=settingsWindow)
-        frm_advSettings.pack(fill=tk.BOTH)
-
-        # EXPERT SETTINGS
-        lbl_pingWidth = tk.Label(
-            frm_advSettings, text='Expected Ping Width(ms)')
-        lbl_pingWidth.grid(row=0, column=0, sticky='new')
-
-        lbl_minWidthMult = tk.Label(
-            frm_advSettings, text='Min. Width Multiplier')
-        lbl_minWidthMult.grid(row=1, column=0, sticky='new')
-
-        lbl_maxWidthMult = tk.Label(
-            frm_advSettings, text='Max. Width Multiplier')
-        lbl_maxWidthMult.grid(row=2, column=0, sticky='new')
-
-        lbl_minPingSNR = tk.Label(frm_advSettings, text='Min. Ping SNR(dB)')
-        lbl_minPingSNR.grid(row=3, column=0, sticky='new')
-
-        lbl_GPSPort = tk.Label(frm_advSettings, text='GPS Port')
-        lbl_GPSPort.grid(row=4, column=0, sticky='new')
-
-        lbl_GPSBaudRate = tk.Label(frm_advSettings, text='GPS Baud Rate')
-        lbl_GPSBaudRate.grid(row=5, column=0, sticky='new')
-
-        lbl_outputDir = tk.Label(frm_advSettings, text='Output Directory')
-        lbl_outputDir.grid(row=6, column=0, sticky='new')
-
-        lbl_GPSMode = tk.Label(frm_advSettings, text='GPS Mode')
-        lbl_GPSMode.grid(row=7, column=0, sticky='new')
-
-        entr_pingWidth = tk.Entry(
-            frm_advSettings, textvariable=self.optionVars['DSP_pingWidth'], width=8)
-        entr_pingWidth.grid(row=0, column=1, sticky='new')
-
-        entr_minWidthMult = tk.Entry(
-            frm_advSettings, textvariable=self.optionVars['DSP_pingMin'], width=8)
-        entr_minWidthMult.grid(row=1, column=1, sticky='new')
-
-        entr_maxWidthMult = tk.Entry(
-            frm_advSettings, textvariable=self.optionVars['DSP_pingMax'], width=8)
-        entr_maxWidthMult.grid(row=2, column=1, sticky='new')
-
-        entr_minPingSNR = tk.Entry(
-            frm_advSettings, textvariable=self.optionVars['DSP_pingSNR'], width=8)
-        entr_minPingSNR.grid(row=3, column=1, sticky='new')
-
-        entr_GPSPort = tk.Entry(
-            frm_advSettings, textvariable=self.optionVars['GPS_device'], width=8)
-        entr_GPSPort.grid(row=4, column=1, sticky='new')
-
-        entr_GPSBaudRate = tk.Entry(
-            frm_advSettings, textvariable=self.optionVars['GPS_baud'], width=8)
-        entr_GPSBaudRate.grid(row=5, column=1, sticky='new')
-
-        entr_outputDir = tk.Entry(
-            frm_advSettings, textvariable=self.optionVars['SYS_outputDir'], width=8)
-        entr_outputDir.grid(row=6, column=1, sticky='new')
-
-        entr_GPSMode = tk.Entry(
-            frm_advSettings, textvariable=self.optionVars['GPS_mode'], width=8)
-        entr_GPSMode.grid(row=7, column=1, sticky='new')
-
-        def submit():
-            pingWidth = self.optionVars['DSP_pingWidth'].get()
-            minWidthMult = self.optionVars['DSP_pingMin'].get()
-            maxWidthMult = self.optionVars['DSP_pingMax'].get()
-            minPingSNR = self.optionVars['DSP_pingSNR'].get()
-            GPSPort = self.optionVars['GPS_device'].get()
-            GPSBaud = self.optionVars['GPS_baud'].get()
-            outputDir = self.optionVars['SYS_outputDir'].get()
-            GPSMode = self.optionVars['GPS_mode'].get()
-            optionsFlag = False  # set to true if setOptions is necessary
-
-            setOptionsDict = {}
-            if pingWidth != '':
-                optionsFlag = True
-                setOptionsDict['ping_width_ms'] = int(pingWidth)
-            if minWidthMult != '':
-                optionsFlag = True
-                setOptionsDict['ping_min_len_mult'] = float(minWidthMult)
-            if maxWidthMult != '':
-                optionsFlag = True
-                setOptionsDict['ping_max_len_mult'] = float(maxWidthMult)
-            if minPingSNR != '':
-                optionsFlag = True
-                setOptionsDict['ping_min_snr'] = float(minPingSNR)
-            if GPSPort != '':
-                optionsFlag = True
-                setOptionsDict['gps_target'] = GPSPort
-            if outputDir != '':
-                optionsFlag = True
-                setOptionsDict['output_dir'] = outputDir
-            if GPSMode != '':
-                optionsFlag = True
-                setOptionsDict['gps_mode'] = bool(GPSMode)
-            if optionsFlag:
-                self._mavModel.setOptions(setOptionsDict)
-
-            options = self._mavModel.getOptions(5)
-
-            # print statements for debugging purposes
-            print("Done with getOptions call")
-            print("Here are the options: ")
-            for option in options:
-                print(option + ':' + str(options[option]))
-
-            if 'ping_width_ms' in options:
-                self.optionVars['DSP_pingWidth'].set(
-                    str(options['ping_width_ms']))
-            if 'ping_min_len_mult' in options:
-                self.optionVars['DSP_pingMin'].set(
-                    str(options['ping_min_len_mult']))
-            if 'ping_max_len_mult' in options:
-                self.optionVars['DSP_pingMax'].set(
-                    str(options['ping_max_len_mult']))
-            if 'ping_min_snr' in options:
-                self.optionVars['DSP_pingSNR'].set(
-                    str(options['ping_min_snr']))
-            if 'gps_target' in options:
-                self.optionVars['GPS_device'].set(str(options['gps_target']))
-            if 'output_dir' in options:
-                self.optionVars['SYS_outputDir'].set(
-                    str(options['output_dir']))
-            if 'gps_mode' in options:
-                self.optionVars['GPS_mode'].set(str(options['gps_mode']))
-
-            settingsWindow.destroy()
-            settingsWindow.update()
-
-        btn_submit = tk.Button(settingsWindow, text='submit', command=submit)
-        btn_submit.pack()
+        #def submit():
 
 
     def __createWidgets(self):
         '''
         Internal helper to make GUI widgets
         '''
-        self.title('RCT GCS')
+        
 
-        frm_sideControl = tk.Frame(
-            master=self, width=self.SBWidth, height=300, bg="dark gray")
-        frm_sideControl.pack(anchor=tk.NW, side=tk.RIGHT)
-        frm_sideControl.grid_columnconfigure(0, weight=1)
-        frm_sideControl.grid_rowconfigure(0, weight=1)
-        frm_sideControl.focus_get()
-        self.testFrame = frm_sideControl
+        holder = QGridLayout()
+        centr_widget = QFrame()
+        self.setCentralWidget(centr_widget)
+
+        self.setWindowTitle('RCT GCS')
+        frm_sideControl = QScrollArea()
+        frm_sideControl.resize(self.SBWidth, 400)
+
+        content = QWidget()
+        content.resize(self.SBWidth, 400)
+        frm_sideControl.setWidget(content)
+        frm_sideControl.setWidgetResizable(True)
+
+        #wlay is the layout that holds all tabs 
+        wlay = QVBoxLayout(content)
+
 
         # SYSTEM TAB
-        self._systemConnectionTab = CollapseFrame(
-            frm_sideControl, 'System: No Connection')
-        self._systemConnectionTab.grid(row=0, column=0, sticky='new')
-        Button(self._systemConnectionTab.frame, relief=tk.FLAT, width=self.SBWidth,
-               text="Connect", command=self.__handleConnectInput).grid(column=0, row=0, sticky='new')
+        self._systemConnectionTab = CollapseFrame(title='System: No Connection')
+        self._systemConnectionTab.resize(self.SBWidth, 400)
+        lay_sys = QVBoxLayout()
+        btn_connect = QPushButton("Connect")
+        btn_connect.resize(self.SBWidth, 100)
+        btn_connect.clicked.connect(lambda:self.__handleConnectInput())
+        lay_sys.addWidget(btn_connect)
+        self._systemConnectionTab.setContentLayout(lay_sys)
 
         # COMPONENTS TAB
-        frm_components = CollapseFrame(frm_sideControl, 'Components')
-        frm_components.grid(column=0, row=1, sticky='new')
+        frm_components = CollapseFrame('Components')
 
-        lbl_componentNotif = tk.Label(
-            frm_components.frame, width=self.SBWidth, text='Vehicle not connected')
-        lbl_componentNotif.grid(column=0, row=0, sticky='new')
+        lay_comp = QVBoxLayout()
+        lbl_componentNotif = QLabel('Vehicle not connected')
+        lay_comp.addWidget(lbl_componentNotif)
+        frm_components.setContentLayout(lay_comp)
 
         # DATA DISPLAY TOOLS
-        self.mapControl = MapControl(frm_sideControl, self)
-        self.mapControl.grid(column=0, row=2, sticky='n')
+        self.mapControl = MapControl(frm_sideControl, holder, self)
 
         # SYSTEM SETTINGS
-        self.systemSettingsWidget = SystemSettingsControl(
-            frm_sideControl, self)
-        self.systemSettingsWidget.grid(column=0, row=3, sticky='new')
+        self.systemSettingsWidget = SystemSettingsControl(self)
+        scrollArea = QScrollArea()
+        scrollArea.setWidgetResizable(True)
+        scrollArea.setWidget(self.systemSettingsWidget)
+
+
 
         # START PAYLOAD RECORDING
-        btn_startRecord = tk.Button(frm_sideControl, width=self.SBWidth,
-                                    textvariable=self.__missionStatusText, command=self.__startStopMission)
-        btn_startRecord.grid(column=0, row=4, sticky='nsew')
+        btn_startRecord = QPushButton(self.__missionStatusText)
+        #                            textvariable=self.__missionStatusText, 
+        btn_startRecord.clicked.connect(lambda:self.__startStopMission())
 
-class CollapseFrame(ttk.Frame):
-    '''
-    Helper class to deal with collapsible GUI components
-    '''
+        wlay.addWidget(self._systemConnectionTab)
+        wlay.addWidget(frm_components)
+        wlay.addWidget(self.mapControl)
+        wlay.addWidget(self.systemSettingsWidget)
+        wlay.addWidget(btn_startRecord)
+        wlay.addStretch()
+        holder.addWidget(content, 0, 0, alignment=Qt.AlignLeft)
+        centr_widget.setLayout(holder)
+        self.resize(1600, 1200)
+        self.show()
 
-    def __init__(self, parent, labelText, width=25):
+class CollapseFrame(QWidget):
+    def __init__(self, title="", parent=None):
+        super(CollapseFrame, self).__init__(parent)
 
-        ttk.Frame.__init__(self, parent)
+        self.toggle_button = QToolButton(
+            text=title, checkable=True, checked=False
+        )
+        self.toggle_button.setStyleSheet("QToolButton { border: none; }")
+        self.toggle_button.setToolButtonStyle(
+            Qt.ToolButtonTextBesideIcon
+        )
+        self.toggle_button.setArrowType(Qt.RightArrow)
+        self.toggle_button.pressed.connect(self.on_pressed)
 
-        # These are the class variable
-        # see a underscore in expanded_text and _collapsed_text
-        # this means these are private to class
-        self.parent = parent
+        self.toggle_animation = QParallelAnimationGroup(self)
 
-        self.columnconfigure(0, weight=1)
+        self.content_area = QScrollArea(
+            maximumHeight=0, minimumHeight=0
+        )
+        self.content_area.setSizePolicy(
+            QSizePolicy.Expanding, QSizePolicy.Fixed
+        )
+        self.content_area.setFrameShape(QFrame.NoFrame)
 
-        # Tkinter variable storing integer value
-        self._variable = tk.IntVar()
+        lay = QVBoxLayout(self)
+        lay.setSpacing(0)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(self.toggle_button)
+        lay.addWidget(self.content_area)
 
-        self._button = ttk.Checkbutton(self, width=width, variable=self._variable,
-                                       command=self._activate, text=labelText, style="TMenubutton")
-        self._button.grid(row=0, column=0, sticky="we")
+        self.toggle_animation.addAnimation(
+            QPropertyAnimation(self, b"minimumHeight")
+        )
+        self.toggle_animation.addAnimation(
+            QPropertyAnimation(self, b"maximumHeight")
+        )
+        self.toggle_animation.addAnimation(
+            QPropertyAnimation(self.content_area, b"maximumHeight")
+        )
 
-        collapseStyle = ttk.Style()
-        collapseStyle.configure("TFrame", background="dark gray")
-        self.frame = ttk.Frame(self, style="TFrame")
+    def updateText(self, text):
+        self.toggle_button.setText(text)
 
-        self._width = width
+    @pyqtSlot()
+    def on_pressed(self):
+        checked = self.toggle_button.isChecked()
+        self.toggle_button.setArrowType(
+            Qt.DownArrow if not checked else Qt.RightArrow
+        )
+        self.toggle_animation.setDirection(
+            QAbstractAnimation.Forward
+            if not checked
+            else QAbstractAnimation.Backward
+        )
+        self.toggle_animation.start()
 
-        # This will call activate function of class
-        self._activate()
+    def setContentLayout(self, layout):
+        lay = self.content_area.layout()
+        del lay
+        self.content_area.setLayout(layout)
+        collapsed_height = (
+            self.sizeHint().height() - self.content_area.maximumHeight()
+        )
+        content_height = layout.sizeHint().height()
+        for i in range(self.toggle_animation.animationCount()):
+            animation = self.toggle_animation.animationAt(i)
+            animation.setDuration(500)
+            animation.setStartValue(collapsed_height)
+            animation.setEndValue(collapsed_height + content_height)
 
-    def _activate(self):
-        if not self._variable.get():
-
-            self.frame.grid_forget()
-
-        elif self._variable.get():
-            # increasing the frame area so new widgets
-            # could reside in this container
-            self.frame.grid(row=1, column=0, columnspan=1)
-
-    def toggle(self):
-        """Switches the label frame to the opposite state."""
-        self._variable.set(not self._variable.get())
-        self._activate()
-
-    def updateText(self, newText="label"):
-        self._button.config(text=newText)
+        content_animation = self.toggle_animation.animationAt(
+            self.toggle_animation.animationCount() - 1
+        )
+        content_animation.setDuration(500)
+        content_animation.setStartValue(0)
+        content_animation.setEndValue(content_height)
 
 class SystemSettingsControl(CollapseFrame):
-    def __init__(self, parent, root: GCS):
-        CollapseFrame.__init__(self, parent, labelText='System Settings')
-        self.__parent = parent
+    def __init__(self, root):
+        CollapseFrame.__init__(self, title='System Settings')
+        #self.__parent = parent
         self.__root = root
 
         self.__innerFrame = None
         self.frm_targHolder = None
+        self.scroll_targHolder = None
+        self.widg_targHolder = None
         self.targEntries = {}
 
         self.optionVars = {
             "TGT_frequencies": [],
-            "SDR_centerFreq": tk.IntVar(),
-            "SDR_samplingFreq": tk.IntVar(),
-            "SDR_gain": tk.DoubleVar(),
-            "DSP_pingWidth": tk.DoubleVar(),
-            "DSP_pingSNR": tk.DoubleVar(),
-            "DSP_pingMax": tk.DoubleVar(),
-            "DSP_pingMin": tk.DoubleVar(),
-            "GPS_mode": tk.IntVar(),
-            "GPS_device": tk.StringVar(),
-            "GPS_baud": tk.IntVar(),
-            "SYS_outputDir": tk.StringVar(),
-            "SYS_autostart": tk.BooleanVar(),
+            "SDR_centerFreq": None,
+            "SDR_samplingFreq": None,
+            "SDR_gain": None,
+            "DSP_pingWidth": None,
+            "DSP_pingSNR": None,
+            "DSP_pingMax": None,
+            "DSP_pingMin": None,
+            "GPS_mode": None,
+            "GPS_device": None,
+            "GPS_baud": None,
+            "SYS_outputDir": None,
+            "SYS_autostart": None,
         }
         self.__createWidget()
 
     def update(self):
-        CollapseFrame.update(self)
-        self.__createWidget()
+        self.__updateWidget() #add updated values
+
+        # Repaint widgets and layouts
+        self.widg_targHolder.repaint()
+        self.scroll_targHolder.repaint()
+        self.frm_targHolder.activate()
+        CollapseFrame.repaint(self)
+        self.__innerFrame.activate()
+        
+
+    def __updateWidget(self):
+        if self.frm_targHolder:
+            while (self.frm_targHolder.count() > 0):
+                child = self.frm_targHolder.takeAt(0)
+                if child.widget():
+                    child.widget().deleteLater()
+        rowIdx = 0
+        self.targEntries = {}
+        if self.__root._mavModel is not None:
+            cntrFreq = self.__root._mavModel.getOption('SDR_centerFreq')
+            sampFreq = self.__root._mavModel.getOption('SDR_samplingFreq')
+            self.optionVars["SDR_centerFreq"].setText(str(cntrFreq))
+            self.optionVars["SDR_samplingFreq"].setText(str(sampFreq))
+            self.frm_targHolder.setVerticalSpacing(0)
+            time.sleep(1)
+            for freq in self.__root._mavModel.getFrequencies(self.__root.defaultTimeout):
+                #Put in frm_targHolder
+                new = QHBoxLayout()
+                freqLabel = QLabel('Target %d' % (rowIdx + 1))
+                freqVariable = freq
+                freqEntry = QLineEdit()
+                val = QIntValidator(cntrFreq-sampFreq, cntrFreq+sampFreq)                            
+                freqEntry.setValidator(val)
+                freqEntry.setText(str(freqVariable))
+
+                # Add new target to layout
+                new.addWidget(freqLabel)
+                new.addWidget(freqEntry)
+                newWidg = QWidget()
+                newWidg.setLayout(new)
+                self.frm_targHolder.addRow(newWidg)
+
+                
+                self.targEntries[freq] = [freq]
+                rowIdx += 1
 
     def __createWidget(self):
-        if self.__innerFrame:
-            self.__innerFrame.destroy()
-        self.__innerFrame = tk.Frame(self.frame)
-        self.__innerFrame.grid(row=0, column=0, sticky='nesw')
+        '''
+        Inner function to create widgets in the System Settings tab
+        '''
+        self.__innerFrame = QGridLayout()
 
-        lbl_cntrFreq = tk.Label(self.__innerFrame, text='Center Frequency')
-        lbl_cntrFreq.grid(row=1, column=0, sticky='new')
+        lbl_cntrFreq = QLabel('Center Frequency')
 
-        lbl_sampFreq = tk.Label(self.__innerFrame,
-                                text='Sampling Frequency')
-        lbl_sampFreq.grid(row=2, column=0, sticky='new')
+        lbl_sampFreq = QLabel('Sampling Frequency')
 
-        lbl_sdrGain = tk.Label(self.__innerFrame, text='SDR Gain')
-        lbl_sdrGain.grid(row=3, column=0, sticky='new')
+        lbl_sdrGain = QLabel('SDR Gain')
 
-        entr_cntrFreq = tk.Entry(
-            self.__innerFrame, textvariable=self.optionVars['SDR_centerFreq'], width=8)
-        entr_cntrFreq.grid(row=1, column=1, sticky='new')
+        self.optionVars['SDR_centerFreq'] = QLineEdit()
 
-        entr_sampFreq = tk.Entry(
-            self.__innerFrame, textvariable=self.optionVars['SDR_samplingFreq'], width=8)
-        entr_sampFreq.grid(row=2, column=1, sticky='new')
 
-        entr_sdrGain = tk.Entry(self.__innerFrame,
-                                textvariable=self.optionVars['SDR_gain'], width=8)
-        entr_sdrGain.grid(row=3, column=1, sticky='new')
+        self.optionVars['SDR_samplingFreq'] = QLineEdit()
 
-        self.frm_targHolder = tk.Frame(
-            self.__innerFrame, width=self._width - 2)
-        self.frm_targHolder.grid(row=4, column=0, columnspan=2, sticky='new')
+        self.optionVars['SDR_gain'] = QLineEdit()
 
-        btn_addTarget = tk.Button(self.__innerFrame, relief=tk.FLAT, text='Add Target',
-                                  command=self.addTarget)
-        btn_addTarget.grid(row=0, columnspan=2, sticky='new')
+        self.frm_targHolder = QFormLayout() # Layout that holds target widgets
+        self.widg_targHolder = QWidget()
+        self.scroll_targHolder = QScrollArea()
+        self.scroll_targHolder.setWidgetResizable(True)
+        self.scroll_targHolder.setWidget(self.widg_targHolder)
+        self.widg_targHolder.setLayout(self.frm_targHolder)
 
         rowIdx = 0
         self.targEntries = {}
         if self.__root._mavModel is not None:
             for freq in self.__root._mavModel.getFrequencies(self.__root.defaultTimeout):
-                freqLabel = tk.Label(self.frm_targHolder,
-                                     text='Target %d' % (rowIdx + 1))
-                freqLabel.grid(row=rowIdx, column=0, sticky='ew')
-                freqVariable = tk.IntVar()
-                freqVariable.set(freq)
-                freqEntry = tk.Entry(self.frm_targHolder,
-                                     textvariable=freqVariable, validate='focusout',
-                                     validatecommand=lambda sv=freqVariable: self.validateFrequency(sv))
-                freqEntry.grid(row=rowIdx, column=1, sticky='ew')
-                self.targEntries[freq] = [freqVariable]
+                #Put in frm_targHolder
+                new = QHBoxLayout()
+                freqLabel = QLabel('Target %d' % (rowIdx + 1))
+                freqVariable = freq
+                freqEntry = QLineEdit()
+                cntrFreq = self.__root._mavModel.getOption('SDR_centerFreq')
+                sampFreq = self.__root._mavModel.getOption('SDR_samplingFreq')
+                val = QIntValidator(cntrFreq-sampFreq, cntrFreq+sampFreq)                            
+                freqEntry.setValidator(val)
+                freqEntry.setText(freqVariable)
+                
+                new.addWidget(freqLabel)
+                new.addWidget(freqEntry)
+                newWidg = QWidget()
+                newWidg.setLayout(new)
+                self.frm_targHolder.addRow(newWidg)
+                self.targEntries[freq] = [freq]
                 rowIdx += 1
 
-        btn_clearTargs = tk.Button(
-            self.__innerFrame, text='Clear Targets', command=self.clearTargets)
-        btn_clearTargs.grid(column=0, row=5, sticky='new')
+        # Add widgets to main layout: self.__innerFrame
+        self.__innerFrame.addWidget(self.scroll_targHolder, 4, 0, 1, 2)
+        self.__innerFrame.addWidget(lbl_cntrFreq, 1, 0)
+        self.__innerFrame.addWidget(lbl_sampFreq, 2, 0)
+        self.__innerFrame.addWidget(lbl_sdrGain, 3, 0)
+        self.__innerFrame.addWidget(self.optionVars['SDR_centerFreq'], 1, 1)
+        self.__innerFrame.addWidget(self.optionVars['SDR_samplingFreq'], 2, 1)
+        self.__innerFrame.addWidget(self.optionVars['SDR_gain'], 3, 1)
 
-        btn_submit = tk.Button(self.__innerFrame,
-                               text='Update', command=self._updateButtonCallback)
-        btn_submit.grid(column=1, row=5, sticky='new')
+        btn_addTarget = QPushButton('Add Target')
+        btn_addTarget.clicked.connect(lambda:self.addTarget())
+        self.__innerFrame.addWidget(btn_addTarget, 0, 0, 1, 2)
+        btn_clearTargs = QPushButton('Clear Targets')
+        btn_clearTargs.clicked.connect(lambda:self.clearTargets())
+        self.__innerFrame.addWidget(btn_clearTargs, 5, 0)
 
-        btn_advSettings = tk.Button(self.__innerFrame,
-                                    text='Expert & Debug Configuration', relief=tk.FLAT, command=self.__advancedSettings)
-        btn_advSettings.grid(column=0, columnspan=2, row=6)
+        btn_submit = QPushButton('Update')
+        btn_submit.clicked.connect(lambda:self._updateButtonCallback())
+        self.__innerFrame.addWidget(btn_submit, 5, 1)
+
+        btn_advSettings = QPushButton('Expert & Debug Configuration')
+        btn_advSettings.clicked.connect(lambda:self.__advancedSettings())
+        self.__innerFrame.addWidget(btn_advSettings, 6, 0, 1, 2)
+
+        self.setContentLayout(self.__innerFrame)
 
 
     def clearTargets(self):
+        '''
+        Helper function to clear target frequencies from UI and 
+        MavMode
+        '''
         self.__root._mavModel.setFrequencies(
             [], timeout=self.__root.defaultTimeout)
         self.update()
 
     def __advancedSettings(self):
-        ExpertSettingsDialog(self, self.optionVars)
+        openSettings = ExpertSettingsDialog(self, self.optionVars)
+        openSettings.exec_()
 
-    def validateFrequency(self, var: tk.IntVar):
+    def validateFrequency(self, var: int):
         cntrFreq = self.__root._mavModel.getOption('SDR_centerFreq')
         sampFreq = self.__root._mavModel.getOption('SDR_samplingFreq')
-        if abs(var.get() - cntrFreq) > sampFreq:
+        if abs(var - cntrFreq) > sampFreq:
             return False
         return True
 
     def _updateButtonCallback(self):
-        cntrFreq = self.optionVars['SDR_centerFreq'].get()
-        sampFreq = self.optionVars['SDR_samplingFreq'].get()
+        cntrFreq = int(self.optionVars['SDR_centerFreq'].text())
+        sampFreq = int(self.optionVars['SDR_samplingFreq'].text())
 
         targetFrequencies = []
         for targetName in self.targEntries:
             if not self.validateFrequency(self.targEntries[targetName][0]):
-                tkm.showerror(
-                title="Invalid Target Frequency", message="Target frequency " + str(self.targEntries[targetName][0].get()) + " is invalid. Please enter another value.")
+                dialog = QMessageBox()
+                dialog.setIcon(QMessageBox.Critical)
+                dialog.setText("Target frequency " + 
+                        str(self.targEntries[targetName][0]) + 
+                        " is invalid. Please enter another value.")
+                dialog.addButton(QMessageBox.Ok)
+                dialog.exec()
                 return
-            targetFreq = self.targEntries[targetName][0].get()
+            targetFreq = self.targEntries[targetName][0]
             targetFrequencies.append(targetFreq)
 
         self.__root._mavModel.setFrequencies(
@@ -639,7 +596,7 @@ class SystemSettingsControl(CollapseFrame):
         optionDict = self.__root._mavModel.getOptions(
             scope, timeout=self.__root.defaultTimeout)
         for optionName, optionValue in optionDict.items():
-            self.optionVars[optionName].set(optionValue)
+            self.optionVars[optionName].setText(str(optionValue))
         self.update()
 
     def submitGUIOptionVars(self, scope: int):
@@ -658,15 +615,21 @@ class SystemSettingsControl(CollapseFrame):
         if scope >= 0xFF:
             acceptedKeywords.extend(__engOptionKeywords)
 
-        options = {keyword: self.optionVars[keyword].get(
-        ) for keyword in acceptedKeywords}
+        options = {}
+        
+        for keyword in acceptedKeywords:
+            try:
+                options[keyword] = int(self.optionVars[keyword].text())
+            except ValueError:
+                options[keyword] = float(self.optionVars[keyword].text())
         self.__root._mavModel.setOptions(
             timeout=self.__root.defaultTimeout, **options)
 
     def addTarget(self):
-        cntrFreq = self.optionVars['SDR_centerFreq'].get()
-        sampFreq = self.optionVars['SDR_samplingFreq'].get()
-        addTargetWindow = AddTargetDialog(self, cntrFreq, sampFreq)
+        cntrFreq = int(self.optionVars['SDR_centerFreq'].text())
+        sampFreq = int(self.optionVars['SDR_samplingFreq'].text())
+        addTargetWindow = AddTargetDialog(self.frm_targHolder, cntrFreq, sampFreq)
+        addTargetWindow.exec_()
 
         # TODO: remove name
         name = addTargetWindow.name
@@ -676,87 +639,85 @@ class SystemSettingsControl(CollapseFrame):
             return
 
         self.__root._mavModel.addFrequency(freq, self.__root.defaultTimeout)
+
         self.update()
 
-class ExpertSettingsDialog(tk.Toplevel):
-    def __init__(self, parent: SystemSettingsControl, optionVars: dict):
-        tk.Toplevel.__init__(self, parent)
+
+
+class ExpertSettingsDialog(QWizard):
+    def __init__(self, parent, optionVars):
+        super(ExpertSettingsDialog, self).__init__()
+        self.parent = parent
+        self.addPage(ExpertSettingsDialogPage(self, optionVars))
+        self.setWindowTitle('Expert/Engineering Settings')
+        self.resize(640,480)
+
+class ExpertSettingsDialogPage(QWizardPage):
+    def __init__(self, parent=None, optionVars=None):
+        super(ExpertSettingsDialogPage, self).__init__(parent)
         self.__parent = parent
         self.optionVars = optionVars
 
         # Configure member vars here
-        self.__parent.updateGUIOptionVars(0xFF)
-        # Modal window
-        self.transient(parent)
+        self.__parent.parent.updateGUIOptionVars(0xFF)
         self.__createWidget()
-        self.wait_window(self)
 
     def __createWidget(self):
-        self.title('Expert/Engineering Settings')
-        expSettingsFrame = tk.Frame(self)
-        expSettingsFrame.pack(fill=tk.BOTH)
+        expSettingsFrame = QGridLayout()
 
-        lbl_pingWidth = tk.Label(
-            expSettingsFrame, text='Expected Ping Width(ms)')
-        lbl_pingWidth.grid(row=0, column=0, sticky='new')
+        lbl_pingWidth = QLabel('Expected Ping Width(ms)')
+        expSettingsFrame.addWidget(lbl_pingWidth, 0, 0)
 
-        lbl_minWidthMult = tk.Label(
-            expSettingsFrame, text='Min. Width Multiplier')
-        lbl_minWidthMult.grid(row=1, column=0, sticky='new')
+        lbl_minWidthMult = QLabel('Min. Width Multiplier')
+        expSettingsFrame.addWidget(lbl_minWidthMult, 1, 0)
 
-        lbl_maxWidthMult = tk.Label(
-            expSettingsFrame, text='Max. Width Multiplier')
-        lbl_maxWidthMult.grid(row=2, column=0, sticky='new')
+        lbl_maxWidthMult = QLabel('Max. Width Multiplier')
+        expSettingsFrame.addWidget(lbl_maxWidthMult, 2, 0)
 
-        lbl_minPingSNR = tk.Label(expSettingsFrame, text='Min. Ping SNR(dB)')
-        lbl_minPingSNR.grid(row=3, column=0, sticky='new')
+        lbl_minPingSNR = QLabel('Min. Ping SNR(dB)')
+        expSettingsFrame.addWidget(lbl_minPingSNR, 3, 0)
 
-        lbl_GPSPort = tk.Label(expSettingsFrame, text='GPS Port')
-        lbl_GPSPort.grid(row=4, column=0, sticky='new')
+        lbl_GPSPort = QLabel('GPS Port')
+        expSettingsFrame.addWidget(lbl_GPSPort, 4, 0)
 
-        lbl_GPSBaudRate = tk.Label(expSettingsFrame, text='GPS Baud Rate')
-        lbl_GPSBaudRate.grid(row=5, column=0, sticky='new')
+        lbl_GPSBaudRate = QLabel('GPS Baud Rate')
+        expSettingsFrame.addWidget(lbl_GPSBaudRate, 5, 0)
 
-        lbl_outputDir = tk.Label(expSettingsFrame, text='Output Directory')
-        lbl_outputDir.grid(row=6, column=0, sticky='new')
+        lbl_outputDir = QLabel('Output Directory')
+        expSettingsFrame.addWidget(lbl_outputDir, 6, 0)
 
-        lbl_GPSMode = tk.Label(expSettingsFrame, text='GPS Mode')
-        lbl_GPSMode.grid(row=7, column=0, sticky='new')
+        lbl_GPSMode = QLabel('GPS Mode')
+        expSettingsFrame.addWidget(lbl_GPSMode, 7, 0)
 
-        entr_pingWidth = tk.Entry(
-            expSettingsFrame, textvariable=self.optionVars['DSP_pingWidth'], width=8)
-        entr_pingWidth.grid(row=0, column=1, sticky='new')
+        self.optionVars['DSP_pingWidth'] = QLineEdit()
+        expSettingsFrame.addWidget(self.optionVars['DSP_pingWidth'], 0, 1)
 
-        entr_minWidthMult = tk.Entry(
-            expSettingsFrame, textvariable=self.optionVars['DSP_pingMin'], width=8)
-        entr_minWidthMult.grid(row=1, column=1, sticky='new')
+        self.optionVars['DSP_pingMin'] = QLineEdit()
+        expSettingsFrame.addWidget(self.optionVars['DSP_pingMin'], 1, 1)
 
-        entr_maxWidthMult = tk.Entry(
-            expSettingsFrame, textvariable=self.optionVars['DSP_pingMax'], width=8)
-        entr_maxWidthMult.grid(row=2, column=1, sticky='new')
+        self.optionVars['DSP_pingMax'] = QLineEdit()
+        expSettingsFrame.addWidget(self.optionVars['DSP_pingMax'], 2, 1)
 
-        entr_minPingSNR = tk.Entry(
-            expSettingsFrame, textvariable=self.optionVars['DSP_pingSNR'], width=8)
-        entr_minPingSNR.grid(row=3, column=1, sticky='new')
+        self.optionVars['DSP_pingSNR'] = QLineEdit()
+        expSettingsFrame.addWidget(self.optionVars['DSP_pingSNR'], 3, 1)
 
-        entr_GPSPort = tk.Entry(
-            expSettingsFrame, textvariable=self.optionVars['GPS_device'], width=8)
-        entr_GPSPort.grid(row=4, column=1, sticky='new')
+        self.optionVars['GPS_device'] = QLineEdit()
+        expSettingsFrame.addWidget(self.optionVars['GPS_device'], 4, 1)
 
-        entr_GPSBaudRate = tk.Entry(
-            expSettingsFrame, textvariable=self.optionVars['GPS_baud'], width=8)
-        entr_GPSBaudRate.grid(row=5, column=1, sticky='new')
+        self.optionVars['GPS_baud'] = QLineEdit()
+        expSettingsFrame.addWidget(self.optionVars['GPS_baud'], 5, 1)
 
-        entr_outputDir = tk.Entry(
-            expSettingsFrame, textvariable=self.optionVars['SYS_outputDir'], width=8)
-        entr_outputDir.grid(row=6, column=1, sticky='new')
+        self.optionVars['SYS_outputDir'] = QLineEdit()
+        expSettingsFrame.addWidget(self.optionVars['SYS_outputDir'], 6, 1)
 
-        entr_GPSMode = tk.Entry(
-            expSettingsFrame, textvariable=self.optionVars['GPS_mode'], width=8)
-        entr_GPSMode.grid(row=7, column=1, sticky='new')
+        self.optionVars['GPS_mode'] = QLineEdit()
+        expSettingsFrame.addWidget(self.optionVars['GPS_mode'], 7, 1)
 
-        btn_submit = tk.Button(self, text='submit', command=self.submit)
-        btn_submit.pack()
+        btn_submit = QPushButton('submit')
+        btn_submit.clicked.connect(lambda:self.submit())
+        expSettingsFrame.addWidget(btn_submit, 8, 0, 1, 2)
+
+        self.setLayout(expSettingsFrame)
 
     def validateParameters(self):
         return True
@@ -764,21 +725,46 @@ class ExpertSettingsDialog(tk.Toplevel):
     def submit(self):
         if not self.validateParameters():
             return
-        self.__parent.submitGUIOptionVars(0xFF)
+        self.__parent.parent.submitGUIOptionVars(0xFF)
 
-        self.cancel()
 
-    def cancel(self):
-        self.__parent.focus_set()
-        self.destroy()
-        self.__parent.update()
 
-class AddTargetDialog(tk.Toplevel):
+class AddTargetDialog(QWizard):
     def __init__(self, parent, centerFrequency: int, samplingFrequency: int):
-        tk.Toplevel.__init__(self, parent)
+        QWizardPage.__init__(self)
         self.__parent = parent
-        self.targNameEntry = tk.StringVar()
-        self.targFreqEntry = tk.IntVar()
+        self.name = "filler"
+        self.freq = 0
+        self.centerFrequency = centerFrequency
+        self.samplingFrequency = samplingFrequency
+        self.page = AddTargetDialogPage(self, centerFrequency, samplingFrequency)
+        self.addPage(self.page)
+        self.setWindowTitle('Add Target')
+        self.resize(640,480)
+        self.button(QWizard.FinishButton).clicked.connect(self.submit)
+
+    def validate(self):
+        return abs(int(self.page.targFreqEntry.text()) - self.centerFrequency) <= self.samplingFrequency
+
+
+    def submit(self):
+        if not self.validate():
+            dialog = QMessageBox()
+            dialog.setIcon(QMessageBox.Critical)
+            dialog.setText("You have entered an invalid target frequency. Please try again.")
+            dialog.addButton(QMessageBox.Ok)
+            dialog.exec()
+            return
+        self.name = self.page.targNameEntry.text()
+        self.freq = int(self.page.targFreqEntry.text())
+
+
+class AddTargetDialogPage(QWizardPage):
+    def __init__(self, parent, centerFrequency: int, samplingFrequency: int):
+        QWizardPage.__init__(self, parent)
+        self.__parent = parent
+        self.targNameEntry = None
+        self.targFreqEntry = None
 
         self.__centerFreq = centerFrequency
         self.__samplingFreq = samplingFrequency
@@ -786,174 +772,181 @@ class AddTargetDialog(tk.Toplevel):
         self.name = None
         self.freq = None
 
-        self.transient(parent)
-
         self.__createWidget()
 
-        self.wait_window(self)
 
     def __createWidget(self):
-        self.title('Add Target')
-        frm_targetSettings = tk.Frame(self)
-        frm_targetSettings.pack(fill=tk.BOTH)
+        rx  = QRegExp("[0-9]{30}")                           
+        val = QRegExpValidator(rx)                            
+        frm_targetSettings = QGridLayout()
 
-        lbl_targetName = tk.Label(frm_targetSettings, text='Target Name:')
-        lbl_targetName.grid(row=0, column=0, sticky='new')
+        lbl_targetName = QLabel('Target Name:')
+        frm_targetSettings.addWidget(lbl_targetName, 0, 0)
 
-        entr_targetName = tk.Entry(
-            frm_targetSettings, textvariable=self.targNameEntry)
-        entr_targetName.grid(row=0, column=1, sticky='new')
+        #entr_targetName = QLineEdit()
+        self.targNameEntry = QLineEdit()
+        frm_targetSettings.addWidget(self.targNameEntry, 0, 1)
 
-        lbl_targetFreq = tk.Label(
-            frm_targetSettings, text='Target Frequency:')
-        lbl_targetFreq.grid(row=1, column=0, sticky='new')
+        lbl_targetFreq = QLabel('Target Frequency:')
+        frm_targetSettings.addWidget(lbl_targetFreq, 1, 0)
 
-        entr_targetFreq = tk.Entry(
-            frm_targetSettings, textvariable=self.targFreqEntry)
-        entr_targetFreq.grid(row=1, column=1, sticky='new')
+        self.targFreqEntry = QLineEdit()
+        self.targFreqEntry.setValidator(val)
+        frm_targetSettings.addWidget(self.targFreqEntry, 1, 1)
 
-        btn_submit = tk.Button(self, text='submit', command=self.submit)
-        btn_submit.pack()
+        '''
+        btn_submit = QPushButton('submit')
+        btn_submit.clicked.connect(lambda:self.submit())
+        frm_targetSettings.addWidget(btn_submit, 2, 0, 1, 2)
+        '''
+        self.setLayout(frm_targetSettings)
 
-        self.bind('<Escape>', self.cancel)
 
-    def validate(self):
-        return abs(self.targFreqEntry.get() - self.__centerFreq) <= self.__samplingFreq
+
+
+class ConnectionDialog(QWizard):
+    def __init__(self, parent):
+        super(ConnectionDialog, self).__init__()
+        self.__parent = parent
+        self.setWindowTitle('Connect Settings')
+        self.page = ConnectionDialogPage(self)
+        self.addPage(self.page)
+        self.port = None
+        self.comms = None
+        self.model = None
+        self.resize(640,480)
+        self.button(QWizard.FinishButton).clicked.connect(lambda:self.submit())
 
     def submit(self):
-        if not self.validate():
-            tkm.showerror(
-            title="Invalid Target Frequency", message="You have entered an invalid target frequency. Please try again.")
+        try:
+            print(self.page.portEntry.text())
+            self.port = rctTransport.RCTTCPClient(
+                addr='127.0.0.1', port=int(self.page.portEntry.text()))
+            self.comms = rctComms.gcsComms(self.port)
+            self.model = rctCore.MAVModel(self.comms)
+            self.model.start()
+        except:
             return
-        self.name = self.targNameEntry.get()
-        self.freq = self.targFreqEntry.get()
-        self.cancel()
 
-    def cancel(self):
-        self.__parent.focus_set()
-        self.destroy()
-
-class ConnectionDialog(tk.Toplevel):
+class ConnectionDialogPage(QWizardPage):
     def __init__(self, parent):
-        tk.Toplevel.__init__(self, parent)
+        super(ConnectionDialogPage, self).__init__(parent)
         self.__parent = parent
-        self.__portEntry = tk.IntVar()
-        self.__portEntry.set(9000)  # default value
+        #self.__portEntry = tk.IntVar()
+        #self.__portEntry.set(9000)  # default value
+        self.__portEntryVal = 9000 # default value
+        self.portEntry = None # default value
         self.port = None
         self.comms = None
         self.model = None
 
-        self.transient(parent)
+        #self.transient(parent)
 
         self.__createWidget()
 
-        self.wait_window(self)
+        #self.wait_window(self)
 
     def __createWidget(self):
-        self.title('Connect Settings')
 
-        frm_conType = tk.Frame(master=self, width=350,
-                               height=400, bg='light gray')
-        frm_conType.pack(fill=tk.Y, side=tk.LEFT)
+        frm_holder = QHBoxLayout()
+        frm_holder.addStretch(1)
+        frm_conType = QVBoxLayout()
+        frm_conType.addStretch(1)
 
-        lbl_conType = tk.Label(frm_conType, text='Connection Type:')
-        lbl_conType.pack(fill=tk.X)
+        lbl_conType = QLabel('Connection Type:')
+        frm_conType.addWidget(lbl_conType)
 
-        btn_TCP = tk.Checkbutton(frm_conType, text='TCP')
-        btn_TCP.pack(fill=tk.X)
+        btn_TCP = QCheckBox('TCP')
+        frm_conType.addWidget(btn_TCP)
 
-        frm_port = tk.Frame(master=self, width=500, height=400, bg='dark gray')
-        frm_port.pack(fill=tk.BOTH, side=tk.RIGHT)
+        frm_port = QVBoxLayout()
+        frm_port.addStretch(1)
 
-        lbl_port = tk.Label(frm_port, text='Port')
-        lbl_port.pack(fill=tk.BOTH)
+        lbl_port = QLabel('Port')
+        frm_port.addWidget(lbl_port)
 
-        entr_port = tk.Entry(frm_port, textvariable=self.__portEntry)
-        entr_port.pack(fill=tk.BOTH)
+        self.portEntry = QLineEdit() #textvariable=self.__portEntry)
+        self.portEntry.setText(str(self.__portEntryVal))
+        frm_port.addWidget(self.portEntry)
 
-        btn_submit = tk.Button(frm_port, text='Submit', command=self.__submit)
-        btn_submit.pack()
 
-        self.bind('<Escape>', self.__cancel)
 
-    def __submit(self):
-        try:
-            self.port = rctTransport.RCTTCPClient(
-                addr='127.0.0.1', port=self.__portEntry.get())
-            self.comms = rctComms.gcsComms(self.port)
-            self.model = rctCore.MAVModel(self.comms)
-            self.model.start()
-            self.__cancel()
-        except:
-            return
+        frm_holder.addLayout(frm_conType)
+        frm_holder.addLayout(frm_port)
+        self.setLayout(frm_holder)
 
-    def __cancel(self):
-        self.__parent.focus_set()
-        self.destroy()
+        #self.bind('<Escape>', self.__cancel)
 
 
 class MapControl(CollapseFrame):    
-    SBWidth = 25
-    def __init__(self, parent, root: GCS):
-        CollapseFrame.__init__(self, parent, labelText='Map Display Tools')
+    def __init__(self, parent, holder, root: GCS):
+        CollapseFrame.__init__(self, title='Map Display Tools')
         self.__parent = parent
         self.__root = root
-
+        self.__holder = holder
         self.__mapFrame = None
-        self.__latEntry = StringVar()
-        self.__lonEntry = StringVar()
-        self.__zoomEntry = StringVar()
+        self.__latEntry = None
+        self.__lonEntry = None
+        self.__zoomEntry = None
 
         self.__createWidgets()
 
 
 
     def __createWidgets(self):
-        frm_mapGrid = tk.Frame(master=self.__root)
-        frm_mapGrid.pack(fill=tk.BOTH, side=tk.LEFT)
-        frm_mapGrid.grid_columnconfigure(0, weight=1)
-        frm_mapGrid.grid_rowconfigure(0, weight=1)
-        self.__mapFrame = tk.Frame(master=self.__root, bg='gray', height=548, width=800)
-        self.__mapFrame.pack_propagate(0)
-        self.__mapFrame.pack() 
-        btn_loadMap = Button(self.frame, command=self.__loadMapFile, anchor='w',
-                relief=tk.FLAT, width=self.SBWidth, text =" Load Map")
-        btn_loadMap.grid(column=0, row=0, sticky='new')
+        controlPanelHolder = QScrollArea()
+        content = QWidget()
 
+        controlPanelHolder.setWidget(content)
+        controlPanelHolder.setWidgetResizable(True)
 
-        btn_export = Button(self.frame, anchor='w',
-                            relief=tk.FLAT, width=self.SBWidth, text=" Export")
-        btn_export.grid(column=0, row=3, sticky='new')
-        
-        frm_loadWebMap = CollapseFrame(self.frame, labelText='Load WebMap')
-        frm_loadWebMap.grid(column=0, row=2, sticky='new')
+        controlPanel = QVBoxLayout(content)
 
-        frm_loadWebMap.frame.pack_propagate(0)
-        frm_loadWebMap.frame.config(width=self.SBWidth)
+        controlPanel.addStretch()
 
-        lbl_lat = tk.Label(frm_loadWebMap.frame, text='Latitude')
-        lbl_lat.grid(column=0, row=0, sticky='new')
+        self.__mapFrame = QWidget()
+        self.__holder.addWidget(self.__mapFrame, 0, 0)
+        btn_loadMap = QPushButton('Load Map')
+        btn_loadMap.clicked.connect(lambda:self.__loadMapFile())
+        controlPanel.addWidget(btn_loadMap)
+        btn_export = QPushButton(" Export")
+        controlPanel.addWidget(btn_export)
 
-        latEntry = tk.Entry(frm_loadWebMap.frame, textvariable=self.__latEntry, width=19)
-        latEntry.grid(column=1, row=0, sticky='new')
-
-        lbl_lon = tk.Label(frm_loadWebMap.frame, text='Longitude')
-        lbl_lon.grid(column=0, row=1, sticky='new')
-
-        lonEntry = tk.Entry(frm_loadWebMap.frame, textvariable=self.__lonEntry, width=19)
-        lonEntry.grid(column=1, row=1, sticky='new')
-
-        lbl_zoom = tk.Label(frm_loadWebMap.frame, text='Zoom')
-        lbl_zoom.grid(column=0, row=2, sticky='new')
-
-        zoomEntry = tk.Entry(frm_loadWebMap.frame, textvariable=self.__zoomEntry, width=19)
-        zoomEntry.grid(column=1, row=2, sticky='new')
 
         
-        btn_loadWebMap = Button(frm_loadWebMap.frame, command=self.__loadWebMap,
-                            relief=tk.FLAT, text="Load")
-        btn_loadWebMap.grid(column=1, row=3, sticky='new')
+        frm_loadWebMap = QLabel('Load WebMap')
+        controlPanel.addWidget(frm_loadWebMap)
+        lay_loadWebMap = QGridLayout()
+        lay_loadWebMapHolder = QVBoxLayout()
+        lay_loadWebMapHolder.addStretch()
 
+
+        lbl_lat = QLabel('Latitude')
+        lay_loadWebMap.addWidget(lbl_lat, 0, 0)
+
+        self.__latEntry = QLineEdit()
+        lay_loadWebMap.addWidget(self.__latEntry, 0, 1)
+
+        lbl_lon = QLabel('Longitude')
+        lay_loadWebMap.addWidget(lbl_lon, 1, 0)
+
+        self.__lonEntry = QLineEdit()
+        lay_loadWebMap.addWidget(self.__lonEntry, 1, 1)
+
+        lbl_zoom = QLabel('Zoom')
+        lay_loadWebMap.addWidget(lbl_zoom, 2, 0)
+
+        self.__zoomEntry = QLineEdit()
+        lay_loadWebMap.addWidget(self.__zoomEntry, 2, 1)
+
+        
+        btn_loadWebMap = QPushButton('Load') 
+        btn_loadWebMap.clicked.connect(lambda:self.__loadWebMap())
+        lay_loadWebMap.addWidget(btn_loadWebMap, 3, 1)
+        controlPanel.addWidget(frm_loadWebMap)
+        controlPanel.addLayout(lay_loadWebMap)
+
+        '''
         #TODO: Move Map options and map legend to separate control class
         # MAP OPTIONS
         frm_mapOptions = tk.Frame(master=frm_mapGrid, width=self.SBWidth)
@@ -986,268 +979,101 @@ class MapControl(CollapseFrame):
         lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
                               bg='light gray', text='Target')
         lbl_legend.grid(column=0, row=2, sticky='ew')
-
+        '''
+        self.setContentLayout(controlPanel)
+        
     def __loadWebMap(self):
-        self.__clearMap()
-        lat = float(self.__latEntry.get())
-        lon = float(self.__lonEntry.get())
-        zoom = int(self.__zoomEntry.get())
-        self.__mapFrame = WebMap(self.__root, lat, lon, zoom)
-
+        lat = float(self.__latEntry.text())
+        lon = float(self.__lonEntry.text())
+        zoom = int(self.__zoomEntry.text())
+        self.__mapFrame.setParent(None)
+        self.__mapFrame = WebMap(self.__holder, lat, lon, zoom)
 
     def __loadMapFile(self):
-        self.__clearMap()
-        self.__mapFrame = StaticMap(self.__root)
+        self.__mapFrame.setParent(None)
+        self.__mapFrame = StaticMap(self.__holder)
 
 
-    def __clearMap(self):
-        for child in self.__mapFrame.winfo_children():
-            child.destroy()
-        self.__mapFrame.destroy()
-
-class StaticMap(tk.Frame):
-    def __init__(self, master):
-        tk.Frame.__init__(self, master)
-        self.__filename = None
-        self.__master = master
-        self.__master.geometry("1000x580")
-
-        self.config(bg='gray', height=548, width=800)
-        self.pack_propagate(0)
-        self.pack() 
-
-        #Map Space controls starting zoom on raster image
-        # Larger space = larger amount of surrounding map shown
-        self.__mapSpace = 1
-
-        self.__getFileName()
-        self.__displayMap()
 
 
-    def __getFileName(self):
-        self.__filename = askopenfilename()
-        print(self.__filename)
+class StaticMap(QWidget):
+    def __init__(self, root):
+        # Initialize WebMapFrame
+        QWidget.__init__(self)
+        holder = QVBoxLayout()
 
+        self.html_string = ""
+        self.mapFile = ""
+        self.web = QWebEngineView()
+        holder.addWidget(self.web)
 
-    def __displayMap(self): 
+        #Get Map file
+        self.__openMap()
 
-        fig = plt.figure(figsize=(5,5))
-        
-        my_image = georaster.SingleBandRaster(self.__filename, load_data=False)
-        
+        #Generate html for webmap
+        self.__buildMap()
+
+        self.setLayout(holder)
+        root.addWidget(self, 0, 1, 1, 2)
+
+    def __openMap(self):
+        dialog = QFileDialog()
+        self.mapFile = dialog.getOpenFileName()
+
+    def __buildMap(self):
+        if (self.mapFile == ""):
+            return
+        print(self.mapFile[0])
+        my_image = georaster.SingleBandRaster(self.mapFile[0], load_data=True)
+
         minx, maxx, miny, maxy = my_image.extent
-        
-        a = fig.add_subplot(111)
 
-        mapSpace = self.__mapSpace
+        centerx=(minx+maxx)/2
+        centery=(miny+maxy)/2
 
-        m = Basemap( projection='cyl', \
-                    llcrnrlon=minx-mapSpace, \
-                    llcrnrlat=miny-mapSpace, \
-                    urcrnrlon=maxx+mapSpace, \
-                    urcrnrlat=maxy+mapSpace, \
-                    resolution='h', ax=a)
+        #Visualization in folium
+        folmap= folium.Map(location=[centery, centerx], zoom_start=10,tiles='Stamen Terrain')
+        raster_layers.ImageOverlay(
+            image=my_image.r,
+            bounds=[[miny, minx], [maxy, maxx]],
+            opacity=0.8, 
+            zindex=1
+        ).add_to(folmap)
 
-        m.drawcoastlines(color="gray")
-        m.fillcontinents(color='beige')
-        m.shadedrelief()
+        self.html_string = folmap.get_root().render()
+        self.web.setHtml(self.html_string)
 
-        canvas = FigureCanvasTkAgg(fig, master=self)
-        canvas.draw()
-        canvas.get_tk_widget().pack(side='top', fill='both', expand=0)
-
-        toolbar = NavigationToolbar2Tk( canvas, self )
-        toolbar.update()
-        canvas._tkcanvas.pack(side='top', fill='both', expand=0)
-
-        
-        image = georaster.SingleBandRaster( self.__filename, \
-                                load_data=(minx, maxx, miny, maxy), \
-                                latlon=True)
-    
-        plt.imshow(image.r, extent=(minx, maxx, miny, maxy), zorder=10, alpha=0.8)
 
 
 '''
     Helper Class to facilititate displaying online web maps
 '''
-class WebMap(tk.Frame):
+class WebMap(QWidget):
 
     def __init__(self, root, lat, lon, zoom):
-        self.browser_frame = None
-        self.html_string = ""
+        # Initialize WebMapFrame
+        QWidget.__init__(self)
+        holder =QVBoxLayout()
 
         print(lat)
         print(lon)
         LDN_COORDINATES = (lat, lon)
+        self.html_string = ""
+        self.web = QWebEngineView()
+        holder.addWidget(self.web)
 
         #Generate html for webmap
         self.__buildMap(LDN_COORDINATES, zoom)
 
-        # Initialize WebMapFrame
-        tk.Frame.__init__(self, root)
+        self.setLayout(holder)
+        root.addWidget(self, 0, 1, 1, 2)
 
-        # Root size must be manually set in order for map to show
-        root.geometry("1000x500")
-
-        tk.Grid.rowconfigure(self, 0, weight=0)
-        tk.Grid.columnconfigure(self, 0, weight=0)
-
-        self.bind("<Configure>", self.on_configure)
-        self.bind("<FocusOut>", self._on_focus_out)
-        #self.bind("<FocusIn>", self._on_focus_in)
-
-        # Pack MainFrame
-        self.pack(fill=tk.BOTH, expand=tk.YES)
-        self.lower(belowThis=None)
-        self.__displayMap()
-
-
-
-
-    def on_configure(self, event):
-        if self.browser_frame:
-            width = event.width
-            height = event.height
-            self.browser_frame.on_mainframe_configure(width, height)
-
-
-    def _on_focus_out(self, _):
-        self.master.focus_force() # <- added
 
     def __buildMap(self, LDN_COORDINATES, zoom):
         folmap = folium.Map(location=LDN_COORDINATES, zoom_start=zoom)
         self.html_string = folmap.get_root().render()
-        folmap.save("index.html")
+        self.web.setHtml(self.html_string)
 
-    def __displayMap(self):
-        self.browser_frame = BrowserFrame(self)
-        self.browser_frame.grid(row=1, column=0,
-                                sticky=(tk.N + tk.S + tk.E + tk.W))
-        tk.Grid.rowconfigure(self, 1, weight=1)
-        tk.Grid.columnconfigure(self, 0, weight=1)
-
-
-'''
-    Helper Class to WebMap that holds the browser to display html content
-'''
-class BrowserFrame(tk.Frame):
-    # Fix for PyCharm hints warnings
-    WindowUtils = cef.WindowUtils()
-
-    # Platforms
-    WINDOWS = (platform.system() == "Windows")
-    LINUX = (platform.system() == "Linux")
-    MAC = (platform.system() == "Darwin")
-    IMAGE_EXT = ".png" if tk.TkVersion > 8.5 else ".gif"
-
-    def __init__(self, master):
-
-        tk.Frame.__init__(self, master)
-        self.browser = None
-        self.bind("<Configure>", self.on_configure)
-        self.bind("<FocusIn>", self.on_focus_in)
-        self.bind("<FocusOut>", self.on_focus_out)
-        self.focus_set()
-        self.lower(belowThis=None)
-
-    def embed_browser(self):
-        window_info = cef.WindowInfo()
-        rect = [0, 0, self.winfo_width()-50, self.winfo_height()-50]
-        window_info.SetAsChild(self.get_window_handle(), rect)
-        self.browser = cef.CreateBrowserSync(window_info,
-                                             url="file:///index.html") #todo
-        assert self.browser
-        self.browser.SetClientHandler(FocusHandler(self))
-        self.master.master.focus_force() # <- added
-        self.message_loop_work()
-
-    def get_window_handle(self):
-        if self.winfo_id() > 0:
-            return self.winfo_id()
-        elif self.MAC:
-            # On Mac window id is an invalid negative value (Issue #308).
-            # This is kind of a dirty hack to get window handle using
-            # PyObjC package. If you change structure of windows then you
-            # need to do modifications here as well.
-            # noinspection PyUnresolvedReferences
-            from AppKit import NSApp
-            # noinspection PyUnresolvedReferences
-            import objc
-            # Sometimes there is more than one window, when application
-            # didn't close cleanly last time Python displays an NSAlert
-            # window asking whether to Reopen that window.
-            # noinspection PyUnresolvedReferences
-            return objc.pyobjc_id(NSApp.windows()[-1].contentView())
-        else:
-            raise Exception("Couldn't obtain window handle")
-
-    def message_loop_work(self):
-        cef.MessageLoopWork()
-        self.after(10, self.message_loop_work)
-
-    def on_configure(self, _):
-        if not self.browser:
-            self.embed_browser()
-
-    def on_focus_in(self, _):
-        logger.debug("BrowserFrame.on_focus_in")
-        if self.browser:
-            self.browser.SetFocus(True)
-
-    def on_focus_out(self, _):
-        print("BrowserFrame.on_focus_out")
-        """For focus problems see Issue #255 and Issue #535. """
-        if self.LINUX and self.browser:
-            self.browser.SetFocus(False)
-        self.master.master.focus_force()
-
-
-    def on_mainframe_configure(self, width, height):
-        if self.browser:
-            if self.WINDOWS:
-                ctypes.windll.user32.SetWindowPos(
-                    self.browser.GetWindowHandle(), 0,
-                    0, 0, width-50, height, 0x0002)
-            elif self.LINUX:
-                self.browser.SetBounds(0, 0, width-50, height)
-
-    def clear_browser_references(self):
-        # Clear browser references that you keep anywhere in your
-        # code. All references must be cleared for CEF to shutdown cleanly.
-        self.browser = None
-
-
-class FocusHandler(object):
-    """For focus problems see Issue #255 and Issue #535. """
-    # Fix for PyCharm hints warnings
-    WindowUtils = cef.WindowUtils()
-
-    # Platforms
-    WINDOWS = (platform.system() == "Windows")
-    LINUX = (platform.system() == "Linux")
-    MAC = (platform.system() == "Darwin")
-    IMAGE_EXT = ".png" if tk.TkVersion > 8.5 else ".gif"
-
-    def __init__(self, browser_frame):
-        self.browser_frame = browser_frame
-
-    def OnTakeFocus(self, next_component, **_):
-        logger.debug("FocusHandler.OnTakeFocus, next={next}"
-                     .format(next=next_component))
-
-    def OnSetFocus(self, source, **_):
-        logger.debug("FocusHandler.OnSetFocus, source={source}"
-                     .format(source=source))
-        if self.LINUX:
-            return False
-        else:
-            return True
-
-    def OnGotFocus(self, **_):
-        logger.debug("FocusHandler.OnGotFocus")
-        if self.LINUX:
-            self.browser_frame.focus_set()
 
 if __name__ == '__main__':
     logName = dt.datetime.now().strftime('%Y.%m.%d.%H.%M.%S_gcs.log')
@@ -1264,8 +1090,6 @@ if __name__ == '__main__':
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
-    app = GCS()
-    cef.Initialize()
-    app.mainloop()
-    cef.Shutdown()
-    app.quit()
+    app = QApplication(sys.argv)
+    ex = GCS()
+    sys.exit(app.exec_())
