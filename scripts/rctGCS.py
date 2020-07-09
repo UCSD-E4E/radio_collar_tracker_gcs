@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 07/09/20  ML  Converted Static Maps and WebMaps to QGIS
 # 06/30/20  ML  Translated tkinter GUI into PyQt5
 # 06/17/20  ML  Implemented ability to load webmap from OSM based on coordinates
 # 05/29/20  ML  refactored MapControl 
@@ -53,14 +54,16 @@ import sys
 import rctTransport
 import rctComms
 import rctCore
-import georaster
-import folium
-from folium import raster_layers
 from PyQt5.QtCore import *
 from PyQt5.QtWebEngineWidgets import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5 import QtNetwork
+import qgis
+from qgis.core import *    
+from qgis.gui import *  
+from qgis.utils import *
+from qgis.core import QgsProject
 
 class GCS(QMainWindow):
     '''
@@ -1050,57 +1053,75 @@ class MapControl(CollapseFrame):
     def __cacheMap(self):
         lat = float(self.__latEntry.text())
         lon = float(self.__lonEntry.text())
-        self.__mapFrame.cacheMap(lat,lon)
+        self.__mapFrame.cacheMap()
 
 
 
-class StaticMap(QWidget):
-    def __init__(self, root):
-        # Initialize WebMapFrame
-        QWidget.__init__(self)
-        holder = QVBoxLayout()
 
-        self.html_string = ""
-        self.mapFile = ""
-        self.web = QWebEngineView()
-        holder.addWidget(self.web)
 
-        #Get Map file
-        self.__openMap()
+class RectangleMapTool(QgsMapToolEmitPoint):
+  def __init__(self, canvas):
+    self.canvas = canvas
+    QgsMapToolEmitPoint.__init__(self, self.canvas)
+    self.rubberBand = QgsRubberBand(self.canvas, True)
+    self.rubberBand.setColor(QColor(0,255,255,125))
+    self.rubberBand.setWidth(1)
+    self.reset()
 
-        #Generate html for webmap
-        self.__buildMap()
+  def reset(self):
+    self.startPoint = self.endPoint = None
+    self.isEmittingPoint = False
+    self.rubberBand.reset(True)
 
-        self.setLayout(holder)
-        root.addWidget(self, 0, 1, 1, 2)
+  def canvasPressEvent(self, e):
+    self.startPoint = self.toMapCoordinates(e.pos())
+    self.endPoint = self.startPoint
+    self.isEmittingPoint = True
+    self.showRect(self.startPoint, self.endPoint)
 
-    def __openMap(self):
-        dialog = QFileDialog()
-        self.mapFile = dialog.getOpenFileName()
+  def canvasReleaseEvent(self, e):
+    self.isEmittingPoint = False
+    r = self.rectangle()
+    if r is not None:
+      print("Rectangle:", r.xMinimum(),
+            r.yMinimum(), r.xMaximum(), r.yMaximum()
+           )
 
-    def __buildMap(self):
-        if (self.mapFile == ""):
-            return
-        print(self.mapFile[0])
-        my_image = georaster.SingleBandRaster(self.mapFile[0], load_data=True)
+  def canvasMoveEvent(self, e):
+    if not self.isEmittingPoint:
+      return
 
-        minx, maxx, miny, maxy = my_image.extent
+    self.endPoint = self.toMapCoordinates(e.pos())
+    self.showRect(self.startPoint, self.endPoint)
 
-        centerx=(minx+maxx)/2
-        centery=(miny+maxy)/2
+  def showRect(self, startPoint, endPoint):
+    self.rubberBand.reset(QgsWkbTypes.PolygonGeometry)
+    if startPoint.x() == endPoint.x() or startPoint.y() == endPoint.y():
+      return
 
-        #Visualization in folium
-        folmap= folium.Map(location=[centery, centerx], zoom_start=10,tiles='Stamen Terrain')
-        raster_layers.ImageOverlay(
-            image=my_image.r,
-            bounds=[[miny, minx], [maxy, maxx]],
-            opacity=0.8, 
-            zindex=1
-        ).add_to(folmap)
+    point1 = QgsPointXY(startPoint.x(), startPoint.y())
+    point2 = QgsPointXY(startPoint.x(), endPoint.y())
+    point3 = QgsPointXY(endPoint.x(), endPoint.y())
+    point4 = QgsPointXY(endPoint.x(), startPoint.y())
 
-        self.html_string = folmap.get_root().render()
-        self.web.setHtml(self.html_string)
+    self.rubberBand.addPoint(point1, False)
+    self.rubberBand.addPoint(point2, False)
+    self.rubberBand.addPoint(point3, False)
+    self.rubberBand.addPoint(point4, True)    # true to update canvas
+    self.rubberBand.show()
 
+  def rectangle(self):
+    if self.startPoint is None or self.endPoint is None:
+      return None
+    elif (self.startPoint.x() == self.endPoint.x() or \
+          self.startPoint.y() == self.endPoint.y()):
+      return None
+
+    return QgsRectangle(self.startPoint, self.endPoint)
+
+  def deactivate(self):
+    QgsMapTool.deactivate(self)
+    self.deactivated.emit()
 
 
 '''
@@ -1110,71 +1131,41 @@ class WebMap(QWidget):
     DEBUG_PORT = '5588'
     DEBUG_URL = 'http://127.0.0.1:%s' % DEBUG_PORT
 
+    
+
     def __init__(self, root, lat, lon, zoom):
         # Initialize WebMapFrame
         QWidget.__init__(self)
-        holder =QVBoxLayout()
+        holder = QVBoxLayout()
+        
+        self.toolbar = QToolBar()
+        self.canvas = QgsMapCanvas()
+        self.canvas.setCanvasColor(Qt.white)
+        urlWithParams = 'type=xyz&url=http://a.tile.openstreetmap.org/%7Bz%7D/%7Bx%7D/%7By%7D.png&zmax=19&zmin=0&crs=EPSG3857'    
+        layer = QgsRasterLayer(urlWithParams, 'OpenStreetMap', 'wms') 
+        if layer.isValid():   
+            QgsProject.instance().addMapLayer(layer)
+            print('valid layer')
+        else:
+            print('invalid layer')
 
-        print(lat)
-        print(lon)
-        LDN_COORDINATES = (lat, lon)
-        self.html_string = ""
-        self.web = QWebEngineView()
-        holder.addWidget(self.web)
 
-        #Generate html for webmap
-        self.__buildMap(LDN_COORDINATES, zoom)
+        self.canvas.setExtent(layer.extent())  
+        self.canvas.setLayers([layer]) 
+        self.canvas.zoomToFullExtent()   
+        self.canvas.freeze(True)  
+        self.canvas.show()     
+        self.canvas.refresh()       
+        self.canvas.freeze(False)    
+        self.canvas.repaint()
+        self.__addToolBar()
 
+        holder.addWidget(self.toolbar)
+        holder.addWidget(self.canvas)
         self.setLayout(holder)
+
         root.addWidget(self, 0, 1, 1, 2)
         self.root = root
-        prof = QWebEngineProfile.defaultProfile()
-        prof.setCachePath("./webcache2")
-        prof.setPersistentStoragePath("./webcache2")
-        #self.web.page().profile().clearHttpCache()
-
-
-
-
-    def cacheMap(self, lat, lng):
-        LDN_COORDINATES = (lat, lng)
-        #urlstr = "./webcache/index.html"
-
-        self.deg2num(lat, lng, 10)
-
-        urlstr = 'https://a.tile.openstreetmap.org/10/' +str(self.x)+ '/' +str(self.y)+ '.png'
-
-        print(urlstr)
-        
-        url = QUrl(urlstr)
-        req = QtNetwork.QNetworkRequest(url)
-        man = QtNetwork.QNetworkAccessManager()
-
-        cache = QtNetwork.QNetworkDiskCache()
-        cache.setCacheDirectory("./webcache")
-        man.setCache(cache)
-
-        def handleResponse(reply):
-
-            er = reply.error()
-
-            if er == QtNetwork.QNetworkReply.NoError:
-
-                bytes_string = reply.readAll()
-                print(str(bytes_string, 'utf-8'))
-
-            else:
-                print("Error occured: ", er)
-                print(reply.errorString())
-
-
-            data = reply.readAll()
-            im = QImage()
-            im.loadFromData(data)
-            im.save('new.png', "PNG");
-
-        man.finished.connect(handleResponse)
-        man.get(req)
 
 
     def deg2num(self, lat_deg, lon_deg, zoom):
@@ -1183,15 +1174,142 @@ class WebMap(QWidget):
         self.x = int((lon_deg + 180.0) / 360.0 * n)
         self.y = int((1.0 - math.asinh(math.tan(lat_rad)) / math.pi) / 2.0 * n)
         
+    def __addToolBar(self):
+        self.actionZoomIn = QAction("Zoom in", self)
+        self.actionZoomOut = QAction("Zoom out", self)
+        self.actionPan = QAction("Pan", self)
+        self.rectAction = QAction("Rect", self)
+
+        self.actionZoomIn.setCheckable(True)
+        self.actionZoomOut.setCheckable(True)
+        self.actionPan.setCheckable(True)
+        self.rectAction.setCheckable(True)
+
+        self.actionZoomIn.triggered.connect(self.zoomIn)
+        self.actionZoomOut.triggered.connect(self.zoomOut)
+        self.actionPan.triggered.connect(self.pan)
+        self.rectAction.triggered.connect(self.rect)
+
+        self.toolbar.addAction(self.actionZoomIn)
+        self.toolbar.addAction(self.actionZoomOut)
+        self.toolbar.addAction(self.actionPan)
+        self.toolbar.addAction(self.rectAction)
+
+        # create the map tools
+        self.toolPan = QgsMapToolPan(self.canvas)
+        self.toolPan.setAction(self.actionPan)
+        self.toolZoomIn = QgsMapToolZoom(self.canvas, False) # false = in
+        self.toolZoomIn.setAction(self.actionZoomIn)
+        self.toolZoomOut = QgsMapToolZoom(self.canvas, True) # true = out
+        self.toolZoomOut.setAction(self.actionZoomOut)
+        self.toolRect = RectangleMapTool(self.canvas)
+        self.toolRect.setAction(self.rectAction)
+
+        self.pan()
+
+    def rect(self):
+        self.canvas.setMapTool(self.toolRect)
+
+    def zoomIn(self):
+        self.canvas.setMapTool(self.toolZoomIn)
+
+    def zoomOut(self):
+        self.canvas.setMapTool(self.toolZoomOut)
+
+    def pan(self):
+        self.canvas.setMapTool(self.toolPan)
+
+    def cacheMap(self):
+        if (self.toolRect.rectangle() == None):
+            print("im tired")
+            return
+        else:
+            self.toolRect.rectangle()
+            print("im tired but it worked")
 
 
 
-    def __buildMap(self, LDN_COORDINATES, zoom):
-        folmap = folium.Map(location=LDN_COORDINATES, zoom_start=zoom)
-        pop = folium.LatLngPopup()
-        folmap.add_child(pop)
-        self.html_string = folmap.get_root().render()
-        self.web.setHtml(self.html_string)
+class StaticMap(QWidget):
+    def __init__(self, root):
+        QWidget.__init__(self)
+        holder = QVBoxLayout()
+
+        self.fileName = None
+        self.toolbar = QToolBar()
+        self.canvas = QgsMapCanvas()
+        self.canvas.setCanvasColor(Qt.white)
+
+        self.__getFileName()
+        self.__addLayers()
+
+        self.__addToolBar()
+
+        holder.addWidget(self.toolbar)
+        holder.addWidget(self.canvas)
+        self.setLayout(holder)
+
+        root.addWidget(self, 0, 1, 1, 2)
+        self.root = root
+
+
+        root.addWidget(self, 0, 1, 1, 2)
+
+    def __getFileName(self):
+        self.fileName = QFileDialog.getOpenFileName()      
+
+    def __addLayers(self):
+        if(self.fileName == None):
+            return
+        layer = QgsRasterLayer(self.fileName[0], "SRTM layer name")
+        if layer.isValid():   
+            QgsProject.instance().addMapLayer(layer)
+            print('valid layer')
+        else:
+            print('invalid layer')
+        self.canvas.setExtent(layer.extent())  
+        self.canvas.setLayers([layer]) 
+        self.canvas.zoomToFullExtent()   
+        self.canvas.freeze(True)  
+        self.canvas.show()     
+        self.canvas.refresh()       
+        self.canvas.freeze(False)    
+        self.canvas.repaint()
+
+    def __addToolBar(self):
+        self.actionZoomIn = QAction("Zoom in", self)
+        self.actionZoomOut = QAction("Zoom out", self)
+        self.actionPan = QAction("Pan", self)
+
+        self.actionZoomIn.setCheckable(True)
+        self.actionZoomOut.setCheckable(True)
+        self.actionPan.setCheckable(True)
+
+        self.actionZoomIn.triggered.connect(self.zoomIn)
+        self.actionZoomOut.triggered.connect(self.zoomOut)
+        self.actionPan.triggered.connect(self.pan)
+
+        self.toolbar.addAction(self.actionZoomIn)
+        self.toolbar.addAction(self.actionZoomOut)
+        self.toolbar.addAction(self.actionPan)
+
+        # create the map tools
+        self.toolPan = QgsMapToolPan(self.canvas)
+        self.toolPan.setAction(self.actionPan)
+        self.toolZoomIn = QgsMapToolZoom(self.canvas, False) # false = in
+        self.toolZoomIn.setAction(self.actionZoomIn)
+        self.toolZoomOut = QgsMapToolZoom(self.canvas, True) # true = out
+        self.toolZoomOut.setAction(self.actionZoomOut)
+
+        self.pan()
+
+    def zoomIn(self):
+        self.canvas.setMapTool(self.toolZoomIn)
+
+    def zoomOut(self):
+        self.canvas.setMapTool(self.toolZoomOut)
+
+    def pan(self):
+        self.canvas.setMapTool(self.toolPan)
 
 
 if __name__ == '__main__':
@@ -1209,6 +1327,12 @@ if __name__ == '__main__':
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
-    app = QApplication(sys.argv)
+    app = QgsApplication([], True)
+    app.setPrefixPath("C:/Users/mluci/Anaconda/envs/testenvgcs/Library/python/qgis", True) 
+    app.initQgis()
+
     ex = GCS()
-    sys.exit(app.exec_())
+    ex.show()
+    exitcode = app.exec_()
+    QgsApplication.exitQgis()
+    sys.exit(exitcode)
