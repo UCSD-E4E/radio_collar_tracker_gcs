@@ -52,6 +52,10 @@ import math
 import time
 import logging
 import sys
+from sys import argv
+import os
+import os.path
+import requests
 import rctTransport
 import rctComms
 import rctCore
@@ -65,6 +69,7 @@ from qgis.core import *
 from qgis.gui import *  
 from qgis.utils import *
 from qgis.core import QgsProject
+from threading import Thread
 
 class GCS(QMainWindow):
     '''
@@ -986,7 +991,7 @@ class MapControl(CollapseFrame):
         self.__lonEntry = QLineEdit()
         lay_loadWebMap.addWidget(self.__lonEntry, 1, 1)
 
-        lbl_zoom = QLabel('Zoom')
+        lbl_zoom = QLabel('Radius')
         lay_loadWebMap.addWidget(lbl_zoom, 2, 0)
 
         self.__zoomEntry = QLineEdit()
@@ -1043,7 +1048,7 @@ class MapControl(CollapseFrame):
     def __loadWebMap(self):
         lat = float(self.__latEntry.text())
         lon = float(self.__lonEntry.text())
-        zoom = int(self.__zoomEntry.text())
+        zoom = float(self.__zoomEntry.text())
         self.__mapFrame.setParent(None)
         self.__mapFrame = WebMap(self.__holder, lat, lon, zoom)
 
@@ -1054,7 +1059,9 @@ class MapControl(CollapseFrame):
     def __cacheMap(self):
         lat = float(self.__latEntry.text())
         lon = float(self.__lonEntry.text())
-        self.__mapFrame.cacheMap()
+        cacheThread = Thread(target=self.__mapFrame.cacheMap)
+        cacheThread.start()
+        self.__mapFrame.canvas.refresh()
 
 
 
@@ -1082,11 +1089,11 @@ class RectangleMapTool(QgsMapToolEmitPoint):
 
   def canvasReleaseEvent(self, e):
     self.isEmittingPoint = False
-    r = self.rectangle()
-    if r is not None:
-      print("Rectangle:", r.xMinimum(),
-            r.yMinimum(), r.xMaximum(), r.yMaximum()
-           )
+    #r = self.rectangle()
+    #if r is not None:
+    #  print("Rectangle:", r.xMinimum(),
+    #        r.yMinimum(), r.xMaximum(), r.yMaximum()
+    #       )
 
   def canvasMoveEvent(self, e):
     if not self.isEmittingPoint:
@@ -1191,9 +1198,24 @@ class WebMap(MapWidget):
     def __init__(self, root, lat, lon, zoom):
         # Initialize WebMapFrame
         MapWidget.__init__(self, root)
-
+    
+        self.transformToWeb = QgsCoordinateTransform(
+                QgsCoordinateReferenceSystem("EPSG:4326"),
+                QgsCoordinateReferenceSystem("EPSG:3857"), 
+                QgsProject.instance())
+        c1 = QgsPointXY(float(lon+zoom), float(lat+zoom))
+        c2 = QgsPointXY(float(lon-zoom), float(lat-zoom))
+        self.zoom = zoom
+        self.transform = QgsCoordinateTransform(
+                QgsCoordinateReferenceSystem("EPSG:3857"), 
+                QgsCoordinateReferenceSystem("EPSG:4326"),
+                QgsProject.instance())
         self.addLayers()
         self.adjustCanvas()
+        rect = self.transformToWeb.transformBoundingBox(
+                QgsRectangle(c1, c2))
+        self.canvas.zoomToFeatureExtent(rect)
+
         self.addToolBar()
         self.addRectTool()
         self.pan()
@@ -1206,9 +1228,14 @@ class WebMap(MapWidget):
         self.root = root
 
     def addLayers(self):
+
         urlWithParams = 'type=xyz&url=http://a.tile.openstreetmap.org/%7Bz%7D/%7Bx%7D/%7By%7D.png&zmax=19&zmin=0&crs=EPSG3857'    
+        #urlWithParams = 'type=xyz&url=file:///C:/Users/mluci/gcs/radio_collar_tracker_gcs/scripts/tiles/%7Bz%7D/%7Bx%7D/%7By%7D.png'    
         self.layer = QgsRasterLayer(urlWithParams, 'OpenStreetMap', 'wms') 
         if self.layer.isValid():   
+            crs = self.layer.crs()
+            crs.createFromString("EPSG:3857")  
+            self.layer.setCrs(crs)
             QgsProject.instance().addMapLayer(self.layer)
             print('valid layer')
         else:
@@ -1228,18 +1255,74 @@ class WebMap(MapWidget):
     def deg2num(self, lat_deg, lon_deg, zoom):
         lat_rad = math.radians(lat_deg)
         n = 2.0 ** zoom
-        self.x = int((lon_deg + 180.0) / 360.0 * n)
-        self.y = int((1.0 - math.asinh(math.tan(lat_rad)) / math.pi) / 2.0 * n)
+        x = int((lon_deg + 180.0) / 360.0 * n)
+        y = int((1.0 - math.asinh(math.tan(lat_rad)) / math.pi) / 2.0 * n)
+        return (x,y)
         
 
     def cacheMap(self):
         if (self.toolRect.rectangle() == None):
-            print("im tired")
             return
         else:
-            self.toolRect.rectangle()
-            print("im tired but it worked")
+            rect = self.toolRect.rectangle()
+            r = self.transform.transformBoundingBox(self.toolRect.rectangle(), 
+                                QgsCoordinateTransform.ForwardTransform, True)
+            print("Rectangle:", r.xMinimum(),
+                    r.yMinimum(), r.xMaximum(), r.yMaximum()
+                 )
+            m1 = QgsVertexMarker(self.canvas)
+            m1.setCenter(QgsPointXY(rect.xMinimum(),rect.yMinimum()))
+            m1.setColor(QColor(255,0, 0)) #(R,G,B)
+            m1.setIconSize(10)
+            m1.setIconType(QgsVertexMarker.ICON_X)
+            m1.setPenWidth(3)
+            m1.show()
+            
+            if (r != None):
+                zoomStart = 17
+                tilecount = 0
+                for zoom in range(zoomStart, 19, 1):
+                    xmin, ymin = self.deg2num(float(r.yMinimum()),float(r.xMinimum()),zoom)
+                    xmax, ymax = self.deg2num(float(r.yMaximum()),float(r.xMaximum()),zoom)
+                    print("Zoom:", zoom)
+                    print(xmin, xmax, ymin, ymax)
+                    for x in range(xmin, xmax+1, 1):
+                        for y in range(ymax, ymin+1, 1):
+                            if (tilecount < 200):
+                                time.sleep(1)
+                                downloaded = self.downloadTile(x,y,zoom)
+                                if downloaded:
+                                    tilecount = tilecount + 1
+                            else:
+                                print("tile count exceeded, pls try again in a few minutes")
+                                return
+                print("Download Complete")
+            else:
+                print(":(")
+            
+    def downloadTile(self, xtile, ytile, zoom):
+        
+        url = "http://c.tile.openstreetmap.org/%d/%d/%d.png" % (zoom, xtile, ytile)
+        dir_path = "tiles/%d/%d/" % (zoom, xtile)
+        download_path = "tiles/%d/%d/%d.png" % (zoom, xtile, ytile)
+        
+        if not os.path.exists(dir_path):
+            os.makedirs(dir_path)
+        
+        if(not os.path.isfile(download_path)):
+            print("downloading %r" % url)
+            source = requests.get(url, headers = {'User-agent': 'Mozilla/5.0'})
+            cont = source.content
+            source.close()
+            destination = open(download_path,'wb')
+            destination.write(cont)
+            destination.close()
+            return True
+        else: 
+            print("skipped %r" % url)
+            return False
 
+        return True
 
 
 class StaticMap(MapWidget):
@@ -1299,6 +1382,7 @@ if __name__ == '__main__':
 
     ex = GCS()
     ex.show()
+
     exitcode = app.exec_()
     QgsApplication.exitQgis()
     sys.exit(exitcode)
