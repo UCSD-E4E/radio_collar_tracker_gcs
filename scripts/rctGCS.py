@@ -99,6 +99,7 @@ class GCS(QMainWindow):
         self.freqElements = []
         self.targEntries = {}
         self.mapControl = None
+        self.mapOptions = None
         self.testFrame = None
         self.__createWidgets()
         for button in self._buttons:
@@ -340,7 +341,10 @@ class GCS(QMainWindow):
         frm_components.setContentLayout(lay_comp)
 
         # DATA DISPLAY TOOLS
-        self.mapControl = MapControl(frm_sideControl, holder, self)
+        self.mapOptions = MapOptions(holder)
+        self.mapOptions.resize(300, 100)
+        self.mapControl = MapControl(frm_sideControl, holder, 
+                self.mapOptions, self)
 
         # SYSTEM SETTINGS
         self.systemSettingsWidget = SystemSettingsControl(self)
@@ -362,8 +366,9 @@ class GCS(QMainWindow):
         wlay.addWidget(btn_startRecord)
         wlay.addStretch()
         holder.addWidget(content, 0, 0, alignment=Qt.AlignLeft)
+        holder.addWidget(self.mapOptions, 0, 4, alignment=Qt.AlignTop)
         centr_widget.setLayout(holder)
-        self.resize(1600, 1200)
+        self.resize(1800, 1100)
         self.show()
 
 class CollapseFrame(QWidget):
@@ -898,11 +903,9 @@ class ConnectionDialogPage(QWizardPage):
         self.comms = None
         self.model = None
 
-        #self.transient(parent)
 
         self.__createWidget()
 
-        #self.wait_window(self)
 
     def __createWidget(self):
 
@@ -933,14 +936,16 @@ class ConnectionDialogPage(QWizardPage):
         frm_holder.addLayout(frm_port)
         self.setLayout(frm_holder)
 
-        #self.bind('<Escape>', self.__cancel)
+
+
 
 
 class MapControl(CollapseFrame):    
-    def __init__(self, parent, holder, root: GCS):
+    def __init__(self, parent, holder, mapOptions, root: GCS):
         CollapseFrame.__init__(self, title='Map Display Tools')
         self.__parent = parent
         self.__root = root
+        self.__mapOptions = mapOptions
         self.__holder = holder
         self.__mapFrame = None
         self.__latEntry = None
@@ -963,7 +968,8 @@ class MapControl(CollapseFrame):
         controlPanel.addStretch()
 
         self.__mapFrame = QWidget()
-        self.__holder.addWidget(self.__mapFrame, 0, 0)
+        self.__mapFrame.resize(800, 500)
+        self.__holder.addWidget(self.__mapFrame, 0, 0, 1, 3)
         btn_loadMap = QPushButton('Load Map')
         btn_loadMap.clicked.connect(lambda:self.__loadMapFile())
         controlPanel.addWidget(btn_loadMap)
@@ -979,89 +985,65 @@ class MapControl(CollapseFrame):
         lay_loadWebMapHolder.addStretch()
 
 
-        lbl_lat = QLabel('Latitude')
-        lay_loadWebMap.addWidget(lbl_lat, 0, 0)
+        lbl_p1 = QLabel('Lat/Long NW Point')
+        lay_loadWebMap.addWidget(lbl_p1, 0, 0)
 
-        self.__latEntry = QLineEdit()
-        lay_loadWebMap.addWidget(self.__latEntry, 0, 1)
+        self.__p1latEntry = QLineEdit()
+        lay_loadWebMap.addWidget(self.__p1latEntry, 0, 1)
+        self.__p1lonEntry = QLineEdit()
+        lay_loadWebMap.addWidget(self.__p1lonEntry, 0, 2)
 
-        lbl_lon = QLabel('Longitude')
-        lay_loadWebMap.addWidget(lbl_lon, 1, 0)
+        lbl_p2 = QLabel('Lat/Long SE Point')
+        lay_loadWebMap.addWidget(lbl_p2, 1, 0)
 
-        self.__lonEntry = QLineEdit()
-        lay_loadWebMap.addWidget(self.__lonEntry, 1, 1)
-
-        lbl_zoom = QLabel('Radius')
-        lay_loadWebMap.addWidget(lbl_zoom, 2, 0)
-
-        self.__zoomEntry = QLineEdit()
-        lay_loadWebMap.addWidget(self.__zoomEntry, 2, 1)
+        self.__p2latEntry = QLineEdit()
+        lay_loadWebMap.addWidget(self.__p2latEntry, 1, 1)
+        self.__p2lonEntry = QLineEdit()
+        lay_loadWebMap.addWidget(self.__p2lonEntry, 1, 2)
 
         
-        btn_loadWebMap = QPushButton('Load') 
+        btn_loadWebMap = QPushButton('Load from Web') 
         btn_loadWebMap.clicked.connect(lambda:self.__loadWebMap())
-        lay_loadWebMap.addWidget(btn_loadWebMap, 3, 1)
+        lay_loadWebMap.addWidget(btn_loadWebMap, 3, 1, 1, 2)
+        
+        btn_loadCachedMap = QPushButton('Load from Cache') 
+        btn_loadCachedMap.clicked.connect(lambda:self.__loadCachedMap())
+        lay_loadWebMap.addWidget(btn_loadCachedMap, 4, 1, 1, 2)
 
-        btn_cacheMap = QPushButton('Cache Map') 
-        btn_cacheMap.clicked.connect(lambda:self.__cacheMap())
-        lay_loadWebMap.addWidget(btn_cacheMap, 4, 1)
         controlPanel.addWidget(frm_loadWebMap)
         controlPanel.addLayout(lay_loadWebMap)
 
 
-        '''
-        #TODO: Move Map options and map legend to separate control class
-        # MAP OPTIONS
-        frm_mapOptions = tk.Frame(master=frm_mapGrid, width=self.SBWidth)
-        frm_mapOptions.pack(side=tk.TOP)
-
-        lbl_mapOptions = tk.Label(
-            frm_mapOptions, bg='gray', width=self.SBWidth, text='Map Options')
-        lbl_mapOptions.grid(column=0, row=0, sticky='ew')
-
-        btn_setSearchArea = tk.Button(frm_mapOptions,  bg='light gray', width=self.SBWidth,
-                                      relief=tk.FLAT, text='Set Search Area')
-        btn_setSearchArea.grid(column=0, row=1, sticky='ew')
-
-        btn_cacheMap = tk.Button(frm_mapOptions, width=self.SBWidth,  bg='light gray',
-                                 relief=tk.FLAT, text='Cache Map')
-        btn_cacheMap.grid(column=0, row=2)
-
-        # MAP LEGEND
-        frm_mapLegend = tk.Frame(master=frm_mapGrid, width=self.SBWidth)
-        frm_mapLegend.pack(side=tk.BOTTOM)
-
-        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
-                              bg='gray', text='Map Legend')
-        lbl_legend.grid(column=0, row=0, sticky='ew')
-
-        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
-                              bg='light gray', text='Vehicle')
-        lbl_legend.grid(column=0, row=1, sticky='ew')
-
-        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
-                              bg='light gray', text='Target')
-        lbl_legend.grid(column=0, row=2, sticky='ew')
-        '''
         self.setContentLayout(controlPanel)
         
     def __loadWebMap(self):
-        lat = float(self.__latEntry.text())
-        lon = float(self.__lonEntry.text())
-        zoom = float(self.__zoomEntry.text())
+        p1lat = float(self.__p1latEntry.text())
+        p1lon = float(self.__p1lonEntry.text())
+        p2lat = float(self.__p2latEntry.text())
+        p2lon = float(self.__p2lonEntry.text())
         self.__mapFrame.setParent(None)
-        self.__mapFrame = WebMap(self.__holder, lat, lon, zoom)
+        self.__mapFrame = WebMap(self.__holder, p1lat, p1lon, 
+                p2lat, p2lon, False)
+        self.__mapFrame.resize(800, 500)
+        self.__mapOptions.setMap(self.__mapFrame, True)
+
+    def __loadCachedMap(self):
+        p1lat = float(self.__p1latEntry.text())
+        p1lon = float(self.__p1lonEntry.text())
+        p2lat = float(self.__p2latEntry.text())
+        p2lon = float(self.__p2lonEntry.text())
+        self.__mapFrame.setParent(None)
+        self.__mapFrame = WebMap(self.__holder, p1lat, p1lon, 
+                p2lat, p2lon, True)
+        self.__mapFrame.resize(800, 500)
+        self.__mapOptions.setMap(self.__mapFrame, True)
 
     def __loadMapFile(self):
         self.__mapFrame.setParent(None)
         self.__mapFrame = StaticMap(self.__holder)
+        self.__mapFrame.resize(800, 500)
+        self.__mapOptions.setMap(self.__mapFrame, False)
 
-    def __cacheMap(self):
-        lat = float(self.__latEntry.text())
-        lon = float(self.__lonEntry.text())
-        cacheThread = Thread(target=self.__mapFrame.cacheMap)
-        cacheThread.start()
-        self.__mapFrame.canvas.refresh()
 
 
 
@@ -1089,11 +1071,6 @@ class RectangleMapTool(QgsMapToolEmitPoint):
 
   def canvasReleaseEvent(self, e):
     self.isEmittingPoint = False
-    #r = self.rectangle()
-    #if r is not None:
-    #  print("Rectangle:", r.xMinimum(),
-    #        r.yMinimum(), r.xMaximum(), r.yMaximum()
-    #       )
 
   def canvasMoveEvent(self, e):
     if not self.isEmittingPoint:
@@ -1189,31 +1166,102 @@ class MapWidget(QWidget):
     def pan(self):
         self.canvas.setMapTool(self.toolPan)
         
+class MapOptions(QWidget):
+
+    def __init__(self, holder):
+        QWidget.__init__(self)
+
+        self.mapWidget = None
+        self.btn_cacheMap = None
+        self.isWebMap = False
+        self.__createWidgets()
+        
+
+
+    def __createWidgets(self):
+        # MAP OPTIONS
+        lay_mapOptions = QVBoxLayout()
+
+        lbl_mapOptions = QLabel('Map Options')
+        lay_mapOptions.addWidget(lbl_mapOptions)
+
+        self.btn_setSearchArea = QPushButton('Set Search Area')
+        self.btn_setSearchArea.setEnabled(False)
+        lay_mapOptions.addWidget(self.btn_setSearchArea)
+
+        self.btn_cacheMap = QPushButton('Cache Map')
+        self.btn_cacheMap.clicked.connect(lambda:self.__cacheMap())
+        self.btn_cacheMap.setEnabled(False)
+        lay_mapOptions.addWidget(self.btn_cacheMap)
+
+        self.setLayout(lay_mapOptions)
+
+
+        '''
+        # MAP LEGEND
+        frm_mapLegend = tk.Frame(master=frm_mapGrid, width=self.SBWidth)
+        frm_mapLegend.pack(side=tk.BOTTOM)
+
+        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
+                              bg='gray', text='Map Legend')
+        lbl_legend.grid(column=0, row=0, sticky='ew')
+
+        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
+                              bg='light gray', text='Vehicle')
+        lbl_legend.grid(column=0, row=1, sticky='ew')
+
+        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
+                              bg='light gray', text='Target')
+        lbl_legend.grid(column=0, row=2, sticky='ew')
+        '''
+    def __cacheMap(self):
+        if self.isWebMap:
+            if (self.mapWidget.toolRect.rectangle() == None):
+                msg = QMessageBox()
+                msg.setText("No specified area to cache!")
+                msg.setWindowTitle("Alert")
+                msg.setInformativeText("Use the rect tool to choose an area on the map to cache")
+                msg.setIcon(QMessageBox.Critical)
+                msg.exec_()
+                self.mapWidget.rect()
+            else:
+                cacheThread = Thread(target=self.mapWidget.cacheMap)
+                cacheThread.start()
+                self.mapWidget.canvas.refresh()
+        else:
+            print("alert")
+
+    def setMap(self, mapWidg: MapWidget, isWebMap):
+        self.isWebMap = isWebMap
+        self.mapWidget = mapWidg
+        
+        self.btn_cacheMap.setEnabled(isWebMap)
 
 '''
     Helper Class to facilititate displaying online web maps
 '''
 class WebMap(MapWidget):
 
-    def __init__(self, root, lat, lon, zoom):
+    def __init__(self, root, p1lat, p1lon, p2lat, p2lon, loadCached):
         # Initialize WebMapFrame
         MapWidget.__init__(self, root)
-    
+
+        self.loadCached = loadCached
+
         self.transformToWeb = QgsCoordinateTransform(
                 QgsCoordinateReferenceSystem("EPSG:4326"),
                 QgsCoordinateReferenceSystem("EPSG:3857"), 
                 QgsProject.instance())
-        c1 = QgsPointXY(float(lon+zoom), float(lat+zoom))
-        c2 = QgsPointXY(float(lon-zoom), float(lat-zoom))
-        self.zoom = zoom
         self.transform = QgsCoordinateTransform(
                 QgsCoordinateReferenceSystem("EPSG:3857"), 
                 QgsCoordinateReferenceSystem("EPSG:4326"),
                 QgsProject.instance())
+
+        
         self.addLayers()
         self.adjustCanvas()
-        rect = self.transformToWeb.transformBoundingBox(
-                QgsRectangle(c1, c2))
+        r = QgsRectangle(p1lon, p2lat, p2lon, p1lat)
+        rect = self.transformToWeb.transformBoundingBox(r)
         self.canvas.zoomToFeatureExtent(rect)
 
         self.addToolBar()
@@ -1228,9 +1276,12 @@ class WebMap(MapWidget):
         self.root = root
 
     def addLayers(self):
-
-        urlWithParams = 'type=xyz&url=http://a.tile.openstreetmap.org/%7Bz%7D/%7Bx%7D/%7By%7D.png&zmax=19&zmin=0&crs=EPSG3857'    
-        #urlWithParams = 'type=xyz&url=file:///C:/Users/mluci/gcs/radio_collar_tracker_gcs/scripts/tiles/%7Bz%7D/%7Bx%7D/%7By%7D.png'    
+        if self.loadCached:
+            direct = QDir()
+            path = direct.currentPath()
+            urlWithParams = 'type=xyz&url=file:///'+ path+'/tiles/%7Bz%7D/%7Bx%7D/%7By%7D.png'
+        else:
+            urlWithParams = 'type=xyz&url=http://a.tile.openstreetmap.org/%7Bz%7D/%7Bx%7D/%7By%7D.png&zmax=19&zmin=0&crs=EPSG3857'    
         self.layer = QgsRasterLayer(urlWithParams, 'OpenStreetMap', 'wms') 
         if self.layer.isValid():   
             crs = self.layer.crs()
@@ -1359,6 +1410,32 @@ class StaticMap(MapWidget):
         else:
             print('invalid layer')
 
+def configSetup():
+    config_path = 'gcsConfig.ini'
+    if(not os.path.isfile(config_path)):
+        prefix_path = QFileDialog.getExistingDirectory(None, 
+                'Select the Qgis directory')
+        if ("qgis" in prefix_path):            
+            config = configparser.ConfigParser()
+            config['FilePaths'] = {}
+            config['FilePaths']['PrefixPath'] = prefix_path
+            with open(config_path, 'w') as configFile:
+                config.write(configFile)
+                return prefix_path
+                print("here")
+        else:
+            msg = QMessageBox()
+            msg.setText("Wrong file. Choose qgis file")
+            msg.setWindowTitle("Alert")
+            msg.setIcon(QMessageBox.Critical)
+            msg.exec_()
+            configSetup()
+    else:
+        config = configparser.ConfigParser()
+        config.read(config_path)
+        prefix_path = config['FilePaths']['PrefixPath']
+        return prefix_path
+   
 
 
 if __name__ == '__main__':
@@ -1368,16 +1445,19 @@ if __name__ == '__main__':
     ch = logging.StreamHandler(sys.stdout)
     ch.setLevel(logging.WARNING)
     formatter = logging.Formatter(
-        '%(asctime)s.%(msecs)03d: %(levelname)s:%(name)s: %(message)s', datefmt='%Y-%M-%d %H:%m:%S')
+        '%(asctime)s.%(msecs)03d: %(levelname)s:%(name)s: %(message)s', 
+        datefmt='%Y-%M-%d %H:%m:%S')
     ch.setFormatter(formatter)
     logger.addHandler(ch)
     ch = logging.FileHandler(logName)
     ch.setLevel(logging.DEBUG)
     ch.setFormatter(formatter)
     logger.addHandler(ch)
-
+    
     app = QgsApplication([], True)
-    app.setPrefixPath("C:/Users/mluci/Anaconda/envs/testenvgcs/Library/python/qgis", True) 
+    prefix_path = configSetup() 
+    #prefix_path = config['FilePaths']['PrefixPath']
+    app.setPrefixPath(prefix_path, True) 
     app.initQgis()
 
     ex = GCS()
