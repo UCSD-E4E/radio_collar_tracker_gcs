@@ -503,6 +503,17 @@ class MAVModel:
         event.wait(timeout=timeout)
         if not self.__ackVectors.pop(0x05)[1]:
             raise RuntimeError("SETOPT NACKED")
+        
+    def sendUpgradePacket(self, byteStream): 
+        numPackets = -1
+        if (len(byteStream) % 1000) != 0:
+            numPackets = len(byteStream)/1000 + 1
+        else:
+            numPackets = len(byteStream)/1000
+        for i in range(0,numPackets):
+            startInd = i*1000
+            endInd = startInd + 1000
+            self.__rx.sendPacket(rctComms.rctUpgradePacket(i+1, numPackets, byteStream[startInd:endInd]))
 
     def __processPing(self, packet: rctComms.rctPingPacket, addr: str):
         ping = ping.rctPing.fromPacket(packet)
