@@ -316,7 +316,6 @@ class GCS(QMainWindow):
         frm_sideControl.resize(self.SBWidth, 400)
 
         content = QWidget()
-        content.resize(self.SBWidth, 400)
         frm_sideControl.setWidget(content)
         frm_sideControl.setWidgetResizable(True)
 
@@ -335,18 +334,8 @@ class GCS(QMainWindow):
         self._systemConnectionTab.setContentLayout(lay_sys)
 
         # COMPONENTS TAB
-        #self.statusWidget = StatusDisplay(frm_sideControl, self)
-        '''
-        frm_components = CollapseFrame('Components')
+        self.statusWidget = StatusDisplay(frm_sideControl, self)
 
-        lay_comp = QVBoxLayout()
-        lbl_componentNotif = QLabel('Vehicle not connected')
-        lay_comp.addWidget(lbl_componentNotif)
-        frm_components.setContentLayout(lay_comp)
-        lbl_componentNotif = tk.Label(
-            self.statusWidget.frame, width=self.SBWidth, text='Vehicle not connected')
-        lbl_componentNotif.grid(column=0, row=0, sticky='new')
-        '''
 
         # DATA DISPLAY TOOLS
         self.mapOptions = MapOptions(holder)
@@ -356,11 +345,13 @@ class GCS(QMainWindow):
 
         # SYSTEM SETTINGS
         self.systemSettingsWidget = SystemSettingsControl(self)
+        self.systemSettingsWidget.resize(self.SBWidth, 400)
         scrollArea = QScrollArea()
         scrollArea.setWidgetResizable(True)
         scrollArea.setWidget(self.systemSettingsWidget)
         
-        self.upgradeDisplay = UpgradeDisplay(self)
+        self.upgradeDisplay = UpgradeDisplay(content, self)
+        self.upgradeDisplay.resize(self.SBWidth, 400)
 
 
 
@@ -370,12 +361,13 @@ class GCS(QMainWindow):
         btn_startRecord.clicked.connect(lambda:self.__startStopMission())
 
         wlay.addWidget(self._systemConnectionTab)
-        #wlay.addWidget(frm_components)
+        wlay.addWidget(self.statusWidget)
         wlay.addWidget(self.mapControl)
         wlay.addWidget(self.systemSettingsWidget)
         wlay.addWidget(self.upgradeDisplay)
         wlay.addWidget(btn_startRecord)
         wlay.addStretch()
+        content.resize(self.SBWidth, 400)
         holder.addWidget(content, 0, 0, alignment=Qt.AlignLeft)
         holder.addWidget(self.mapOptions, 0, 4, alignment=Qt.AlignTop)
         centr_widget.setLayout(holder)
@@ -461,7 +453,7 @@ class CollapseFrame(QWidget):
         
 class UpgradeDisplay(CollapseFrame):
     def __init__(self, parent, root: GCS):
-        CollapseFrame.__init__(self, title='Upgrade Software', parent)
+        CollapseFrame.__init__(self, title='Upgrade Software')
         
         self.__parent = parent
         self.__root = root
@@ -473,19 +465,16 @@ class UpgradeDisplay(CollapseFrame):
         self.__createWidget()
         
     def update(self):
-        CollapseFrame.update(self)
         self.updateGUIOptionVars()
         
     def __createWidget(self):
-        if self.__innerFrame:
-            self.__innerFrame.setParent(None)
         self.__innerFrame = QGridLayout()
         
-        file_lbl = QLabel(self.__innerFrame'Selected File:')
+        file_lbl = QLabel('Selected File:')
         self.__innerFrame.addWidget(file_lbl, 1, 0)
         
         self.filename = QLineEdit()
-        self.__innerFrame.addWidget(file_entry, 1, 1)
+        self.__innerFrame.addWidget(self.filename, 1, 1)
 
         browse_file_btn = QPushButton('Browse for Upgrade File')
         browse_file_btn.clicked.connect(lambda:self.fileDialogue())
@@ -495,7 +484,7 @@ class UpgradeDisplay(CollapseFrame):
         upgrade_btn.clicked.connect(lambda:self.sendUpgradeFile())
         self.__innerFrame.addWidget(upgrade_btn, 3, 0)
 
-        self.setLayout(self.__innerFrame)
+        self.setContentLayout(self.__innerFrame)
         
     def fileDialogue(self):
         filename = QFileDialog.getOpenFileName()
@@ -512,10 +501,10 @@ class UpgradeDisplay(CollapseFrame):
         pass
 
 
-'''
+
 class StatusDisplay(CollapseFrame):
     def __init__(self, parent, root: GCS):
-        CollapseFrame.__init__(self, parent, labelText='Components')
+        CollapseFrame.__init__(self, 'Components')
         
         self.__parent = parent
         self.__root = root
@@ -533,19 +522,19 @@ class StatusDisplay(CollapseFrame):
 
     def __createWidget(self):
         
-        self.__innerFrame = tk.Frame(self.frame)
-        self.__innerFrame.grid(row=0, column=0, sticky='nesw')
+        self.__innerFrame = QGridLayout()
 
-        lbl_overall_status = tk.Label(self.__innerFrame, text='Status:')
-        lbl_overall_status.grid(row=1, column=0, sticky='new')
+        lbl_overall_status = QLabel('Status:')
+        self.__innerFrame.addWidget(lbl_overall_status, 1, 0)
 
-        entr_overall_status = tk.Label(self.__innerFrame, text='')
-        entr_overall_status.grid(row=1, column=1, sticky='new')
+        entr_overall_status = QLabel('')
+        self.__innerFrame.addWidget(entr_overall_status, 1, 1)
         
-        self.componentStatusWidget = ComponentStatusDisplay(parent=self.frame, root=self.__root)
-        self.componentStatusWidget.grid(column=0, row=2, sticky='new')
+        self.componentStatusWidget = ComponentStatusDisplay(root=self.__root)
+        self.__innerFrame.addWidget(self.componentStatusWidget, 0, 2)
 
         self.statusLabel = entr_overall_status
+        self.setContentLayout(self.__innerFrame)
 
     def updateGUIOptionVars(self, scope=0):
         varDict = self.__root._mavModel.state
@@ -557,21 +546,26 @@ class StatusDisplay(CollapseFrame):
         sw_status = varDict["STS_swStatus"]
 
         if sys_status == "RCT_STATES.finish":
-            self.statusLabel.config(text='Stopping', bg='red')
+            self.statusLabel.setText('Stopping')
+            self.statusLabel.setStyleSheet("background-color: red")
         elif sdr_status == "SDR_INIT_STATES.fail" or dir_status == "OUTPUT_DIR_STATES.fail" or gps_status == "GPS_STATES.fail" or sys_status == "RCT_STATES.fail" or (sw_status != 0 and sw_status != 1):
-            self.statusLabel.config(text='Failed', bg='red')
+            self.statusLabel.setText('Failed')
+            self.statusLabel.setStyleSheet("background-color: red")
         elif sys_status == "RCT_STATES.start" or sys_status == "RCT_STATES.wait_end":
-            self.statusLabel.config(text='Running', bg='green')
+            self.statusLabel.setText('Running')
+            self.statusLabel.setStyleSheet("background-color: green")
         elif sdr_status == "SDR_INIT_STATES.rdy" and dir_status == "OUTPUT_DIR_STATES.rdy" and gps_status == "EXTS_STATES.rdy" and sys_status == "RCT_STATES.wait_start" and sw_status == 1:
-            self.statusLabel.config(text='Idle', bg='yellow')
+            self.statusLabel.setText('Idle')
+            self.statusLabel.setStyleSheet("background-color: yellow")
         else:
-            self.statusLabel.config(text='Not Connected', bg='yellow')
+            self.statusLabel.setText('Not Connected')
+            self.statusLabel.setStyleSheet("background-color: yellow")
             
         self.componentStatusWidget.update()
 
-class ComponentStatusDisplay(QWidget):
-    def __init__(self, parent, root: GCS):
-        CollapseFrame.__init__(self, parent, labelText='Component Statuses')
+class ComponentStatusDisplay(CollapseFrame):
+    def __init__(self, root: GCS):
+        CollapseFrame.__init__(self, 'Component Statuses')
         self.sdrMap = {
             "SDR_INIT_STATES.find_devices": {'text': 'SDR: Searching for devices', 'bg':'yellow'},
             "SDR_INIT_STATES.wait_recycle": {'text':'SDR: Recycling!', 'bg':'yellow'},
@@ -620,7 +614,7 @@ class ComponentStatusDisplay(QWidget):
             "STS_swStatus": self.swMap,
         }
             
-        self.__parent = parent
+        #self.__parent = parent
         self.__root = root
 
         self.__innerFrame = None
@@ -630,50 +624,47 @@ class ComponentStatusDisplay(QWidget):
         self.__createWidget()
 
     def update(self):
-        CollapseFrame.update(self)
         self.updateGUIOptionVars()
 
     def __createWidget(self):
-        if self.__innerFrame:
-            self.__innerFrame.destroy()
-        self.__innerFrame = tk.Frame(self.frame)
-        self.__innerFrame.grid(row=0, column=0, sticky='nesw')
+        self.__innerFrame = QGridLayout()
 
-        lbl_sdr_status = tk.Label(self.__innerFrame, text='SDR Status')
-        lbl_sdr_status.grid(row=1, column=0, sticky='new')
+        lbl_sdr_status = QLabel('SDR Status')
+        self.__innerFrame.addWidget(lbl_sdr_status, 1, 0)
 
-        lbl_dir_status = tk.Label(self.__innerFrame, text='Storage Status')
-        lbl_dir_status.grid(row=2, column=0, sticky='new')
+        lbl_dir_status = QLabel('Storage Status')
+        self.__innerFrame.addWidget(lbl_dir_status, 2, 0)
 
-        lbl_gps_status = tk.Label(self.__innerFrame, text='GPS Status')
-        lbl_gps_status.grid(row=3, column=0, sticky='new')
+        lbl_gps_status = QLabel('GPS Status')
+        self.__innerFrame.addWidget(lbl_gps_status, 3, 0)
 
-        lbl_sys_status = tk.Label(self.__innerFrame, text='System Status')
-        lbl_sys_status.grid(row=4, column=0, sticky='new')
+        lbl_sys_status = QLabel('System Status')
+        self.__innerFrame.addWidget(lbl_sys_status, 4, 0)
 
-        lbl_sw_status = tk.Label(self.__innerFrame, text='Software Status')
-        lbl_sw_status.grid(row=5, column=0, sticky='new')
+        lbl_sw_status = QLabel('Software Status')
+        self.__innerFrame.addWidget(lbl_sw_status, 5, 0)
 
-        entr_sdr_status = tk.Label(self.__innerFrame, text='')
-        entr_sdr_status.grid(row=1, column=1, sticky='new')
+        entr_sdr_status = QLabel('')
+        self.__innerFrame.addWidget(entr_sdr_status, 1, 1)
 
-        entr_dir_status = tk.Label(self.__innerFrame, text='')
-        entr_dir_status.grid(row=2, column=1, sticky='new')
+        entr_dir_status = QLabel('')
+        self.__innerFrame.addWidget(entr_dir_status, 2, 1)
 
-        entr_gps_status = tk.Label(self.__innerFrame, text='')
-        entr_gps_status.grid(row=3, column=1, sticky='new')
+        entr_gps_status = QLabel('')
+        self.__innerFrame.addWidget(entr_gps_status, 3, 1)
 
-        entr_sys_status = tk.Label(self.__innerFrame, text='')
-        entr_sys_status.grid(row=4, column=1, sticky='new')
+        entr_sys_status = QLabel('')
+        self.__innerFrame.addWidget(entr_sys_status, 4, 1)
 
-        entr_sw_status = tk.Label(self.__innerFrame, text='')
-        entr_sw_status.grid(row=5, column=1, sticky='new')
+        entr_sw_status = QLabel('')
+        self.__innerFrame.addWidget(entr_sw_status, 5, 1)
 
         self.statusLabels["STS_sdrStatus"] = entr_sdr_status
         self.statusLabels["STS_dirStatus"] = entr_dir_status
         self.statusLabels["STS_gpsStatus"] = entr_gps_status
         self.statusLabels["STS_sysStatus"] = entr_sys_status
         self.statusLabels["STS_swStatus"] = entr_sw_status
+        self.setContentLayout(self.__innerFrame)
 
     def updateGUIOptionVars(self, scope=0):
         varDict = self.__root._mavModel.state
@@ -682,10 +673,12 @@ class ComponentStatusDisplay(QWidget):
             try:
                 configDict = self.compDicts[varName]
                 configOpts = configDict[str(varValue)]
-                self.statusLabels[varName].config(text=configOpts['text'], bg=configOpts['bg'])
+                self.statusLabels[varName].setText(configOpts['text'])
+                style = "background-color: %s" % configOpts['bg']
+                self.statusLabels.setStyleSheet(style)
             except KeyError:
                 continue
-'''
+
 class SystemSettingsControl(CollapseFrame):
     def __init__(self, root):
         CollapseFrame.__init__(self, title='System Settings')
