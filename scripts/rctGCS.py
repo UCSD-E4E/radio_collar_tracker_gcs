@@ -20,6 +20,9 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 07/17/20  ML  Translated component status and upgrade displays into PyQt and
+#               fixed CollapseFrame nesting issue
+# 07/14/20  ML  Added ability to cache and load offline maps
 # 07/09/20  ML  Refactored Map Classes to extend added MapWidget Class
 # 07/09/20  ML  Converted Static Maps and WebMaps to QGIS
 # 06/30/20  ML  Translated tkinter GUI into PyQt5
@@ -106,13 +109,16 @@ class GCS(QMainWindow):
         self.__createWidgets()
         for button in self._buttons:
             button.config(state='disabled')
-        #self.protocol('WM_DELETE_WINDOW', self.__windowClose)
 
     def __registerModelCallbacks(self):
-        #         self._mavModel.registerCallback(
-        #             rctCore.Events.Heartbeat, self.__updateStatus)
+        self._mavModel.registerCallback(
+        rctCore.Events.Heartbeat, self.__heartbeatCallback)
         self._mavModel.registerCallback(
             rctCore.Events.Exception, self.__handleRemoteException)
+        self._mavModel.registerCallback(
+            rctCore.Events.VehicleInfo, self.__handleVehicleInfo)
+        self._mavModel.registerCallback(
+            rctCore.Events.NewPing, self.__handleNewPing)
 
     def mainloop(self, n=0):
         '''
@@ -122,8 +128,9 @@ class GCS(QMainWindow):
         '''
 
     def __heartbeatCallback(self):
-        if (self.__mavModel.swStatus != 0):
-            self.missionDisplay.set('Start Recording')
+        '''
+        Internal Heartbeat callback
+        '''
 
     def __startCommand(self):
         '''
@@ -146,6 +153,21 @@ class GCS(QMainWindow):
         dialog.setText("No Heartbeats Received")
         dialog.addButton(QMessageBox.Ok)
         dialog.exec()
+
+    def __handleNewPing(self):
+        print("in ping")
+
+    def __handleVehicleInfo(self):
+        '''
+        Internal Callback for Vehicle Info
+        '''
+        if self._mavModel == None:
+            return
+        print("here")
+        print(self._mavModel.state['VCL_track'])
+        print(lastPos)
+
+
 
     def __handleRemoteException(self):
         '''
@@ -266,14 +288,6 @@ class GCS(QMainWindow):
             self._mavModel.stop()
         super().closeEvent(event)
             
-    def __windowClose(self):
-        '''
-        Internal callback for window close
-        '''
-        if self._mavModel is not None:
-            self._mavModel.stop()
-        self.destroy()
-        self.quit()
 
     def __handleConnectInput(self):
         '''
@@ -294,12 +308,6 @@ class GCS(QMainWindow):
         self.systemSettingsWidget.updateGUIOptionVars()
         self.statusWidget.updateGUIOptionVars()
 
-    def __advancedSettings(self):
-        '''
-        Internal callback to open Connect Settings
-        '''
-
-        #def submit():
 
 
     def __createWidgets(self):
@@ -313,7 +321,6 @@ class GCS(QMainWindow):
 
         self.setWindowTitle('RCT GCS')
         frm_sideControl = QScrollArea()
-        frm_sideControl.resize(self.SBWidth, 400)
 
         content = QWidget()
         frm_sideControl.setWidget(content)
@@ -368,7 +375,8 @@ class GCS(QMainWindow):
         wlay.addWidget(btn_startRecord)
         wlay.addStretch()
         content.resize(self.SBWidth, 400)
-        holder.addWidget(content, 0, 0, alignment=Qt.AlignLeft)
+        frm_sideControl.setMinimumWidth(self.SBWidth)
+        holder.addWidget(frm_sideControl, 0, 0, alignment=Qt.AlignLeft)
         holder.addWidget(self.mapOptions, 0, 4, alignment=Qt.AlignTop)
         centr_widget.setLayout(holder)
         self.resize(1800, 1100)
@@ -378,6 +386,7 @@ class CollapseFrame(QWidget):
     def __init__(self, title="", parent=None):
         super(CollapseFrame, self).__init__(parent)
 
+        self.content_height = 0
         self.toggle_button = QToolButton(
             text=title, checkable=True, checked=False
         )
@@ -388,15 +397,8 @@ class CollapseFrame(QWidget):
         self.toggle_button.setArrowType(Qt.RightArrow)
         self.toggle_button.pressed.connect(self.on_pressed)
 
-        self.toggle_animation = QParallelAnimationGroup(self)
-
-        self.content_area = QScrollArea(
-            maximumHeight=0, minimumHeight=0
-        )
-        self.content_area.setSizePolicy(
-            QSizePolicy.Expanding, QSizePolicy.Fixed
-        )
-        self.content_area.setFrameShape(QFrame.NoFrame)
+        self.content_area = QWidget()
+        self.content_area.setVisible(False)
 
         lay = QVBoxLayout(self)
         lay.setSpacing(0)
@@ -404,15 +406,6 @@ class CollapseFrame(QWidget):
         lay.addWidget(self.toggle_button)
         lay.addWidget(self.content_area)
 
-        self.toggle_animation.addAnimation(
-            QPropertyAnimation(self, b"minimumHeight")
-        )
-        self.toggle_animation.addAnimation(
-            QPropertyAnimation(self, b"maximumHeight")
-        )
-        self.toggle_animation.addAnimation(
-            QPropertyAnimation(self.content_area, b"maximumHeight")
-        )
 
     def updateText(self, text):
         self.toggle_button.setText(text)
@@ -423,33 +416,12 @@ class CollapseFrame(QWidget):
         self.toggle_button.setArrowType(
             Qt.DownArrow if not checked else Qt.RightArrow
         )
-        self.toggle_animation.setDirection(
-            QAbstractAnimation.Forward
-            if not checked
-            else QAbstractAnimation.Backward
-        )
-        self.toggle_animation.start()
+        self.content_area.setVisible(not checked)
 
     def setContentLayout(self, layout):
         lay = self.content_area.layout()
         del lay
         self.content_area.setLayout(layout)
-        collapsed_height = (
-            self.sizeHint().height() - self.content_area.maximumHeight()
-        )
-        content_height = layout.sizeHint().height()
-        for i in range(self.toggle_animation.animationCount()):
-            animation = self.toggle_animation.animationAt(i)
-            animation.setDuration(500)
-            animation.setStartValue(collapsed_height)
-            animation.setEndValue(collapsed_height + content_height)
-
-        content_animation = self.toggle_animation.animationAt(
-            self.toggle_animation.animationCount() - 1
-        )
-        content_animation.setDuration(500)
-        content_animation.setStartValue(0)
-        content_animation.setEndValue(content_height)
         
 class UpgradeDisplay(CollapseFrame):
     def __init__(self, parent, root: GCS):
@@ -484,6 +456,7 @@ class UpgradeDisplay(CollapseFrame):
         upgrade_btn.clicked.connect(lambda:self.sendUpgradeFile())
         self.__innerFrame.addWidget(upgrade_btn, 3, 0)
 
+        
         self.setContentLayout(self.__innerFrame)
         
     def fileDialogue(self):
@@ -531,9 +504,15 @@ class StatusDisplay(CollapseFrame):
         self.__innerFrame.addWidget(entr_overall_status, 1, 1)
         
         self.componentStatusWidget = ComponentStatusDisplay(root=self.__root)
-        self.__innerFrame.addWidget(self.componentStatusWidget, 0, 2)
+        h1 = self.componentStatusWidget.innerFrame.sizeHint().height()
+        self.__innerFrame.addWidget(self.componentStatusWidget, 2, 0, 1, 2)
 
         self.statusLabel = entr_overall_status
+        h2 = self.__innerFrame.sizeHint().height()
+        h3 = self.toggle_button.sizeHint().height()
+
+
+        self.content_height = h1 + h2 + h3 + h3
         self.setContentLayout(self.__innerFrame)
 
     def updateGUIOptionVars(self, scope=0):
@@ -617,7 +596,7 @@ class ComponentStatusDisplay(CollapseFrame):
         #self.__parent = parent
         self.__root = root
 
-        self.__innerFrame = None
+        self.innerFrame = None
 
         self.statusLabels = {}
 
@@ -627,44 +606,44 @@ class ComponentStatusDisplay(CollapseFrame):
         self.updateGUIOptionVars()
 
     def __createWidget(self):
-        self.__innerFrame = QGridLayout()
+        self.innerFrame = QGridLayout()
 
         lbl_sdr_status = QLabel('SDR Status')
-        self.__innerFrame.addWidget(lbl_sdr_status, 1, 0)
+        self.innerFrame.addWidget(lbl_sdr_status, 1, 0)
 
         lbl_dir_status = QLabel('Storage Status')
-        self.__innerFrame.addWidget(lbl_dir_status, 2, 0)
+        self.innerFrame.addWidget(lbl_dir_status, 2, 0)
 
         lbl_gps_status = QLabel('GPS Status')
-        self.__innerFrame.addWidget(lbl_gps_status, 3, 0)
+        self.innerFrame.addWidget(lbl_gps_status, 3, 0)
 
         lbl_sys_status = QLabel('System Status')
-        self.__innerFrame.addWidget(lbl_sys_status, 4, 0)
+        self.innerFrame.addWidget(lbl_sys_status, 4, 0)
 
         lbl_sw_status = QLabel('Software Status')
-        self.__innerFrame.addWidget(lbl_sw_status, 5, 0)
+        self.innerFrame.addWidget(lbl_sw_status, 5, 0)
 
         entr_sdr_status = QLabel('')
-        self.__innerFrame.addWidget(entr_sdr_status, 1, 1)
+        self.innerFrame.addWidget(entr_sdr_status, 1, 1)
 
         entr_dir_status = QLabel('')
-        self.__innerFrame.addWidget(entr_dir_status, 2, 1)
+        self.innerFrame.addWidget(entr_dir_status, 2, 1)
 
         entr_gps_status = QLabel('')
-        self.__innerFrame.addWidget(entr_gps_status, 3, 1)
+        self.innerFrame.addWidget(entr_gps_status, 3, 1)
 
         entr_sys_status = QLabel('')
-        self.__innerFrame.addWidget(entr_sys_status, 4, 1)
+        self.innerFrame.addWidget(entr_sys_status, 4, 1)
 
         entr_sw_status = QLabel('')
-        self.__innerFrame.addWidget(entr_sw_status, 5, 1)
+        self.innerFrame.addWidget(entr_sw_status, 5, 1)
 
         self.statusLabels["STS_sdrStatus"] = entr_sdr_status
         self.statusLabels["STS_dirStatus"] = entr_dir_status
         self.statusLabels["STS_gpsStatus"] = entr_gps_status
         self.statusLabels["STS_sysStatus"] = entr_sys_status
         self.statusLabels["STS_swStatus"] = entr_sw_status
-        self.setContentLayout(self.__innerFrame)
+        self.setContentLayout(self.innerFrame)
 
     def updateGUIOptionVars(self, scope=0):
         varDict = self.__root._mavModel.state
@@ -675,7 +654,7 @@ class ComponentStatusDisplay(CollapseFrame):
                 configOpts = configDict[str(varValue)]
                 self.statusLabels[varName].setText(configOpts['text'])
                 style = "background-color: %s" % configOpts['bg']
-                self.statusLabels.setStyleSheet(style)
+                self.statusLabels[varName].setStyleSheet(style)
             except KeyError:
                 continue
 
@@ -886,11 +865,16 @@ class SystemSettingsControl(CollapseFrame):
 
         self.updateGUIOptionVars()
 
-    def updateGUIOptionVars(self, scope=0):
+    def updateGUIOptionVars(self, scope=0, options=None):
+        if options is not None:
+            self.optionVars = options
         optionDict = self.__root._mavModel.getOptions(
             scope, timeout=self.__root.defaultTimeout)
         for optionName, optionValue in optionDict.items():
-            self.optionVars[optionName].setText(str(optionValue))
+            try:
+                self.optionVars[optionName].setText(str(optionValue))
+            except AttributeError:
+                print(optionName)
         self.update()
 
     def submitGUIOptionVars(self, scope: int):
@@ -940,7 +924,7 @@ class SystemSettingsControl(CollapseFrame):
 
 class ExpertSettingsDialog(QWizard):
     def __init__(self, parent, optionVars):
-        super(ExpertSettingsDialog, self).__init__()
+        super(ExpertSettingsDialog, self).__init__(parent)
         self.parent = parent
         self.addPage(ExpertSettingsDialogPage(self, optionVars))
         self.setWindowTitle('Expert/Engineering Settings')
@@ -952,9 +936,9 @@ class ExpertSettingsDialogPage(QWizardPage):
         self.__parent = parent
         self.optionVars = optionVars
 
-        # Configure member vars here
-        self.__parent.parent.updateGUIOptionVars(0xFF)
         self.__createWidget()
+        # Configure member vars here
+        self.__parent.parent.updateGUIOptionVars(0xFF, self.optionVars)
 
     def __createWidget(self):
         expSettingsFrame = QGridLayout()
