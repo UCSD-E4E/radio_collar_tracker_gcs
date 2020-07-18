@@ -155,6 +155,7 @@ class Events(Enum):
     NewPing = auto(),
     NewEstimate = auto(),
     UpgradeStatus = auto()
+    #ADDED
     VehicleInfo = auto()
 
 
@@ -246,6 +247,9 @@ class MAVModel:
             rctComms.EVENTS.GENERAL_NO_HEARTBEAT, self.__processNoHeartbeat)
         self.__rx.registerCallback(
             rctComms.EVENTS.DATA_PING, self.__processPing)
+        #ADDED
+        self.__rx.registerCallback(
+            rctComms.EVENTS.DATA_VEHICLE, self.__processVehicle)
 
     def start(self, guiTickCallback=None):
         '''
@@ -337,6 +341,8 @@ class MAVModel:
         '''
         assert(isinstance(event, Events))
         if event not in self.__callbacks:
+            print("in Core register")
+            print(callback)
             self.__callbacks[event] = [callback]
         else:
             self.__callbacks[event].append(callback)
@@ -525,6 +531,16 @@ class MAVModel:
                 callback()
 
     def __processVehicle(self, packet: rctComms.rctVehiclePacket, addr: str):
+        print("in processVehicle")
+        print(packet)
+        print('time')
+        print(packet.timestamp)
+        print(packet.lon)
+        print(packet.lat)
+        print(packet.alt)
+        print(packet.hdg)
+        print(addr)
+        print('\n')
         coordinate = [packet.lat, packet.lon. packet.alt, packet.hdg]
         self.state['VCL_track'][packet.timestamp] = coordinate
         for callback in self.__callbacks[Events.VehicleInfo]:

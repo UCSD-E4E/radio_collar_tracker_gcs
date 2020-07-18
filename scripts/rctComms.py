@@ -784,7 +784,7 @@ class EVENTS(enum.Enum):
     CONFIG_OPTIONS = 0x0202
     UPGRADE_STATUS = 0x0301
     DATA_PING = 0x0401
-    DATA_VEHCLE = 0x0402
+    DATA_VEHICLE = 0x0402
     COMMAND_ACK = 0x0501
     COMMAND_GETF = 0x0502
     COMMAND_SETF = 0x0503
@@ -876,7 +876,13 @@ class gcsComms:
                     packetCode = packet.getClassIDCode()
                     try:
                         for callback in self.__packetMap[packetCode]:
-                            callback(packet=packet, addr=addr)
+                            try:
+                                callback(packet=packet, addr=addr)
+                            except AttributeError:
+                                print ("error!")
+                                print(packetCode)
+                                print(self.__packetMap[packetCode])
+                                print(callback)
                     except KeyError:
                         for callback in self.__packetMap[EVENTS.GENERAL_UNKNOWN.value]:
                             callback(packet=packet, addr=addr)
@@ -955,6 +961,9 @@ class gcsComms:
             self.__packetMap[event.value].append(callback)
         else:
             self.__packetMap[event.value] = [callback]
+            print("in register")
+            print(callback)
+            print('\n')
 
     def unregisterCallback(self, event: EVENTS, callback):
         self.__packetMap[event.value].remove(callback)
@@ -1030,6 +1039,10 @@ class mavComms:
 
     def sendPing(self, ping: rctPingPacket):
         self.sendPacket(ping, None)
+
+    # ADDED
+    def sendVehicle(self, vehicle: rctVehiclePacket):
+        self.sendPacket(vehicle, None)
 
     def sendException(self, exception: str, traceback: str):
         packet = rctExceptionPacket(exception, traceback)
