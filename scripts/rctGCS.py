@@ -526,16 +526,9 @@ class UpgradeDisplay(CollapseFrame):
         browse_file_btn = tk.Button(self.__innerFrame, text='Browse for Upgrade File', command=self.fileDialogue)
         browse_file_btn.grid(row=2, column=0, sticky='new')
         
-        upgrade_btn = tk.Button(self.__innerFrame, text='Upgrade', command=self.sendUpgradeFile)
-        upgrade_btn.grid(row=3, column=0, sticky='new')
-        
     def fileDialogue(self):
         self.filename.set(str(askopenfilename()))
-        
-    def sendUpgradeFile(self):
-        file = open(self.filename.get(), "rb")
-        byteStream = file.read()
-        self.__root._mavModel.sendUpgradePacket(byteStream)
+        self.__root._mavModel.upgrade(self.filename)
         
     def updateGUIOptionVars(self):
         pass

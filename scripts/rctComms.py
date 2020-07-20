@@ -67,6 +67,7 @@ class CONFIG_ID(enum.Enum):
 
 class UPGRADE_ID(enum.Enum):
     STATUS = 0x01
+    PACKET = 0x02
 
 
 class DATA_ID(enum.Enum):
@@ -406,7 +407,7 @@ class rctUpgradePacket(rctBinaryPacket):
         self.numPacket = hex(numPacket)
         self.numTotal = hex(numTotal)
         self.fileBytes = fileBytes
-        self._payload = struct.pack('<BHHH', 0x01, numPacket, numTotal, len(fileBytes) + fileBytes) #TODO: fix this encoding
+        self._payload = struct.pack('<BHHHs', 0x01, numPacket, numTotal, len(fileBytes), fileBytes) #TODO: fix this encoding
     
     @classmethod
     def matches(cls, packetClass: int, packetID: int):
@@ -420,7 +421,7 @@ class rctUpgradePacket(rctBinaryPacket):
         if not cls.matches(pcls, pid):
             raise RuntimeError("Incorrect packet type")
         #TODO: fix decoding
-        _, numPacket, numTotal, bytesLen = struct.unpack('<BHHHH', payload[0x0000: 0x0007])
+        _, numPacket, numTotal, bytesLen = struct.unpack('<BHHH', payload[0x0000: 0x0007])
         fileBytes = payload[0x0007:0x0007 + bytesLen]
         return rctUpgradePacket(numPacket, numTotal, fileBytes)
 
@@ -719,6 +720,7 @@ class rctBinaryPacketFactory:
                  0x0201: rctFrequenciesPacket,
                  0x0202: rctOptionsPacket,
                  0x0301: rctUpgradeStatusPacket,
+                 0x0302: rctUpgradePacket,
                  0x0401: rctPingPacket,
                  0x0402: rctVehiclePacket,
                  0x0501: rctACKCommand,
@@ -783,6 +785,7 @@ class EVENTS(enum.Enum):
     CONFIG_FREQUENCIES = 0x0201
     CONFIG_OPTIONS = 0x0202
     UPGRADE_STATUS = 0x0301
+    UPGRADE_PACKET = 0x0302
     DATA_PING = 0x0401
     DATA_VEHCLE = 0x0402
     COMMAND_ACK = 0x0501

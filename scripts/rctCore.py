@@ -48,6 +48,8 @@ import logging
 import threading
 import ping
 import copy
+from rctComms import rctUpgradeStatusPacket
+from math import ceil
 
 
 class SDR_INIT_STATES(Enum):
@@ -246,6 +248,8 @@ class MAVModel:
             rctComms.EVENTS.GENERAL_NO_HEARTBEAT, self.__processNoHeartbeat)
         self.__rx.registerCallback(
             rctComms.EVENTS.DATA_PING, self.__processPing)
+        self.__rx.registerCallback(
+            rctComms.EVENTS.UPGRADE_STATUS, self.__processUpgradeStatus)
 
     def start(self, guiTickCallback=None):
         '''
@@ -315,9 +319,10 @@ class MAVModel:
             callback()
 
     def __processUpgradeStatus(self, packet: rctComms.rctUpgradeStatusPacket, addr: str):
+        print("Received upgrade status packet")
         self.PP_options['UPG_state'] = packet.state
         self.PP_options['UPG_msg'] = packet.msg
-        for callback in self.__callback[Events.UpgradeStatus]:
+        for callback in self.__callbacks[Events.UpgradeStatus]:
             callback()
 
     def stop(self):
@@ -504,16 +509,37 @@ class MAVModel:
         if not self.__ackVectors.pop(0x05)[1]:
             raise RuntimeError("SETOPT NACKED")
         
-    def sendUpgradePacket(self, byteStream): 
-        numPackets = -1
-        if (len(byteStream) % 1000) != 0:
-            numPackets = len(byteStream)/1000 + 1
-        else:
-            numPackets = len(byteStream)/1000
-        for i in range(0,numPackets):
-            startInd = i*1000
-            endInd = startInd + 1000
-            self.__rx.sendPacket(rctComms.rctUpgradePacket(i+1, numPackets, byteStream[startInd:endInd]))
+    def upgrade(self, filename):
+        event = threading.Event()
+        self.registerCallback(Events.UpgradeStatus, event.set)
+        self.__rx.sendPacket(rctComms.rctUPGRADECommand())
+        print("Sent upgrade command")
+        event.wait()
+        if self.PP_options['UPG_state'] == rctUpgradeStatusPacket.UPGRADE_READY:  
+            print("Ready to upgrade")
+            file = open(filename.get(), "rb")
+            byteStream = file.read() 
+            #splitting byteStream into 1k packets
+            #TODO: add ending packet 
+            numPackets = ceil(len(byteStream)/1000)
+            print("Value of numpackets: " + str(numPackets))
+            for i in range(0, numPackets):
+                startInd = i*1000
+                endInd = startInd + 1000
+                self.__rx.sendPacket(rctComms.rctUpgradePacket(i+1, numPackets, byteStream[startInd:endInd]))
+            print("Finished sending packets")
+            event.wait()
+            if self.PP_options['UPG_state'] == rctUpgradeStatusPacket.UPGRADE_PROGRESS:
+                #Process message and display to the user?
+                pass
+            elif self.PP_options['UPG_state'] == rctUpgradeStatusPacket.UPGRADE_FAILED:
+                #attempt process again? 
+                self.upgrade(filename)         
+        else: 
+            #there is an active mission, send appropriate message to user.
+            raise RuntimeError("Active mission. Cannot upgrade.")
+            return
+
 
     def __processPing(self, packet: rctComms.rctPingPacket, addr: str):
         ping = ping.rctPing.fromPacket(packet)

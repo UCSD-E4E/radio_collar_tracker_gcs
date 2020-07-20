@@ -51,7 +51,7 @@ from time import sleep
 from ping import rctPing
 import utm
 
-from rctComms import mavComms, rctBinaryPacket
+from rctComms import mavComms, rctBinaryPacket, rctUpgradeStatusPacket
 import rctComms
 import time
 
@@ -164,6 +164,9 @@ class droneSim:
 
         # HS - Heartbeat State parameters
         self.HS_run = True
+        
+        # UG - Upgrade payload 
+        self.UG_upgradePackets = []
 
         # register command actions here
         self.port.registerCallback(
@@ -180,6 +183,8 @@ class droneSim:
             rctComms.EVENTS.COMMAND_STOP, self.__doStopMission)
         self.port.registerCallback(
             rctComms.EVENTS.COMMAND_UPGRADE, self.__doUpgrade)
+        self.port.registerCallback(
+            rctComms.EVENTS.UPGRADE_PACKET, self.__processUpgradePacket)
 
     def reset(self):
         self.stop()
@@ -287,6 +292,8 @@ class droneSim:
             rctComms.EVENTS.COMMAND_STOP, self.__doStopMission)
         self.port.registerCallback(
             rctComms.EVENTS.COMMAND_UPGRADE, self.__doUpgrade)
+        self.port.registerCallback(
+            rctComms.EVENTS.UPGRADE_PACKET, self.__processUpgradePacket)
 
     def setGain(self, gain: float):
         self.PP_options['SDR_gain'] = gain
@@ -404,10 +411,31 @@ class droneSim:
         self.PP_options.update(packet.options)
         self.__doGetOptions(packet, addr)
         self.__ackCommand(packet)
+        
+    def __processUpgradePacket(self, packet: rctComms.rctUpgradePacket, addr: str):
+        print("Receiving packet callback.")
+        self.UG_upgradePackets.append(packet)
+        self.__upgradePacketEvent.set()
 
-    def __doUpgrade(self, commandPayload):
-        pass
-
+    def __doUpgrade(self, packet: rctComms.rctUpgradeStatusPacket, addr: str):
+        print("Received upgrade command")
+        if (self.__state['STS_sysStatus'] == 3) or (self.__state['STS_sysStatus'] == 4):
+            print("Not eligible")
+            self.port.sendToGCS(rctUpgradeStatusPacket(rctUpgradeStatusPacket.UPGRADE_FAILED, "Mission in progress."))
+        else:
+            print("Eligible")
+            self.port.sendToGCS(rctUpgradeStatusPacket(rctUpgradeStatusPacket.UPGRADE_READY, "Ready to upgrade."))
+        self.__upgradePacketEvent = threading.Event()
+        self.__upgradePacketEvent.wait()
+        print("Event thread registered first packet.")
+        numTotalPacketsExpected = self.UG_upgradePackets[0].numTotal
+        for i in range(numTotalPacketsExpected-1):
+            self.__upgradePacketEvent.clear()
+            self.__upgradePacketEvent.wait()
+            print("Event resuming after receiving packet beyond first one.")
+        if len(self.UG_upgradePackets) == numTotalPacketsExpected:
+            print("Received all expected packets!")
+            
     def __sender(self):
         while self.HS_run is True:
             packet = rctComms.rctHeartBeatPacket(self.__state['STS_sysStatus'],
