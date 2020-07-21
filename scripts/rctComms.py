@@ -876,13 +876,7 @@ class gcsComms:
                     packetCode = packet.getClassIDCode()
                     try:
                         for callback in self.__packetMap[packetCode]:
-                            try:
                                 callback(packet=packet, addr=addr)
-                            except AttributeError:
-                                print ("error!")
-                                print(packetCode)
-                                print(self.__packetMap[packetCode])
-                                print(callback)
                     except KeyError:
                         for callback in self.__packetMap[EVENTS.GENERAL_UNKNOWN.value]:
                             callback(packet=packet, addr=addr)
@@ -961,9 +955,6 @@ class gcsComms:
             self.__packetMap[event.value].append(callback)
         else:
             self.__packetMap[event.value] = [callback]
-            print("in register")
-            print(callback)
-            print('\n')
 
     def unregisterCallback(self, event: EVENTS, callback):
         self.__packetMap[event.value].remove(callback)

@@ -65,7 +65,6 @@ import rctTransport
 import rctComms
 import rctCore
 from PyQt5.QtCore import *
-from PyQt5.QtWebEngineWidgets import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5 import QtNetwork
@@ -105,6 +104,8 @@ class GCS(QMainWindow):
         self.targEntries = {}
         self.mapControl = None
         self.mapOptions = None
+        self.mapDisplay = None
+        self.mainThread = None
         self.testFrame = None
         self.__createWidgets()
         for button in self._buttons:
@@ -161,11 +162,17 @@ class GCS(QMainWindow):
         '''
         Internal Callback for Vehicle Info
         '''
+        print("here")
         if self._mavModel == None:
             return
-        print("here")
-        print(self._mavModel.state['VCL_track'])
-        print(lastPos)
+        last = list(self._mavModel.state['VCL_track'])[-1]
+        coord = self._mavModel.state['VCL_track'][last]
+
+        if self.mapDisplay is not None:
+            self.mapDisplay.plotVehicle(coord)
+            self.mapDisplay.moveToThread(self.mainThread)
+            self.mapDisplay.canvas.refresh()
+            #addedPoint.show()
 
 
 
@@ -308,12 +315,14 @@ class GCS(QMainWindow):
         self.systemSettingsWidget.updateGUIOptionVars()
         self.statusWidget.updateGUIOptionVars()
 
-
+    def setMap(self, mapWidget):
+        self.mapDisplay = mapWidget
 
     def __createWidgets(self):
         '''
         Internal helper to make GUI widgets
         '''
+        self.mainThread = QThread.currentThread()
 
         holder = QGridLayout()
         centr_widget = QFrame()
@@ -1241,6 +1250,7 @@ class MapControl(CollapseFrame):
                 p2lat, p2lon, False)
         self.__mapFrame.resize(800, 500)
         self.__mapOptions.setMap(self.__mapFrame, True)
+        self.__root.setMap(self.__mapFrame)
 
     def __loadCachedMap(self):
         p1lat = float(self.__p1latEntry.text())
@@ -1252,12 +1262,14 @@ class MapControl(CollapseFrame):
                 p2lat, p2lon, True)
         self.__mapFrame.resize(800, 500)
         self.__mapOptions.setMap(self.__mapFrame, True)
+        self.__root.setMap(self.__mapFrame)
 
     def __loadMapFile(self):
         self.__mapFrame.setParent(None)
         self.__mapFrame = StaticMap(self.__holder)
         self.__mapFrame.resize(800, 500)
         self.__mapOptions.setMap(self.__mapFrame, False)
+        self.__root.setMap(self.__mapFrame)
 
 
 
@@ -1330,10 +1342,19 @@ class MapWidget(QWidget):
         QWidget.__init__(self)
         self.holder = QVBoxLayout()
         self.layer = None
+        self.vehicle = None
         self.toolbar = QToolBar()
         self.canvas = QgsMapCanvas()
         self.canvas.setCanvasColor(Qt.white)
 
+        self.transformToWeb = QgsCoordinateTransform(
+                QgsCoordinateReferenceSystem("EPSG:4326"),
+                QgsCoordinateReferenceSystem("EPSG:3857"), 
+                QgsProject.instance())
+        self.transform = QgsCoordinateTransform(
+                QgsCoordinateReferenceSystem("EPSG:3857"), 
+                QgsCoordinateReferenceSystem("EPSG:4326"),
+                QgsProject.instance())
 
     def adjustCanvas(self):
         self.canvas.setExtent(self.layer.extent())  
@@ -1380,6 +1401,22 @@ class MapWidget(QWidget):
 
     def pan(self):
         self.canvas.setMapTool(self.toolPan)
+
+    def plotVehicle(self, coord):
+        lat = coord[0]
+        lon = coord[1]
+        point = self.transformToWeb.transform(QgsPointXY(lon, lat))
+        if self.vehicle is None:
+            self.vehicle = QgsVertexMarker(self.canvas)
+            self.vehicle.setCenter(point)
+            self.vehicle.setColor(QColor(255,0, 0)) 
+            self.vehicle.setIconSize(10)
+            self.vehicle.setIconType(QgsVertexMarker.ICON_X)
+            self.vehicle.setPenWidth(3)
+        else:
+            self.vehicle.setCenter(point)
+        self.vehicle.show()
+
         
 class MapOptions(QWidget):
 
@@ -1463,15 +1500,6 @@ class WebMap(MapWidget):
 
         self.loadCached = loadCached
 
-        self.transformToWeb = QgsCoordinateTransform(
-                QgsCoordinateReferenceSystem("EPSG:4326"),
-                QgsCoordinateReferenceSystem("EPSG:3857"), 
-                QgsProject.instance())
-        self.transform = QgsCoordinateTransform(
-                QgsCoordinateReferenceSystem("EPSG:3857"), 
-                QgsCoordinateReferenceSystem("EPSG:4326"),
-                QgsProject.instance())
-
         
         self.addLayers()
         self.adjustCanvas()
@@ -1489,6 +1517,7 @@ class WebMap(MapWidget):
 
         root.addWidget(self, 0, 1, 1, 2)
         self.root = root
+        #QTimer.singleShot(500, lambda:self.canvas.refresh())
 
     def addLayers(self):
         if self.loadCached:
@@ -1536,13 +1565,6 @@ class WebMap(MapWidget):
             print("Rectangle:", r.xMinimum(),
                     r.yMinimum(), r.xMaximum(), r.yMaximum()
                  )
-            m1 = QgsVertexMarker(self.canvas)
-            m1.setCenter(QgsPointXY(rect.xMinimum(),rect.yMinimum()))
-            m1.setColor(QColor(255,0, 0)) #(R,G,B)
-            m1.setIconSize(10)
-            m1.setIconType(QgsVertexMarker.ICON_X)
-            m1.setPenWidth(3)
-            m1.show()
             
             if (r != None):
                 zoomStart = 17

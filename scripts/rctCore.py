@@ -531,17 +531,7 @@ class MAVModel:
                 callback()
 
     def __processVehicle(self, packet: rctComms.rctVehiclePacket, addr: str):
-        print("in processVehicle")
-        print(packet)
-        print('time')
-        print(packet.timestamp)
-        print(packet.lon)
-        print(packet.lat)
-        print(packet.alt)
-        print(packet.hdg)
-        print(addr)
-        print('\n')
-        coordinate = [packet.lat, packet.lon. packet.alt, packet.hdg]
+        coordinate = [packet.lat, packet.lon, packet.alt, packet.hdg]
         self.state['VCL_track'][packet.timestamp] = coordinate
         for callback in self.__callbacks[Events.VehicleInfo]:
             callback()
