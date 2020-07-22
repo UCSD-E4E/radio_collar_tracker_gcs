@@ -51,7 +51,7 @@ from time import sleep
 from ping import rctPing
 import utm
 
-from rctComms import mavComms, rctBinaryPacket, rctUpgradeStatusPacket
+from rctComms import mavComms, rctBinaryPacket, rctUpgradeStatusPacket, rctUpgradePacket
 import rctComms
 import time
 
@@ -418,14 +418,20 @@ class droneSim:
         self.__upgradePacketEvent.set()
 
     def __doUpgrade(self, packet: rctComms.rctUpgradeStatusPacket, addr: str):
+        upgradeThread = threading.Thread(target=self.__doUpgradeHelper())
+        upgradeThread.start()
+        
+    def __doUpgradeHelper(self):
         print("Received upgrade command")
         if (self.__state['STS_sysStatus'] == 3) or (self.__state['STS_sysStatus'] == 4):
             print("Not eligible")
             self.port.sendToGCS(rctUpgradeStatusPacket(rctUpgradeStatusPacket.UPGRADE_FAILED, "Mission in progress."))
+            return
         else:
             print("Eligible")
             self.port.sendToGCS(rctUpgradeStatusPacket(rctUpgradeStatusPacket.UPGRADE_READY, "Ready to upgrade."))
         self.__upgradePacketEvent = threading.Event()
+        print("Event is initialized and about to wait.")
         self.__upgradePacketEvent.wait()
         print("Event thread registered first packet.")
         numTotalPacketsExpected = self.UG_upgradePackets[0].numTotal
@@ -618,3 +624,5 @@ if __name__ == '__main__':
         __IPYTHON__
     except NameError:
         sim.start()
+        while(True):
+            i = 0

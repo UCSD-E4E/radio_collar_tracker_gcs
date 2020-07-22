@@ -408,7 +408,7 @@ class rctUpgradePacket(rctBinaryPacket):
         self.numTotal = hex(numTotal)
         self.fileBytes = fileBytes
         self._payload = struct.pack('<BHHHs', 0x01, numPacket, numTotal, len(fileBytes), fileBytes) #TODO: fix this encoding
-    
+        
     @classmethod
     def matches(cls, packetClass: int, packetID: int):
         return packetClass == 0x03 and packetID == 0x02

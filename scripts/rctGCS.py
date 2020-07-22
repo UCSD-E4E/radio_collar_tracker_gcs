@@ -1222,7 +1222,7 @@ if __name__ == '__main__':
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
     ch = logging.StreamHandler(sys.stdout)
-    ch.setLevel(logging.WARNING)
+    ch.setLevel(logging.INFO)
     formatter = logging.Formatter(
         '%(asctime)s.%(msecs)03d: %(levelname)s:%(name)s: %(message)s', datefmt='%Y-%M-%d %H:%m:%S')
     ch.setFormatter(formatter)

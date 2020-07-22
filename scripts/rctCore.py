@@ -156,7 +156,7 @@ class Events(Enum):
     NoHeartbeat = auto(),
     NewPing = auto(),
     NewEstimate = auto(),
-    UpgradeStatus = auto()
+    UpgradeStatus = auto(),
     VehicleInfo = auto()
 
 
