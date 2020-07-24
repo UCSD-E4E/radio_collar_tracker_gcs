@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 07/23/20  NH  Initial docstrings
 # 05/23/20  NH  Moved heartbeat watchdog timeout to parameter
 # 05/21/20  NH  Refactored options information into own class
 # 05/20/20  NH  Fixed SYS_autostart type in SETOPT command, added exception
@@ -48,6 +49,9 @@ import traceback
 
 
 class PACKET_CLASS(enum.Enum):
+    '''
+    Valid Packet Classes
+    '''
     STATUS = 0x01
     CONFIGURATION = 0x02
     UPGRADE = 0x03
@@ -56,25 +60,40 @@ class PACKET_CLASS(enum.Enum):
 
 
 class STATUS_ID(enum.Enum):
+    '''
+    Status Packet IDs
+    '''
     HEARTBEAT = 0x01
     EXCEPTION = 0x02
 
 
 class CONFIG_ID(enum.Enum):
+    '''
+    Configuration Packet IDs
+    '''
     FREQUENCIES = 0x01
     OPTIONS = 0x01
 
 
 class UPGRADE_ID(enum.Enum):
+    '''
+    Upgrade Packet IDs
+    '''
     STATUS = 0x01
 
 
 class DATA_ID(enum.Enum):
+    '''
+    Data Packet IDs
+    '''
     PING = 0x01
     VEHICLE = 0x02
 
 
 class COMMAND_ID(enum.Enum):
+    '''
+    Command Packet IDs
+    '''
     ACK = 0x01
     GETF = 0x02
     SETF = 0x03
@@ -86,16 +105,26 @@ class COMMAND_ID(enum.Enum):
 
 
 class OPTIONS_SCOPE:
+    '''
+    Options Packet Values
+    '''
+    
+    ## Base Options
     BASE_OPTIONS = 0x00
-    EXP_OPTIONS = 0x01
-    ENG_OPTIONS = 0xFF
-
     _baseOptionKeywords = ['SDR_centerFreq', 'SDR_samplingFreq', 'SDR_gain']
+
+    ## Expert Options
+    EXP_OPTIONS = 0x01
     _expOptionKeywords = ['DSP_pingWidth', 'DSP_pingSNR',
                           'DSP_pingMax', 'DSP_pingMin', 'SYS_outputDir']
+
+    ## Engineering Options
+    ENG_OPTIONS = 0xFF
     _engOptionKeywords = ['GPS_mode',
                           'GPS_baud', 'GPS_device', 'SYS_autostart']
 
+    ## Keyword Types.  The associated tuples are python type, struct pack format
+    # character, and number of bytes.
     _keywordTypes = {
         'SDR_centerFreq': (int, '<L', 4),
         'SDR_samplingFreq': (int, '<L', 4),
