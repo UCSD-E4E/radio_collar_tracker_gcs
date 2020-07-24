@@ -20,6 +20,7 @@
 #
 # DATE      WHO DESCRIPTION
 # -----------------------------------------------------------------------------
+# 07/23/20  NH  Added docstring for base class
 # 05/25/20  NH  Started docstrings
 # 05/20/20  NH  Fixed select condition in TCP clients
 # 05/18/20  NH  Removed unused enumerations
@@ -41,23 +42,69 @@ class RCTAbstractTransport(abc.ABC):
     '''
     @abc.abstractmethod
     def __init__(self):
-        pass
+        '''
+        Constructor for the RCTAbstractTransport class.  This constructor shall
+        provision resources for the port, but it shall not open the port.  That
+        is, other processes must be able to access the port after this function
+        returns.
+        '''
 
     @abc.abstractmethod
     def open(self):
-        pass
+        '''
+        Opens the port represented by the RCTAbstractTransport class.  After
+        this function returns, the port shall be owned by this process and be
+        capable of sending and receiving data.  Failure to open the port shall
+        result in an Exception being thrown.
+        '''
 
     @abc.abstractmethod
     def receive(self, bufLen: int, timeout: int=None):
-        pass
+        '''
+        Receives data from the port.  This function shall attempt to retrieve at
+        most buflen bytes from the port within timeout seconds.
+        
+        If there is less than buflen bytes available when this function is 
+        called, the function shall return all available bytes immediately.  If 
+        there are  more than buflen bytes available when this function is 
+        called, the function shall return exactly buflen bytes.  If there is no 
+        data available when this function is called, this function shall wait at
+        most timeout seconds.  If any data arrives within timeout seconds, that 
+        data shall be immediately returned.  If no data arrives, the function 
+        shall raise an Exception.
+        
+        This function shall return a tuple containing two elements.  The first
+        element shall be a bytes object containing the data received.  The 
+        second element shall be a string denoting the originating machine.
+        
+        Making a call to this function when the port is not open shall result in
+        an Exception.
+        
+        :param bufLen:    Maximum number of bytes to return
+        :param timeout:    Maximum number of seconds to wait for data
+        '''
 
     @abc.abstractmethod
     def send(self, data: bytes, dest):
-        pass
+        '''
+        Sends data to the specified destination from the port.  This function
+        shall transmit the provided data to the specified destination.
+        
+        This function shall block until all data is transmitted.
+        
+        :param data:    Data to transmit
+        :param dest:    Destination to route data to
+        '''
 
     @abc.abstractmethod
     def close(self):
-        pass
+        '''
+        Closes the underlying port.  This function shall release the underlying
+        port to be used by other processes.  Calling this function on a port
+        that is already closed shall not result in an Exception.  Subsequent
+        calls to open() shall not fail if the port is available for this process
+        to own.
+        '''
 
 
 class RCTUDPClient(RCTAbstractTransport):
@@ -71,7 +118,10 @@ class RCTUDPClient(RCTAbstractTransport):
         self.__socket.bind(("", self.__port))
 
     def close(self):
-        self.__socket.close()
+        try:
+            self.__socket.close()
+        except:
+            pass
 
     def receive(self, bufLen: int, timeout: int=None):
         ready = select.select([self.__socket], [], [], timeout)
