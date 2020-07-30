@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 07/29/20  NH  Added isOpen to mavComms
 # 07/23/20  NH  Initial docstrings
 # 05/23/20  NH  Moved heartbeat watchdog timeout to parameter
 # 05/21/20  NH  Refactored options information into own class
@@ -1030,6 +1031,9 @@ class mavComms:
         }
 
         self.__parser = rctBinaryPacketFactory()
+        
+    def isOpen(self):
+        return self.__port.isOpen()
 
     def start(self):
         self.__log.info('RCT mavComms starting...')

@@ -20,6 +20,7 @@
 #
 # DATE      WHO DESCRIPTION
 # -----------------------------------------------------------------------------
+# 07/29/20  NH  Added isOpen method for all classes
 # 07/23/20  NH  Added docstring for base class
 # 05/25/20  NH  Started docstrings
 # 05/20/20  NH  Fixed select condition in TCP clients
@@ -105,6 +106,13 @@ class RCTAbstractTransport(abc.ABC):
         calls to open() shall not fail if the port is available for this process
         to own.
         '''
+        
+    @abc.abstractmethod
+    def isOpen(self):
+        '''
+        Returns True if the port is open, False otherwise
+        '''
+        
 
 
 class RCTUDPClient(RCTAbstractTransport):
@@ -122,6 +130,7 @@ class RCTUDPClient(RCTAbstractTransport):
             self.__socket.close()
         except:
             pass
+        self.__socket = None
 
     def receive(self, bufLen: int, timeout: int=None):
         ready = select.select([self.__socket], [], [], timeout)
@@ -133,6 +142,9 @@ class RCTUDPClient(RCTAbstractTransport):
 
     def send(self, data: bytes, dest):
         self.__socket.sendto(data, (dest, self.__port))
+        
+    def isOpen(self):
+        return self.__socket is not None
 
 
 class RCTUDPServer(RCTAbstractTransport):
@@ -148,7 +160,11 @@ class RCTUDPServer(RCTAbstractTransport):
         self.__socket.bind(("", self.__port))
 
     def close(self):
-        self.__socket.close()
+        try:
+            self.__socket.close()
+        except:
+            pass
+        self.__socket = None
 
     def receive(self, bufLen: int, timeout: int = None):
         ready = select.select([self.__socket], [], [], timeout)
@@ -162,11 +178,15 @@ class RCTUDPServer(RCTAbstractTransport):
         if dest is None:
             dest = '255.255.255.255'
         self.__socket.sendto(data, (dest, self.__port))
+        
+    def isOpen(self):
+        return self.__socket is not None
 
 
 class RCTPipeClient(RCTAbstractTransport):
     def __init__(self):
-        pass
+        self.__inFile = None
+        self.__outFile = None
 
     def open(self):
         if not os.path.exists("/tmp/rctClient2Simulator"):
@@ -179,7 +199,8 @@ class RCTPipeClient(RCTAbstractTransport):
         self.__outFile = open('/tmp/rctClient2Simulator', 'wb')
 
     def close(self):
-        pass
+        self.__inFile = None
+        self.__outFile = None
 
     def receive(self, bufLen: int, timeout: int = None):
         pass
@@ -187,6 +208,8 @@ class RCTPipeClient(RCTAbstractTransport):
     def send(self, data: bytes, dest):
         pass
 
+    def isOpen(self):
+        return self.__inFile is not None and self.__outFile is not None
 
 class RCTTCPClient(RCTAbstractTransport):
     def __init__(self, port: int, addr: str):
@@ -199,7 +222,11 @@ class RCTTCPClient(RCTAbstractTransport):
         self.__socket.connect(self.__target)
 
     def close(self):
-        self.__socket.shutdown(socket.SHUT_RDWR)
+        try:
+            self.__socket.shutdown(socket.SHUT_RDWR)
+        except:
+            pass
+        self.__socket = None
 
     def receive(self, bufLen: int, timeout: int=None):
         ready = select.select([self.__socket], [], [], timeout)
@@ -211,7 +238,9 @@ class RCTTCPClient(RCTAbstractTransport):
 
     def send(self, data: bytes, dest=None):
         self.__socket.send(data)
-
+    
+    def isOpen(self):
+        return self.__socket is not None
 
 class RCTTCPServer(RCTAbstractTransport):
     def __init__(self, port: int):
@@ -227,7 +256,11 @@ class RCTTCPServer(RCTAbstractTransport):
         self.__conn, self.__addr = self.__socket.accept()
 
     def close(self):
-        self.__socket.close()
+        try:
+            self.__socket.close()
+        except:
+            pass
+        self.__socket = None
 
     def receive(self, bufLen: int, timeout: int=None):
         ready = select.select([self.__conn], [], [], timeout)
@@ -239,3 +272,6 @@ class RCTTCPServer(RCTAbstractTransport):
 
     def send(self, data: bytes, dest=None):
         self.__conn.send(data)
+
+    def isOpen(self):
+        return self.__socket is not None
