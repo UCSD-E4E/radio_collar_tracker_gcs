@@ -126,7 +126,7 @@ class droneSim:
         self.SM_targetThreshold = 5
         self.SM_loopPeriod = 0.1
         self.SM_TakeoffVel = 5
-        self.SM_WPVel = 5
+        self.SM_WPVel = 35
         self.SM_RTLVel = 20
         self.SM_LandVel = 1
 
@@ -239,7 +239,7 @@ class droneSim:
 
         # SC - Simulation Communications parameters
         self.SC_VehiclePositionMsgPeriod = 1
-        self.SC_PingMeasurementPeriod = 1
+        self.SC_PingMeasurementPeriod = 0.5
         self.SC_PingMeasurementSigma = 0
         self.SC_HeartbeatPeriod = 5
 
@@ -251,8 +251,8 @@ class droneSim:
         self.SP_Exponent = 2.5
         self.SP_ExponentSigma = 0
         self.SP_Position = (478110, 3638661, 0)
-        self.SP_NoiseFloor = 90
-        self.SP_NoiseFloorSigma = 0
+        self.SP_NoiseFloor = 5
+        self.SP_NoiseFloorSigma = 10
         self.SP_TxFreq = 173500000
 
         # SV - Simulation Vehicle parameters
@@ -348,7 +348,7 @@ class droneSim:
         print("Ping on %d at %3.7f, %3.7f, %3.0f m, measuring %3.3f" %
               (dronePing.freq, dronePing.lat, dronePing.lon, dronePing.alt, dronePing.amplitude))
         packet = dronePing.toPacket()
-        self.port.sendToAll(packet)
+        self.port.sendPing(packet)
 
     def setSystemState(self, system: str, state):
         self.__state[system] = state
@@ -433,7 +433,7 @@ class droneSim:
         alt = self.SS_vehiclePosition[2]
         hdg = 0
         packet = rctComms.rctVehiclePacket(lat, lon, alt, hdg)
-        self.port.sendToAll(packet)
+        self.port.sendVehicle(packet)# WAS .sendToAll
 
     def doMission(self, returnOnEnd: bool = False):
 
@@ -513,11 +513,16 @@ class droneSim:
             if (curTime - prevPingTime).total_seconds() > self.SC_PingMeasurementPeriod:
                 pingMeasurement = self.calculatePingMeasurement()
                 if pingMeasurement is not None:
+                    print("in Ping Measurement")
                     lat, lon = utm.to_latlon(
                         self.SS_vehiclePosition[0], self.SS_vehiclePosition[1], self.SM_utmZoneNum, self.SM_utmZone)
                     newPing = rctPing(
                         lat, lon, pingMeasurement[0], pingMeasurement[1], self.SS_vehiclePosition[2], curTime.timestamp())
+                    '''
                     if self.SS_payloadRunning:
+                        self.gotPing(newPing)
+                    '''
+                    if newPing is not None:
                         self.gotPing(newPing)
                 prevPingTime = curTime
 
@@ -528,20 +533,25 @@ class droneSim:
 
     def calculatePingMeasurement(self):
         # check against frequencies
+        '''
         if abs(self.SP_TxFreq - self.PP_options['SDR_centerFreq']) > self.PP_options['SDR_samplingFreq']:
             return None
 
         if self.SP_TxFreq not in self.PP_options['TGT_frequencies']:
             return None
-
+        '''
         # vehicle is correctly configured
         l_rx = np.array(self.SS_vehiclePosition)
         l_tx = np.array(self.SP_Position)
-        P_tx = self.SP_TxPower
+        rand = np.random.normal(scale=self.SP_TxPowerSigma)
+        P_tx = self.SP_TxPower + rand
         n = self.SP_Exponent
         C = self.SP_SystemLoss
         f_tx = self.SP_TxFreq
-        P_n = self.SP_NoiseFloor
+        randN = np.random.normal(scale=self.SP_NoiseFloorSigma)#added
+        P_n = self.SP_NoiseFloor + randN
+        print(randN)
+        print(P_n)
 
         d = np.linalg.norm(l_rx - l_tx)
 
@@ -551,9 +561,106 @@ class droneSim:
 
         # implement noise floor
         if Prx < P_n:
-            measurement = None
+           measurement = None
 
         return measurement
+
+
+    def exportSettings(self, filename):
+        f = open("../../logs/"+filename+".txt", "a")
+        f.write('Command Map:')
+        f.write(str(self.__commandMap))
+        f.write('\n')
+
+        f.write('State:')
+        f.write(str(self.__state ))
+        f.write('\n')
+
+        f.write(str(self.PP_options ))
+        f.write('\n')
+        f.write(str(self.SM_missionRun ))
+        f.write('\n')
+
+        f.write(str(self.SM_utmZoneNum)) 
+        f.write('\n')
+        f.write(str(self.SM_utmZone)) 
+        f.write('\n')
+        f.write(str(self.SM_origin))
+        f.write('\n')
+        f.write(str(self.SM_TakeoffTarget)) 
+        f.write('\n')
+        f.write(str(self.SM_waypoints ))
+        f.write('\n')
+        f.write(str(self.SM_targetThreshold)) 
+        f.write('\n')
+        f.write(str(self.SM_loopPeriod ))
+        f.write('\n')
+        f.write(str(self.SM_TakeoffVel)) 
+        f.write('\n')
+        f.write(str(self.SM_WPVel ))
+        f.write('\n')
+        f.write(str(self.SM_RTLVel))
+        f.write('\n')
+        f.write(str(self.SM_LandVel))
+        f.write('\n')
+
+        f.write(str(self.SC_VehiclePositionMsgPeriod))
+        f.write('\n')
+        f.write(str(self.SC_PingMeasurementPeriod ))
+        f.write('\n')
+        f.write(str(self.SC_PingMeasurementSigma ))
+        f.write('\n')
+        f.write(str(self.SC_HeartbeatPeriod ))
+        f.write('\n')
+
+        f.write(str(self.SP_TxPower ))
+        f.write('\n')
+        f.write(str(self.SP_TxPowerSigma)) 
+        f.write('\n')
+        f.write(str(self.SP_SystemLoss ))
+        f.write('\n')
+        f.write(str(self.SP_SystemLossSigma ))
+        f.write('\n')
+        f.write(str(self.SP_Exponent ))
+        f.write('\n')
+        f.write(str(self.SP_ExponentSigma)) 
+        f.write('\n')
+        f.write(str(self.SP_Position ))
+        f.write('\n')
+        f.write(str(self.SP_NoiseFloor))
+        f.write('\n')
+        f.write('Noise Floor Sigma:')
+        f.write(str(self.SP_NoiseFloorSigma ))
+        f.write('\n')
+        f.write(str(self.SP_TxFreq ))
+        f.write('\n')
+
+        f.write(str(self.SV_vehiclePositionSigma)) 
+        f.write('\n')
+
+        f.write(str(self.SS_utmZoneNum)) 
+        f.write('\n')
+        f.write(str(self.SS_utmZone ))
+        f.write('\n')
+        f.write(str(self.SS_vehiclePosition ))
+        f.write('\n')
+        f.write(str(self.SS_vehicleState))
+        f.write('\n')
+        f.write(str(self.SS_startTime ))
+        f.write('\n')
+        f.write(str(self.SS_velocityVector)) 
+        f.write('\n')
+        f.write(str(self.SS_vehicleTarget)) 
+        f.write('\n')
+        f.write(str(self.SS_waypointIdx ))
+        f.write('\n')
+        f.write(str(self.SS_payloadRunning ))
+        f.write('\n')
+
+        f.write(str(self.HS_run ))
+        f.write('\n')
+        f.close()
+
 
 
 if __name__ == '__main__':

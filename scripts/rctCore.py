@@ -155,7 +155,6 @@ class Events(Enum):
     NewPing = auto(),
     NewEstimate = auto(),
     UpgradeStatus = auto()
-    #ADDED
     VehicleInfo = auto()
 
 
@@ -247,7 +246,6 @@ class MAVModel:
             rctComms.EVENTS.GENERAL_NO_HEARTBEAT, self.__processNoHeartbeat)
         self.__rx.registerCallback(
             rctComms.EVENTS.DATA_PING, self.__processPing)
-        #ADDED
         self.__rx.registerCallback(
             rctComms.EVENTS.DATA_VEHICLE, self.__processVehicle)
 
@@ -522,8 +520,8 @@ class MAVModel:
             self.__rx.sendPacket(rctComms.rctUpgradePacket(i+1, numPackets, byteStream[startInd:endInd]))
 
     def __processPing(self, packet: rctComms.rctPingPacket, addr: str):
-        ping = ping.rctPing.fromPacket(packet)
-        estimate = self.EST_mgr.addPing(ping)
+        newping = ping.rctPing.fromPacket(packet)
+        estimate = self.EST_mgr.addPing(newping)
         for callback in self.__callbacks[Events.NewPing]:
             callback()
         if estimate is not None:

@@ -1031,7 +1031,6 @@ class mavComms:
     def sendPing(self, ping: rctPingPacket):
         self.sendPacket(ping, None)
 
-    # ADDED
     def sendVehicle(self, vehicle: rctVehiclePacket):
         self.sendPacket(vehicle, None)
 

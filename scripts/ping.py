@@ -32,6 +32,7 @@ import numpy as np
 from scipy.optimize import least_squares
 import utm
 import rctComms
+import time
 
 
 class rctPing:
@@ -42,11 +43,16 @@ class rctPing:
         self.freq = freq
         self.alt = alt
         self.time = dt.datetime.fromtimestamp(time)
+        self.zone = None
+        self.let = None
 
     def toNumpy(self):
         # X, Y, Z, A
         easting, northing, _, _ = utm.from_latlon(self.lat, self.lon)
-        return np.array([easting, northing, self.alt, 20 * np.log10(self.amplitude)])
+        u = utm.from_latlon(self.lat, self.lon)
+        return np.array([easting, northing, self.alt, 20 * np.log10(self.amplitude), self.amplitude, u])
+    
+    
 
     def toDict(self):
         d = {}
@@ -85,20 +91,33 @@ class rctPing:
         alt = packet.alt
         amp = packet.txp
         freq = packet.txf
-        time = packet.timestamp
-        return rctPing(lat, lon, amp, freq, alt, time)
+        t = packet.timestamp
+        tup = t.timetuple()
+        tim = time.mktime(tup)
+        return rctPing(lat, lon, amp, freq, alt, tim)
 
 
 class DataManager:
     def __init__(self):
         self.__estimators = {}
+        self.zone = None
+        self.let = None
 
     def addPing(self, ping: rctPing):
         pingFreq = ping.freq
         if pingFreq not in self.__estimators:
             self.__estimators[pingFreq] = LocationEstimator()
         self.__estimators[pingFreq].addPing(ping)
+        
+        if self.zone == None:
+            self.setZone(ping.lat, ping.lon)
+        
         return self.__estimators[pingFreq].doEstimate()
+    
+    def setZone(self, lat, lon):
+        _, _, zone, let = utm.from_latlon(lat, lon)
+        self.zone = zone
+        self.let = let
 
     def getEstimate(self, frequency: int):
         estimator = self.__estimators[frequency]
@@ -118,6 +137,9 @@ class DataManager:
         '''
         estimator = self.__estimators[frequency]
         return estimator.getPings()
+    
+    def getUTMZone(self):
+        return self.zone, self.let
 
 
 class LocationEstimator:
@@ -151,14 +173,16 @@ class LocationEstimator:
             # Location is average of current measurements
             # Power is max of measurements
             # N_0 = 4
-            X_tx_0 = np.mean(pings[:, 0])
-            Y_tx_0 = np.mean(pings[:, 1])
-            P_tx_0 = np.max(pings[:, 3])
-            n_0 = 2
+
+            X_tx_0 = np.mean(pings[:, 0])#0
+            Y_tx_0 = np.mean(pings[:, 1])#1
+            P_tx_0 = np.max(pings[:, 3])#3
+            n_0 = 4
             self.__params = np.array([X_tx_0, Y_tx_0, P_tx_0, n_0])
-        res_x = least_squares(self.__residuals, self.__params, bounds=(
-            [0, 167000, -np.inf, 2], [10000000, 833000, np.inf, np.inf]))
-        # bounds=([0, 167000, -np.inf, 2], [10000000, 833000, np.inf, 6]),
+        res_x = least_squares(self.__residuals, self.__params, 
+            bounds=([0, 167000, -np.inf, 2], [833000, 10000000, np.inf, 6]))
+            #bounds=([0, 167000, -np.inf, 2], [833000, 10000000, np.inf, np.inf]))
+
         if res_x.success:
             self.__params = res_x.x
             self.__staleEstimate = False
@@ -170,12 +194,15 @@ class LocationEstimator:
         return self.__params, self.__staleEstimate
 
     def dToPrx(self, pingVector: np.ndarray, paramVector: np.ndarray):
-        l_rx = pingVector[0:3]
+        l_rx = np.array(pingVector[0:3])
         l_tx = np.array([paramVector[0], paramVector[1], 0])
         P_tx = paramVector[2]
         n = paramVector[3]
+        
 
         d = np.linalg.norm(l_rx - l_tx)
+        
+        
         if d < 0.01:
             d = 0.01
 
@@ -199,10 +226,12 @@ class LocationEstimator:
     def getEstimate(self):
         if self.__params is None:
             return None
-        return self.__params, self.__staleEstimate
+        return self.__params, self.__staleEstimate, self.result
 
     def _getComparator(self):
         pass
 
     def getPings(self):
         return self.__pings
+    
+
