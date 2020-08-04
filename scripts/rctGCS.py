@@ -103,8 +103,6 @@ class GCS(QMainWindow):
         self._buttons = []
         self._systemConnectionTab = None
         self.systemSettingWidget = None
-        #self.__missionStatusText = StringVar()
-        #self.__missionStatusText.set("Start Recording")
         self.__missionStatusText = "Start Recording"
         self.innerFreqFrame = None
         self.freqElements = []
@@ -207,7 +205,6 @@ class GCS(QMainWindow):
             self.mapDisplay.plotVehicle(coord)
 
 
-
     def __handleRemoteException(self):
         '''
         Internal callback for an exception message
@@ -221,14 +218,7 @@ class GCS(QMainWindow):
 
     def __startStopMission(self):
         # State machine for start recording -> stop recording
-        '''
-        if self.__missionStatusText.get() == 'Start Recording':
-            self.__missionStatusText.set('Stop Recording')
-            self._mavModel.startMission(timeout=self.defaultTimeout)
-        else:
-            self.__missionStatusText.set('Start Recording')
-            self._mavModel.stopMission(timeout=self.defaultTimeout)
-        '''
+
         if self._mavModel == None:
             return
 
