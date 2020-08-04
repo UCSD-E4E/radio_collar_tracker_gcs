@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 07/30/20  NH  Updated rctCore.MAVModel docstrings
 # 05/25/20  NH  Added docstring to new events, added callback to process pings,
 #                 added type hint to setFrequencies
 # 05/20/20  NH  Fixed logging message in MAVmodel.setOptions
@@ -182,8 +183,8 @@ class MAVModel:
     def __init__(self, receiver: rctComms.gcsComms):
         '''
         Creates a new MAVModel
-        :param receiver: gcsComms Object
-        :type receiver: rctComms.gcsComms
+        Args:
+            receiver: gcsComms Object
         '''
         self.__log = logging.getLogger('rctGCS:MAVModel')
         self.__rx = receiver
@@ -252,9 +253,11 @@ class MAVModel:
     def start(self, guiTickCallback=None):
         '''
         Initializes the MAVModel object
-        :param guiTickCallback: Callback to a function for progress bar
-        :type guiTickCallback: Function with no parameters to be called for
-            progress
+        
+        Args:
+            guiTickCallback: Callback to a function for progress bar.  This 
+                             shall be a function with no parameters to be called
+                             for progress
         '''
         self.__rx.start(guiTickCallback)
         self.__log.info("MVAModel started")
@@ -262,10 +265,9 @@ class MAVModel:
     def __processFrequencies(self, packet: rctComms.rctFrequenciesPacket, addr: str):
         '''
         Internal callback to handle frequency messages
-        :param packet: Frequency message payload
-        :type packet: List of integers
-        :param addr: Source of packet
-        :type addr: str
+        Args:
+            packet: Frequency message payload
+            addr: Source of packet as a string
         '''
         self.__log.info("Received frequencies")
         self.PP_options['TGT_frequencies'] = packet.frequencies
@@ -274,6 +276,12 @@ class MAVModel:
             callback()
 
     def __processOptions(self, packet: rctComms.rctOptionsPacket, addr: str):
+        '''
+        Internal callback to handle option messages
+        Args:
+            packet: Options packet payload
+            addr: Source of packet
+        '''
         self.__log.info('Received options')
         for parameter in packet.options:
             self.PP_options[parameter] = packet.options[parameter]
@@ -290,10 +298,9 @@ class MAVModel:
     def __processHeartbeat(self, packet: rctComms.rctHeartBeatPacket, addr: str):
         '''
         Internal callback to handle heartbeat messages
-        :param packet: Heartbeat packet payload
-        :type packet: dict
-        :param addr: Source of packet
-        :type addr: str
+        Args:
+            packet: Heartbeat packet payload
+            addr: Source of packet
         '''
         self.__log.info("Received heartbeat")
         self.state['STS_sdrStatus'] = SDR_INIT_STATES(packet.sdrState)
@@ -308,15 +315,20 @@ class MAVModel:
     def __processNoHeartbeat(self, packet, addr):
         '''
         Internal callback to handle no hearbeat messages
-        :param packet: None
-        :type packet: None
-        :param addr: None
-        :type addr: None
+        Args:
+            packet:    None
+            addr:    None
         '''
         for callback in self.__callbacks[Events.NoHeartbeat]:
             callback()
 
     def __processUpgradeStatus(self, packet: rctComms.rctUpgradeStatusPacket, addr: str):
+        '''
+        Internal callback to handle upgrade status messages
+        Args:
+            packet:    Upgrade Status packet
+            addr:    Source address
+        '''
         self.PP_options['UPG_state'] = packet.state
         self.PP_options['UPG_msg'] = packet.msg
         for callback in self.__callback[Events.UpgradeStatus]:
@@ -332,10 +344,9 @@ class MAVModel:
     def registerCallback(self, event: Events, callback):
         '''
         Registers a callback for the specified event
-        :param event: Event to trigger on
-        :type event: rctCore.Events
-        :param callback: Callback to call
-        :type callback:
+        Args:
+            event:    Event to trigger on
+            callback:    Callback to call
         '''
         assert(isinstance(event, Events))
         if event not in self.__callbacks:
@@ -343,9 +354,11 @@ class MAVModel:
         else:
             self.__callbacks[event].append(callback)
 
-    def startMission(self, timeout):
+    def startMission(self, timeout:int):
         '''
         Sends the start mission command
+        Args:
+            timeout: Timeout in seconds
         '''
         event = threading.Event()
         event.clear()
@@ -359,6 +372,8 @@ class MAVModel:
     def stopMission(self, timeout):
         '''
         Sends the stop mission command
+        Args: 
+                timeout: Timeout in seconds
         '''
         event = threading.Event()
         event.clear()
@@ -372,9 +387,8 @@ class MAVModel:
     def getFrequencies(self, timeout):
         '''
         Retrieves the PRX_frequencies from the payload
-
-        :param timeout: Seconds to wait before timing out
-        :type timeout: number
+        Args:
+            timeout:    Seconds to wait before timing out
         '''
         if self.__optionCacheDirty[self.TGT_PARAMS] == self.CACHE_INVALID:
             frequencyPacketEvent = threading.Event()
@@ -391,10 +405,9 @@ class MAVModel:
     def __handleRemoteException(self, packet: rctComms.rctExceptionPacket, addr):
         '''
         Internal callback to handle traceback messages
-        :param packet: Traceback packet payload
-        :type packet: str
-        :param addr: Source of packet
-        :type addr: str
+        Args:
+            packet: Traceback packet payload
+            addr: Source of packet
         '''
         self.__log.exception("Remote Exception: %s" % packet.exception)
         self.__log.exception("Remote Traceback: %s" % packet.traceback)
@@ -408,8 +421,9 @@ class MAVModel:
     def setFrequencies(self, freqs: list, timeout):
         '''
         Sends the command to set the specified PRX_frequencies
-        :param freqs: Frequencies to set
-        :type freqs: list
+        Args:
+            freqs: Frequencies to set as a list
+            timeout: Timeout in seconds
         '''
         assert(isinstance(freqs, list))
         for freq in freqs:
@@ -426,6 +440,16 @@ class MAVModel:
             raise RuntimeError("SETF NACKED")
 
     def addFrequency(self, frequency: int, timeout):
+        '''
+        Adds the specified frequency to the target frequencies.
+        
+        If the specified frequency is already in TGT_frequencies, then this 
+        function does nothing.  Otherwise, this function will update the 
+        TGT_frequencies on the payload.
+        Args:
+            frequency:    Frequency to add
+            timeout:    Timeout in seconds
+        '''
         if frequency in self.PP_options['TGT_frequencies']:
             return
         else:
@@ -433,6 +457,16 @@ class MAVModel:
                 self.PP_options['TGT_frequencies'] + [frequency], timeout)
 
     def removeFrequency(self, frequency: int, timeout):
+        '''
+        Removes the specified frequency from the target frequencies.
+        
+        If the specified frequency is not in TGT_frequencies, then this function
+        raises a RuntimeError.  Otherwise, this function will update the 
+        TGT_frequencies on the payload.
+        Args:
+            frequency:    Frequency to remove
+            timeout:    Timeout in seconds
+        '''
         if frequency not in self.PP_options['TGT_frequencies']:
             raise RuntimeError('Invalid frequency')
         else:
@@ -441,6 +475,15 @@ class MAVModel:
             self.setFrequencies(newFreqs, timeout)
 
     def getOptions(self, scope: int, timeout):
+        '''
+        Retrieves and returns the options as a dictionary from the remote.
+        
+        scope should be set to one of rctCore.MAVModel.BASE_OPTIONS, 
+        rctCore.MAVModel.EXP_OPTIONS, or rctCore.MAVModel.ENG_OPTIONS.
+        Args:
+            scope: Scope of options to return
+            timeout: Timeout in seconds
+        '''
         optionPacketEvent = threading.Event()
         optionPacketEvent.clear()
         self.registerCallback(
@@ -462,6 +505,12 @@ class MAVModel:
         return {key: self.PP_options[key] for key in acceptedKeywords}
 
     def getOption(self, keyword, timeout=10):
+        '''
+        Retrieves the specific option by keyword
+        Args:
+            keyword:    Keyword of option to retrieve
+            timeout:    Timeout in seconds
+        '''
         if keyword in self.__baseOptionKeywords:
             if self.__optionCacheDirty[self.BASE_OPTIONS] == self.CACHE_INVALID:
                 return self.getOptions(self.BASE_OPTIONS, timeout)[keyword]
@@ -474,6 +523,12 @@ class MAVModel:
         return copy.deepcopy(self.PP_options[keyword])
 
     def setOptions(self, timeout, **kwargs):
+        '''
+        Sets the specified options on the payload
+        Args:
+            timeout:    Timeout in seconds
+            kwargs:    Options to set by keyword
+        '''
         scope = self.BASE_OPTIONS
         for keyword in kwargs:
             if keyword in self.__baseOptionKeywords:
@@ -518,6 +573,12 @@ class MAVModel:
             self.__rx.sendPacket(rctComms.rctUpgradePacket(i+1, numPackets, byteStream[startInd:endInd]))
 
     def __processPing(self, packet: rctComms.rctPingPacket, addr: str):
+        '''
+        Internal callback to handle ping packets from the payload.
+        Args:
+            packet: Ping packet
+            addr: Source address
+        '''
         ping = ping.rctPing.fromPacket(packet)
         estimate = self.EST_mgr.addPing(ping)
         for callback in self.__callbacks[Events.NewPing]:
@@ -527,12 +588,24 @@ class MAVModel:
                 callback()
 
     def __processVehicle(self, packet: rctComms.rctVehiclePacket, addr: str):
-        coordinate = [packet.lat, packet.lon, packet.alt, packet.hdg]
+        '''
+        Internal callback to handle vehicle position packets from the payload.
+        Args:
+            packet:    Vehicle Position packet
+            addr:    Source address
+        '''
+        coordinate = [packet.lat, packet.lon. packet.alt, packet.hdg]
         self.state['VCL_track'][packet.timestamp] = coordinate
         for callback in self.__callbacks[Events.VehicleInfo]:
             callback()
 
     def __processAck(self, packet: rctComms.rctACKCommand, addr: str):
+        '''
+        Internal callback to handle command ACK packets from the payload.
+        Args:
+            packet:    ACK message
+            addr:    Source address
+        '''
         commandID = packet.commandID
         if commandID in self.__ackVectors:
             vector = self.__ackVectors[commandID]
