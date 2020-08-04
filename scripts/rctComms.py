@@ -876,7 +876,7 @@ class gcsComms:
                     packetCode = packet.getClassIDCode()
                     try:
                         for callback in self.__packetMap[packetCode]:
-                                callback(packet=packet, addr=addr)
+                            callback(packet=packet, addr=addr)
                     except KeyError:
                         for callback in self.__packetMap[EVENTS.GENERAL_UNKNOWN.value]:
                             callback(packet=packet, addr=addr)
@@ -1031,7 +1031,6 @@ class mavComms:
     def sendPing(self, ping: rctPingPacket):
         self.sendPacket(ping, None)
 
-    # ADDED
     def sendVehicle(self, vehicle: rctVehiclePacket):
         self.sendPacket(vehicle, None)
 

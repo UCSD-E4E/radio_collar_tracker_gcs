@@ -155,7 +155,6 @@ class Events(Enum):
     NewPing = auto(),
     NewEstimate = auto(),
     UpgradeStatus = auto()
-    #ADDED
     VehicleInfo = auto()
 
 
@@ -247,7 +246,6 @@ class MAVModel:
             rctComms.EVENTS.GENERAL_NO_HEARTBEAT, self.__processNoHeartbeat)
         self.__rx.registerCallback(
             rctComms.EVENTS.DATA_PING, self.__processPing)
-        #ADDED
         self.__rx.registerCallback(
             rctComms.EVENTS.DATA_VEHICLE, self.__processVehicle)
 
@@ -341,8 +339,6 @@ class MAVModel:
         '''
         assert(isinstance(event, Events))
         if event not in self.__callbacks:
-            print("in Core register")
-            print(callback)
             self.__callbacks[event] = [callback]
         else:
             self.__callbacks[event].append(callback)
