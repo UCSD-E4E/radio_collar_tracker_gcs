@@ -29,3 +29,5 @@ doxygen-doc
 **.svg
 .ipynb_checkpoints/
 /.metadata/
+
+scripts/gcsConfig.ini
