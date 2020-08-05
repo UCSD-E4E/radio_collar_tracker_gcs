@@ -520,21 +520,27 @@ class MAVModel:
             file = open(filename.get(), "rb")
             byteStream = file.read() 
             #splitting byteStream into 1k packets
-            #TODO: add ending packet 
             numPackets = ceil(len(byteStream)/1000)
             print("Value of numpackets: " + str(numPackets))
             for i in range(0, numPackets):
                 startInd = i*1000
                 endInd = startInd + 1000
+                print("This is the stream: " + str(byteStream[startInd:endInd]))
                 self.__rx.sendPacket(rctComms.rctUpgradePacket(i+1, numPackets, byteStream[startInd:endInd]))
             print("Finished sending packets")
             event.wait()
-            if self.PP_options['UPG_state'] == rctUpgradeStatusPacket.UPGRADE_PROGRESS:
-                #Process message and display to the user?
-                pass
-            elif self.PP_options['UPG_state'] == rctUpgradeStatusPacket.UPGRADE_FAILED:
-                #attempt process again? 
-                self.upgrade(filename)         
+            while self.PP_options['UPG_state'] != rctUpgradeStatusPacket.UPGRADE_COMPLETE:
+                if self.PP_options['UPG_state'] == rctUpgradeStatusPacket.UPGRADE_PROGRESS:
+                    msg = self.PP_options['UPG_msg']
+                    if msg.startswith("Missing "):
+                        indToResend = int(msg[8:])
+                        startInd = (indToResend-1)*1000
+                        endInd = startInd + 1000
+                        self.__rx.sendPacket(rctComms.rctUpgradePacket(indToResend, numPackets, byteStream[startInd:endInd]))
+                elif self.PP_options['UPG_state'] == rctUpgradeStatusPacket.UPGRADE_FAILED:
+                    #attempt process again? 
+                    return
+                event.wait()
         else: 
             #there is an active mission, send appropriate message to user.
             raise RuntimeError("Active mission. Cannot upgrade.")

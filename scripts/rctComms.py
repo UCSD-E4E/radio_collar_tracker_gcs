@@ -404,10 +404,10 @@ class rctUpgradePacket(rctBinaryPacket):
     def __init__(self, numPacket, numTotal, fileBytes):
         self._pclass = 0x03
         self._pid = 0x02
-        self.numPacket = hex(numPacket)
-        self.numTotal = hex(numTotal)
+        self.numPacket = numPacket
+        self.numTotal = numTotal
         self.fileBytes = fileBytes
-        self._payload = struct.pack('<BHHHs', 0x01, numPacket, numTotal, len(fileBytes), fileBytes) #TODO: fix this encoding
+        self._payload = struct.pack('<BHHH', 0x01, numPacket, numTotal, len(fileBytes)) + fileBytes #TODO: fix this encoding
         
     @classmethod
     def matches(cls, packetClass: int, packetID: int):

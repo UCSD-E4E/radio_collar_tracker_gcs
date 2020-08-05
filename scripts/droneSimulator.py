@@ -49,6 +49,7 @@ import rctTransport
 import numpy as np
 from time import sleep
 from ping import rctPing
+from zipfile import ZipFile
 import utm
 
 from rctComms import mavComms, rctBinaryPacket, rctUpgradeStatusPacket, rctUpgradePacket
@@ -166,7 +167,9 @@ class droneSim:
         self.HS_run = True
         
         # UG - Upgrade payload 
+        self.UG_numTries = 2 #number of times to wait for a missing packet
         self.UG_upgradePackets = []
+        self.UG_receivedIds = []
 
         # register command actions here
         self.port.registerCallback(
@@ -415,10 +418,12 @@ class droneSim:
     def __processUpgradePacket(self, packet: rctComms.rctUpgradePacket, addr: str):
         print("Receiving packet callback.")
         self.UG_upgradePackets.append(packet)
-        self.__upgradePacketEvent.set()
+        self.UG_upgradePackets.append(packet.numPacket)
+        if packet.numPacket == packet.numTotal:
+            self.__upgradePacketEvent.set()
 
     def __doUpgrade(self, packet: rctComms.rctUpgradeStatusPacket, addr: str):
-        upgradeThread = threading.Thread(target=self.__doUpgradeHelper())
+        upgradeThread = threading.Thread(target=self.__doUpgradeHelper)
         upgradeThread.start()
         
     def __doUpgradeHelper(self):
@@ -431,16 +436,33 @@ class droneSim:
             print("Eligible")
             self.port.sendToGCS(rctUpgradeStatusPacket(rctUpgradeStatusPacket.UPGRADE_READY, "Ready to upgrade."))
         self.__upgradePacketEvent = threading.Event()
-        print("Event is initialized and about to wait.")
         self.__upgradePacketEvent.wait()
-        print("Event thread registered first packet.")
         numTotalPacketsExpected = self.UG_upgradePackets[0].numTotal
-        for i in range(numTotalPacketsExpected-1):
-            self.__upgradePacketEvent.clear()
-            self.__upgradePacketEvent.wait()
-            print("Event resuming after receiving packet beyond first one.")
-        if len(self.UG_upgradePackets) == numTotalPacketsExpected:
-            print("Received all expected packets!")
+        for i in range(numTotalPacketsExpected):
+            counter = 0
+            while i+1 not in self.UG_receivedIds and counter < self.UG_numTries:       
+                self.port.sendToGCS(rctUpgradeStatusPacket(rctUpgradeStatusPacket.UPGRADE_PROGRESS, "Missing " + str(i+1)))
+                sleep(5)
+                counter = counter + 1
+            if i+1 not in self.UG_receivedIds:
+                self.port.sendToGCS(rctUpgradeStatusPacket(rctUpgradeStatusPacket.UPGRADE_FAILED, "Missing " + str(i+1)))
+                return
+        self.port.sendToGCS(rctUpgradeStatusPacket(rctUpgradeStatusPacket.UPGRADE_PROGRESS, "Received all packets."))
+        fileBytes = None
+        for packet in self.UG_upgradePackets:
+            if fileBytes == None:
+                fileBytes = packet.fileBytes
+            else:
+                fileBytes = fileBytes + packet.fileBytes
+        outputFile = open('upgradeFile', 'wb')
+        outputFile.write(fileBytes)
+        outputFile.close()
+        self.port.sendToGCS(rctUpgradeStatusPacket(rctUpgradeStatusPacket.UPGRADE_PROGRESS, "Finished assembling packets."))
+        self.UG_upgradePackets = []
+        self.UG_receivedIds = []
+        with ZipFile('upgradeFile', 'r') as zipObj:
+            zipObj.extractall()
+
             
     def __sender(self):
         while self.HS_run is True:
