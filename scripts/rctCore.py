@@ -322,6 +322,7 @@ class MAVModel:
         print("Received upgrade status packet")
         self.PP_options['UPG_state'] = packet.state
         self.PP_options['UPG_msg'] = packet.msg
+        print("msg: " + packet.msg)
         for callback in self.__callbacks[Events.UpgradeStatus]:
             callback()
 
@@ -525,7 +526,6 @@ class MAVModel:
             for i in range(0, numPackets):
                 startInd = i*1000
                 endInd = startInd + 1000
-                print("This is the stream: " + str(byteStream[startInd:endInd]))
                 self.__rx.sendPacket(rctComms.rctUpgradePacket(i+1, numPackets, byteStream[startInd:endInd]))
             print("Finished sending packets")
             event.wait()

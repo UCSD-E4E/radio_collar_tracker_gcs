@@ -418,7 +418,7 @@ class droneSim:
     def __processUpgradePacket(self, packet: rctComms.rctUpgradePacket, addr: str):
         print("Receiving packet callback.")
         self.UG_upgradePackets.append(packet)
-        self.UG_upgradePackets.append(packet.numPacket)
+        self.UG_receivedIds.append(packet.numPacket)
         if packet.numPacket == packet.numTotal:
             self.__upgradePacketEvent.set()
 
@@ -462,8 +462,8 @@ class droneSim:
         self.UG_receivedIds = []
         with ZipFile('upgradeFile', 'r') as zipObj:
             zipObj.extractall()
+        self.port.sendToGCS(rctUpgradeStatusPacket(rctUpgradeStatusPacket.UPGRADE_COMPLETE, "Finished!"))
 
-            
     def __sender(self):
         while self.HS_run is True:
             packet = rctComms.rctHeartBeatPacket(self.__state['STS_sysStatus'],
