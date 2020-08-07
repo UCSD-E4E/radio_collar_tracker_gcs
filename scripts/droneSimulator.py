@@ -90,6 +90,7 @@ class droneSim:
         Creates a new DroneSim object
         :param port:
         '''
+        self.__txThread = None
         self.port = port
         self.__commandMap = {}
         self.__state = {
@@ -254,7 +255,7 @@ class droneSim:
         self.SM_targetThreshold = 5
         self.SM_loopPeriod = 0.1
         self.SM_TakeoffVel = 5
-        self.SM_WPVel = 5
+        self.SM_WPVel = 35
         self.SM_RTLVel = 20
         self.SM_LandVel = 1
 
@@ -272,8 +273,8 @@ class droneSim:
         self.SP_Exponent = 2.5
         self.SP_ExponentSigma = 0
         self.SP_Position = (478110, 3638661, 0)
-        self.SP_NoiseFloor = 5
-        self.SP_NoiseFloorSigma = 10
+        self.SP_NoiseFloor = 90
+        self.SP_NoiseFloorSigma = 0
         self.SP_TxFreq = 173500000
 
         # SV - Simulation Vehicle parameters
@@ -355,7 +356,7 @@ class droneSim:
         Starts the simulator.  This is equivalent to turning on the payload with
         autostart enabled.
         '''
-        self.reset()
+        #self.reset()
         self.port.start()
         self.HS_run = True
         self.__txThread = threading.Thread(target=self.__sender)
@@ -683,7 +684,8 @@ class droneSim:
         l_tx = np.array(self.SP_Position)
         rand = np.random.normal(scale=self.SP_TxPowerSigma)
         P_tx = self.SP_TxPower + rand
-        n = self.SP_Exponent
+        randEx = np.random.normal(scale=self.SP_ExponentSigma)
+        n = self.SP_Exponent + randEx
         C = self.SP_SystemLoss
         f_tx = self.SP_TxFreq
         randN = np.random.normal(scale=self.SP_NoiseFloorSigma)#added

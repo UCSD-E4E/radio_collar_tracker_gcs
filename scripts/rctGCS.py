@@ -81,6 +81,7 @@ import configparser
 from cmath import exp
 import xlwt 
 from xlwt import Workbook 
+import json
 
 
 class GCS(QMainWindow):
@@ -189,8 +190,8 @@ class GCS(QMainWindow):
         for frequency in freqList:
             last = self._mavModel.EST_mgr.getPings(frequency)[-1]
             zone, let = self._mavModel.EST_mgr.getUTMZone()
-            coord = utm.to_latlon(last[0], last[1], zone, let)
-            #coord = utm.to_latlon(*last[5])\
+            #coord = utm.to_latlon(last[0], last[1], zone, let)
+            coord = utm.to_latlon(*last[5])
             amp = last[4]
     
             if self.mapDisplay is not None:
@@ -313,6 +314,29 @@ class GCS(QMainWindow):
             self.swStatusLabel.config(text='SW: ON', bg='green')
         else:
             self.swStatusLabel.config(text='SW: NULL', bg='red')
+            
+    def exportAll(self):
+        if self.mapDisplay is not None:
+            print('in export')
+            pingIter = self.mapDisplay.pingLayer.getFeatures()
+            vPathIter = self.mapDisplay.vehiclePath.getFeatures()
+            pingDict = {}
+            vDict = {}
+            
+            for ping in pingIter:
+                geo = ping.getGeometry()
+                pingDict['Coordinate'] = geo
+            for path in vPathIter:
+                geo = path.getGeometry()
+                vDict['Line'] = geo
+                
+            final = {}
+            final['Pings'] = pingDict
+            final['Vehicle Path'] = vDict
+            
+            json_object = json.dumps(final, indent = 4)   
+            print(json_object)  
+            
 
 
     def closeEvent(self, event):
@@ -329,6 +353,8 @@ class GCS(QMainWindow):
             lon1 = ext.xMinimum()
             lat2 = ext.yMinimum()
             lon2 = ext.xMaximum()
+            
+            self.exportAll()
             
 
             
@@ -1807,6 +1833,7 @@ class MapWidget(QWidget):
         lon = coord[1]
         change = False
         point = self.transformToWeb.transform(QgsPointXY(lon, lat))
+        print(point)
         if self.pingLayer is None:
             return
         else:
@@ -1855,9 +1882,10 @@ class MapWidget(QWidget):
             
             #Create new ping point
             pnt = QgsGeometry.fromPointXY(point)
+            print(pnt)
             f = QgsFeature()
             fields = QgsFields()
-            fields.append(QgsField(name='Amp', type=QVariant.Double, len=1))
+            fields.append(QgsField(name='Amp', type=QVariant.Double, len=30))
             f.setFields(fields)
             f.setGeometry(pnt)
             f.setAttribute(0, amp)
@@ -2240,7 +2268,7 @@ class WebMap(MapWidget):
             path = QDir().currentPath()
             urlWithParams = 'type=xyz&url=file:///'+ path+'/tiles/%7Bz%7D/%7Bx%7D/%7By%7D.png'
         else:
-            urlWithParams = 'type=xyz&url=http://a.tile.openstreetmap.org/%7Bz%7D/%7Bx%7D/%7By%7D.png&zmax=19&zmin=0&crs=EPSG3857'    
+            urlWithParams = 'type=xyz&url=https://a.tile.openstreetmap.org/%7Bz%7D/%7Bx%7D/%7By%7D.png&zmax=19&zmin=0&crs=EPSG3857'    
         self.layer = QgsRasterLayer(urlWithParams, 'OpenStreetMap', 'wms') 
         
         if self.layer.isValid():   

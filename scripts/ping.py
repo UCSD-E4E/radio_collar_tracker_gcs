@@ -33,6 +33,7 @@ from scipy.optimize import least_squares
 import utm
 import rctComms
 import time
+#from Library.python.plugins.processing.tests import GdalAlgorithmsGeneralTest
 
 
 class rctPing:
@@ -50,7 +51,7 @@ class rctPing:
         # X, Y, Z, A
         easting, northing, _, _ = utm.from_latlon(self.lat, self.lon)
         u = utm.from_latlon(self.lat, self.lon)
-        return np.array([easting, northing, self.alt, 20 * np.log10(self.amplitude), self.amplitude, u])
+        return np.array([easting, northing, self.alt, 20 * np.log10(self.amplitude), self.amplitude])
     
     
 
@@ -159,6 +160,29 @@ class LocationEstimator:
     def addPing(self, ping: rctPing):
         self.__pings.append(ping.toNumpy())
 
+    def resamplePings(self):
+        pings = np.array(self.__pings)
+        for ping in pings:
+            rad = 10
+            ind = np.where((pings[:,0] < ping[0] + rad) & (pings[:,0] > ping[0] - rad) & (pings[:,1] < ping[1] + rad) & (pings[:,1] > ping[1]-rad))
+            
+            if len(ind[0]) > 1:
+                newArr = None
+                for i in ind[0]:
+                    if newArr is None:  
+                        newArr = np.array([pings[i]])
+                    else:     
+                        newArr = np.vstack((newArr, [pings[i]]))
+                newArr = np.vstack((newArr, [ping]))
+                x = np.mean(newArr[:, 0])
+                y = np.mean(newArr[:, 1])
+                alt = np.mean(newArr[:, 2])
+                a = np.mean(newArr[:, 3])
+                amp = np.mean(newArr[:, 4])
+                pings = np.delete(pings, ind[0], 0)
+                pings = np.vstack((pings, [[x, y, alt, a, amp]]))
+        return pings
+
     def doEstimate(self):
         if len(self.__pings) < 4:
             return None
@@ -168,19 +192,20 @@ class LocationEstimator:
         if True:
             # Pings is now the data matrix of n x 4
             # Columns are X_rx, Y_rx, Z_rx, P_rx
-            pings = np.array(self.__pings)
+            pings = self.resamplePings()
             # first estimate, generate initial params from data
             # Location is average of current measurements
             # Power is max of measurements
             # N_0 = 4
+        
 
             X_tx_0 = np.mean(pings[:, 0])#0
             Y_tx_0 = np.mean(pings[:, 1])#1
             P_tx_0 = np.max(pings[:, 3])#3
-            n_0 = 4
+            n_0 = 2
             self.__params = np.array([X_tx_0, Y_tx_0, P_tx_0, n_0])
         res_x = least_squares(self.__residuals, self.__params, 
-            bounds=([0, 167000, -np.inf, 2], [833000, 10000000, np.inf, 6]))
+            bounds=([0, 167000, -np.inf, 1.9], [833000, 10000000, np.inf, 2.01]))
             #bounds=([0, 167000, -np.inf, 2], [833000, 10000000, np.inf, np.inf]))
 
         if res_x.success:

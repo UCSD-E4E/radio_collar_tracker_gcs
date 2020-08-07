@@ -579,8 +579,8 @@ class MAVModel:
             packet: Ping packet
             addr: Source address
         '''
-        ping = ping.rctPing.fromPacket(packet)
-        estimate = self.EST_mgr.addPing(ping)
+        newping = ping.rctPing.fromPacket(packet)
+        estimate = self.EST_mgr.addPing(newping)
         for callback in self.__callbacks[Events.NewPing]:
             callback()
         if estimate is not None:
@@ -594,7 +594,7 @@ class MAVModel:
             packet:    Vehicle Position packet
             addr:    Source address
         '''
-        coordinate = [packet.lat, packet.lon. packet.alt, packet.hdg]
+        coordinate = [packet.lat, packet.lon, packet.alt, packet.hdg]
         self.state['VCL_track'][packet.timestamp] = coordinate
         for callback in self.__callbacks[Events.VehicleInfo]:
             callback()
