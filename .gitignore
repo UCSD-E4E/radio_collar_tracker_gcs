@@ -31,3 +31,5 @@ doxygen-doc
 /.metadata/
 
 scripts/gcsConfig.ini
+
+*.xls
