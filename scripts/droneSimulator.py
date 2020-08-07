@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 08/06/20  NH  Fixed reset on init
 # 07/29/20  NH  Added docstrings
 # 05/23/20  NH  Fixed simulator run/stop actions
 # 05/20/20  NH  Added droneSim.reset to facilitate simulator reset, fixed
@@ -100,6 +101,8 @@ class droneSim:
             'STS_sysStatus': 0,
             'STS_swStatus': 0,
         }
+        
+        self.__txThread = None
 
         # PP - Payload parameters
         self.PP_options = {

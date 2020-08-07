@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 08/06/20  NH  Fixed syntax and variable masking
 # 07/30/20  NH  Updated rctCore.MAVModel docstrings
 # 05/25/20  NH  Added docstring to new events, added callback to process pings,
 #                 added type hint to setFrequencies
@@ -579,8 +580,8 @@ class MAVModel:
             packet: Ping packet
             addr: Source address
         '''
-        newping = ping.rctPing.fromPacket(packet)
-        estimate = self.EST_mgr.addPing(newping)
+        pingObj = ping.rctPing.fromPacket(packet)
+        estimate = self.EST_mgr.addPing(pingObj)
         for callback in self.__callbacks[Events.NewPing]:
             callback()
         if estimate is not None:
