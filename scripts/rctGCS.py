@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 08/11/20  ML  Added export settings, pings, and vehicle path as json file
 # 08/06/20  NH  Refactored map loading code for ease of debugging
 # 07/31/20  ML  Added ability to export pings and vehicle paths as Shapefile
 # 07/17/20  ML  Translated component status and upgrade displays into PyQt and
@@ -83,6 +84,7 @@ from cmath import exp
 import xlwt 
 from xlwt import Workbook 
 import json
+import numpy as np
 
 
 class GCS(QMainWindow):
@@ -189,14 +191,13 @@ class GCS(QMainWindow):
         '''
         freqList = self._mavModel.EST_mgr.getFrequencies()
         for frequency in freqList:
-            last = self._mavModel.EST_mgr.getPings(frequency)[-1]
+            last = self._mavModel.EST_mgr.getPings(frequency)[-1].tolist()
             zone, let = self._mavModel.EST_mgr.getUTMZone()
-            #coord = utm.to_latlon(last[0], last[1], zone, let)
-            coord = utm.to_latlon(*last[5])
-            amp = last[4]
-    
+            u = (last[0], last[1], zone, let)
+            coord = utm.to_latlon(*u)
+            power = last[3]
             if self.mapDisplay is not None:
-                self.mapDisplay.plotPing(coord, amp)
+                self.mapDisplay.plotPing(coord, power)
 
 
 
@@ -208,6 +209,8 @@ class GCS(QMainWindow):
             return
         last = list(self._mavModel.state['VCL_track'])[-1]
         coord = self._mavModel.state['VCL_track'][last]
+        
+        self._mavModel.EST_mgr.addVehicleLocation(coord)
 
         if self.mapDisplay is not None:
             self.mapDisplay.plotVehicle(coord)
@@ -317,26 +320,72 @@ class GCS(QMainWindow):
             self.swStatusLabel.config(text='SW: NULL', bg='red')
             
     def exportAll(self):
+        '''
+        Exports pings, vehcle path, and settings as json file
+        '''
+        final = {}
+        
         if self.mapDisplay is not None:
-            print('in export')
-            pingIter = self.mapDisplay.pingLayer.getFeatures()
-            vPathIter = self.mapDisplay.vehiclePath.getFeatures()
+            vPath = self._mavModel.EST_mgr.getVehiclePath()
             pingDict = {}
             vDict = {}
-            
-            for ping in pingIter:
-                geo = ping.getGeometry()
-                pingDict['Coordinate'] = geo
-            for path in vPathIter:
-                geo = path.getGeometry()
-                vDict['Line'] = geo
+            indPing = 0
+            indPath = 0
+            freqList = self._mavModel.EST_mgr.getFrequencies()
+            for frequency in freqList:
+                pings = self._mavModel.EST_mgr.getPings(frequency)
+                for pingArray in pings:
+                    pingArr = pingArray.tolist()
+                    zone, let = self._mavModel.EST_mgr.getUTMZone()
+                    u = (pingArr[0], pingArr[1], zone, let)
+                    coord = utm.to_latlon(*u)
+                    amp = pingArr[4]
+                    newPing = {}
+                    newPing['Frequency'] = frequency
+                    newPing['Coordinate'] = coord
+                    newPing['Amplitude'] = amp
+                    pingDict[indPing] = newPing
+                    indPing = indPing + 1
+            for coord in vPath:
+                newCoord = {}
+                newCoord['Coordinate'] = (coord[0], coord[1])
+                vDict[indPath] = newCoord
+                indPath = indPath + 1
                 
-            final = {}
             final['Pings'] = pingDict
             final['Vehicle Path'] = vDict
             
-            json_object = json.dumps(final, indent = 4)   
-            print(json_object)  
+        if self.systemSettingsWidget is not None:
+            optionVars = self.systemSettingsWidget.optionVars
+            optionDict = {}
+            for key in optionVars.keys():
+                if key == "TGT_frequencies":
+                    optionDict[key] = optionVars[key]
+                elif optionVars[key] is not None:
+                    optionDict[key] = optionVars[key].text()
+                    
+            final['System Settings'] = optionDict
+                
+        varDict = self._mavModel.state
+        newVarDict = {}
+        
+        for key in varDict.keys():
+            if ((key == 'STS_sdrStatus') or (key == 'STS_dirStatus') or 
+                (key == 'STS_gpsStatus') or (key == 'STS_sysStatus')):
+                temp = {}
+                temp['name'] = varDict[key].name
+                temp['value'] = varDict[key].value
+                newVarDict[key] = temp
+            elif(key == 'VCL_track'):
+                pass
+            else:
+                newVarDict[key] = varDict[key]
+
+            
+        final['States'] = newVarDict
+            
+        with open('data.json', 'w') as outfile:
+            json.dump(final, outfile)
             
 
 
@@ -354,8 +403,6 @@ class GCS(QMainWindow):
             lon1 = ext.xMinimum()
             lat2 = ext.yMinimum()
             lon2 = ext.xMaximum()
-            
-            self.exportAll()
             
 
             
@@ -452,6 +499,7 @@ class GCS(QMainWindow):
         
         self.upgradeDisplay = UpgradeDisplay(content, self)
         self.upgradeDisplay.resize(self.SBWidth, 400)
+        
 
 
 
@@ -459,6 +507,9 @@ class GCS(QMainWindow):
         btn_startRecord = QPushButton(self.__missionStatusText)
         #                            textvariable=self.__missionStatusText, 
         btn_startRecord.clicked.connect(lambda:self.__startStopMission())
+        
+        btn_exportAll = QPushButton('Export Info')
+        btn_exportAll.clicked.connect(lambda:self.exportAll())
 
         wlay.addWidget(self._systemConnectionTab)
         wlay.addWidget(self.statusWidget)
@@ -466,6 +517,7 @@ class GCS(QMainWindow):
         wlay.addWidget(self.systemSettingsWidget)
         wlay.addWidget(self.upgradeDisplay)
         wlay.addWidget(btn_startRecord)
+        wlay.addWidget(btn_exportAll)
         wlay.addStretch()
         content.resize(self.SBWidth, 400)
         frm_sideControl.setMinimumWidth(self.SBWidth)
@@ -1468,8 +1520,6 @@ class MapControl(CollapseFrame):
         btn_loadMap = QPushButton('Load Map')
         btn_loadMap.clicked.connect(lambda:self.__loadMapFile())
         controlPanel.addWidget(btn_loadMap)
-        btn_export = QPushButton(" Export")
-        controlPanel.addWidget(btn_export)
 
 
         
@@ -1723,6 +1773,7 @@ class MapWidget(QWidget):
         self.estimate = None
         self.pingMin = 800
         self.pingMax = 0
+        self.indPing = 0
         self.ind = 0
         self.indEst = 0
         self.toolbar = QToolBar()
@@ -1836,7 +1887,7 @@ class MapWidget(QWidget):
             self.vehicle.updateExtents()
             self.ind = self.ind + 1
 
-    def plotPing(self, coord, amp):
+    def plotPing(self, coord, power):
         '''
         Function to plot a new ping on the ping map layer
         Args:
@@ -1846,18 +1897,33 @@ class MapWidget(QWidget):
         '''
         lat = coord[0]
         lon = coord[1]
+        
+        if(self.indPing==0):
+            self.wb = Workbook()
+            self.sheet1 = self.wb.add_sheet('pings')
+            self.sheet1.write(0, 0, 'Lat')
+            self.sheet1.write(0, 1, 'Long')
+            self.sheet1.write(0, 2, 'Power')
+            
+        self.indPing = self.indPing + 1
+        self.sheet1.write(self.indPing, 0, str(lat))
+        self.sheet1.write(self.indPing, 1, str(lon))
+        self.sheet1.write(self.indPing, 2, str(power))
+        
+        self.wb.save('points.xls')
+        
+        
         change = False
         point = self.transformToWeb.transform(QgsPointXY(lon, lat))
-        print(point)
         if self.pingLayer is None:
             return
         else:
-            if amp < self.pingMin:
+            if power < self.pingMin:
                 change = True
-                self.pingMin = amp
-            if amp > self.pingMax:
+                self.pingMin = power
+            if power > self.pingMax:
                 change = True
-                self.pingMax = amp
+                self.pingMax = power
             if (self.pingMax == self.pingMin):
                 self.pingMax = self.pingMax + 1
             if change:
@@ -1897,13 +1963,10 @@ class MapWidget(QWidget):
             
             #Create new ping point
             pnt = QgsGeometry.fromPointXY(point)
-            print(pnt)
             f = QgsFeature()
-            fields = QgsFields()
-            fields.append(QgsField(name='Amp', type=QVariant.Double, len=30))
-            f.setFields(fields)
+            f.setFields(self.pingLayer.fields())
             f.setGeometry(pnt)
-            f.setAttribute(0, amp)
+            f.setAttribute(0, power)
             vpr.addFeatures([f])
             self.pingLayer.updateExtents()
             
@@ -1917,6 +1980,8 @@ class MapWidget(QWidget):
         '''
         lat = coord[0]
         lon = coord[1]
+        
+        
         point = self.transformToWeb.transform(QgsPointXY(lon, lat))
         if self.estimate is None:
             return
@@ -2084,8 +2149,9 @@ class MapOptions(QWidget):
         self.wb.save('result.xls')
         self.ind = self.ind + 1
         
+        d = '%.3f'%(dist)
 
-        self.lbl_dist.setText(str(dist))
+        self.lbl_dist.setText(d + '(m.)')
         
     def distance(self, lat1, lat2, lon1, lon2): 
         '''
@@ -2111,28 +2177,32 @@ class MapOptions(QWidget):
         # Radius of earth in kilometers. Use 3956 for miles 
         r = 6371
            
-        return(c * r)
+        return(c * r * 1000)
     
     def exportPing(self):
         '''
         Method to export a MapWidget's pingLayer to a shapefile
         '''
+        folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
+        file = folder + '/pings.shp'
         options = QgsVectorFileWriter.SaveVectorOptions()
         options.driverName = "ESRI Shapefile"
 
         QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.pingLayer, 
-                                        r"C:/Users/mluci/gcs/logs/pings.shp", 
+                                        file, 
                                         QgsCoordinateTransformContext(), options)
         
     def exportVehiclePath(self):
         '''
         Method to export a MapWidget's vehiclePath to a shapefile
         '''
+        folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
+        file = folder + '/vehiclePath.shp'
         options = QgsVectorFileWriter.SaveVectorOptions()
         options.driverName = "ESRI Shapefile"
 
         QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.vehiclePath, 
-                                        r"C:/Users/mluci/gcs/logs/vehicle.shp", 
+                                        file, 
                                         QgsCoordinateTransformContext(), options)
            
 
