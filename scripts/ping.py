@@ -33,6 +33,7 @@ from scipy.optimize import least_squares
 import utm
 import rctComms
 import time
+
 #from Library.python.plugins.processing.tests import GdalAlgorithmsGeneralTest
 
 
@@ -44,14 +45,13 @@ class rctPing:
         self.freq = freq
         self.alt = alt
         self.time = dt.datetime.fromtimestamp(time)
-        self.zone = None
-        self.let = None
+
 
     def toNumpy(self):
         # X, Y, Z, A
         easting, northing, _, _ = utm.from_latlon(self.lat, self.lon)
-        u = utm.from_latlon(self.lat, self.lon)
-        return np.array([easting, northing, self.alt, 20 * np.log10(self.amplitude), self.amplitude])
+        #print(20 * np.log10(self.amplitude))
+        return np.array([easting, northing, self.alt, self.amplitude])
     
     
 
@@ -103,6 +103,7 @@ class DataManager:
         self.__estimators = {}
         self.zone = None
         self.let = None
+        self.__vehiclePath = []
 
     def addPing(self, ping: rctPing):
         pingFreq = ping.freq
@@ -114,6 +115,9 @@ class DataManager:
             self.setZone(ping.lat, ping.lon)
         
         return self.__estimators[pingFreq].doEstimate()
+    
+    def addVehicleLocation(self, coord):
+        self.__vehiclePath.append(coord)
     
     def setZone(self, lat, lon):
         _, _, zone, let = utm.from_latlon(lat, lon)
@@ -139,6 +143,9 @@ class DataManager:
         estimator = self.__estimators[frequency]
         return estimator.getPings()
     
+    def getVehiclePath(self):
+        return self.__vehiclePath
+    
     def getUTMZone(self):
         return self.zone, self.let
 
@@ -162,10 +169,17 @@ class LocationEstimator:
 
     def resamplePings(self):
         pings = np.array(self.__pings)
+        pingCopy = None
+        currInd = 0
+        indSkip = np.array([])
         for ping in pings:
-            rad = 10
+            if (currInd in indSkip):
+                currInd = currInd + 1
+                continue
+            rad = 5
             ind = np.where((pings[:,0] < ping[0] + rad) & (pings[:,0] > ping[0] - rad) & (pings[:,1] < ping[1] + rad) & (pings[:,1] > ping[1]-rad))
-            
+            indSkip = np.append(indSkip, ind[0])
+            currInd = currInd + 1
             if len(ind[0]) > 1:
                 newArr = None
                 for i in ind[0]:
@@ -177,11 +191,17 @@ class LocationEstimator:
                 x = np.mean(newArr[:, 0])
                 y = np.mean(newArr[:, 1])
                 alt = np.mean(newArr[:, 2])
-                a = np.mean(newArr[:, 3])
-                amp = np.mean(newArr[:, 4])
-                pings = np.delete(pings, ind[0], 0)
-                pings = np.vstack((pings, [[x, y, alt, a, amp]]))
-        return pings
+                power = np.mean(newArr[:, 3])
+                if pingCopy is None:
+                    pingCopy = np.array([[x, y, alt, power]])
+                else:
+                    pingCopy = np.vstack((pingCopy, [[x, y, alt, power]]))
+            else:
+                if pingCopy is None:
+                    pingCopy = np.array([ping])
+                else:
+                    pingCopy = np.vstack((pingCopy, [ping]))
+        return pingCopy
 
     def doEstimate(self):
         if len(self.__pings) < 4:
@@ -230,7 +250,7 @@ class LocationEstimator:
         
         if d < 0.01:
             d = 0.01
-
+            
         Prx = P_tx - 10 * n * np.log10(d)
         return Prx
 
@@ -258,5 +278,8 @@ class LocationEstimator:
 
     def getPings(self):
         return self.__pings
+    
+    def setPings(self, pings):
+        self.__pings = pings
     
 

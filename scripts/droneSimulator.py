@@ -52,7 +52,7 @@ import numpy as np
 from time import sleep
 from ping import rctPing
 import utm
-
+import json
 from rctComms import mavComms, rctBinaryPacket
 import rctComms
 import time
@@ -127,6 +127,7 @@ class droneSim:
         self.SM_utmZoneNum = 11
         self.SM_utmZone = 'S'
         self.SM_origin = (478110, 3638925, 0)
+        self.SM_end = (478110, 3638400, 0)
         self.SM_TakeoffTarget = (478110, 3638925, 30)
         self.SM_waypoints = [(477974.06988529314, 3638776.3039655555, 30),
                              (478281.5079546513, 3638711.2010632926, 30),
@@ -240,6 +241,7 @@ class droneSim:
         self.SM_utmZoneNum = 11
         self.SM_utmZone = 'S'
         self.SM_origin = (478110, 3638925, 0)
+        self.SM_end = (478110, 3638400, 0)
         self.SM_TakeoffTarget = (478110, 3638925, 30)
         self.SM_waypoints = [(477974.06988529314, 3638776.3039655555, 30),
                              (478281.5079546513, 3638711.2010632926, 30),
@@ -613,6 +615,7 @@ class droneSim:
                             self.SM_waypoints[self.SS_waypointIdx])
                     else:
                         self.SS_vehicleState = droneSim.MISSION_STATE.RTL
+                        #self.SS_vehicleTarget = np.array(self.SM_end)
                         self.SS_vehicleTarget = np.array(self.SM_TakeoffTarget)
             elif self.SS_vehicleState == droneSim.MISSION_STATE.RTL:
                 targetVector = self.SS_vehicleTarget - self.SS_vehiclePosition
@@ -625,7 +628,9 @@ class droneSim:
                     wpTime = dt.datetime.now()
 
                     self.SS_vehicleState = droneSim.MISSION_STATE.LAND
+                    #self.SS_vehicleTarget = np.array(self.SM_end)
                     self.SS_vehicleTarget = np.array(self.SM_origin)
+
             elif self.SS_vehicleState == droneSim.MISSION_STATE.LAND:
                 self.SS_velocityVector = np.array([0, 0, -1]) * self.SM_LandVel
                 self.SS_vehiclePosition += self.SS_velocityVector * itTime
@@ -710,99 +715,94 @@ class droneSim:
 
 
     def exportSettings(self, filename):
-        f = open("../../logs/"+filename+".txt", "a")
-        f.write('Command Map:')
-        f.write(str(self.__commandMap))
-        f.write('\n')
+        e = {}
+        e['commandMap:'] = str(self.__commandMap)
 
-        f.write('State:')
-        f.write(str(self.__state ))
-        f.write('\n')
+        e['State:'] = str(self.__state )
 
-        f.write(str(self.PP_options ))
-        f.write('\n')
-        f.write(str(self.SM_missionRun ))
-        f.write('\n')
+        e['PP_options'] = str(self.PP_options )
+        e['SM_missionRun'] = str(self.SM_missionRun )
 
-        f.write(str(self.SM_utmZoneNum)) 
-        f.write('\n')
-        f.write(str(self.SM_utmZone)) 
-        f.write('\n')
-        f.write(str(self.SM_origin))
-        f.write('\n')
-        f.write(str(self.SM_TakeoffTarget)) 
-        f.write('\n')
-        f.write(str(self.SM_waypoints ))
-        f.write('\n')
-        f.write(str(self.SM_targetThreshold)) 
-        f.write('\n')
-        f.write(str(self.SM_loopPeriod ))
-        f.write('\n')
-        f.write(str(self.SM_TakeoffVel)) 
-        f.write('\n')
-        f.write(str(self.SM_WPVel ))
-        f.write('\n')
-        f.write(str(self.SM_RTLVel))
-        f.write('\n')
-        f.write(str(self.SM_LandVel))
-        f.write('\n')
+        e['SM_utmZoneNum'] = str(self.SM_utmZoneNum) 
+        e['SM_utmZone'] = str(self.SM_utmZone) 
+        
+        e['SM_origin'] = str(self.SM_origin)
+        
+        e['SM_TakeoffTarget'] = str(self.SM_TakeoffTarget) 
+        
+        e['SM_waypoints'] = str(self.SM_waypoints )
+        
+        e['SM_targetThreshold'] = str(self.SM_targetThreshold) 
+        
+        e['SM_loopPeriod'] = str(self.SM_loopPeriod )
+        
+        e['SM_TakeoffVel'] = str(self.SM_TakeoffVel) 
+        
+        e['SM_WPVel'] = str(self.SM_WPVel )
+        
+        e['SM_RTLVel'] = str(self.SM_RTLVel)
+        
+        e['SM_LandVel'] = str(self.SM_LandVel)
+        
 
-        f.write(str(self.SC_VehiclePositionMsgPeriod))
-        f.write('\n')
-        f.write(str(self.SC_PingMeasurementPeriod ))
-        f.write('\n')
-        f.write(str(self.SC_PingMeasurementSigma ))
-        f.write('\n')
-        f.write(str(self.SC_HeartbeatPeriod ))
-        f.write('\n')
+        e['SC_VehiclePositionMsgPeriod'] = str(self.SC_VehiclePositionMsgPeriod)
+        
+        e['SC_PingMeasurementPeriod'] = str(self.SC_PingMeasurementPeriod )
+        
+        e['SC_PingMeasurementSigma'] = str(self.SC_PingMeasurementSigma )
+        
+        e['SC_HeartbeatPeriod'] = str(self.SC_HeartbeatPeriod )
+        
 
-        f.write(str(self.SP_TxPower ))
-        f.write('\n')
-        f.write(str(self.SP_TxPowerSigma)) 
-        f.write('\n')
-        f.write(str(self.SP_SystemLoss ))
-        f.write('\n')
-        f.write(str(self.SP_SystemLossSigma ))
-        f.write('\n')
-        f.write(str(self.SP_Exponent ))
-        f.write('\n')
-        f.write(str(self.SP_ExponentSigma)) 
-        f.write('\n')
-        f.write(str(self.SP_Position ))
-        f.write('\n')
-        f.write(str(self.SP_NoiseFloor))
-        f.write('\n')
-        f.write('Noise Floor Sigma:')
-        f.write(str(self.SP_NoiseFloorSigma ))
-        f.write('\n')
-        f.write(str(self.SP_TxFreq ))
-        f.write('\n')
+        e['SP_TxPower'] = str(self.SP_TxPower )
+        
+        e['SP+TxPowerSigma'] = str(self.SP_TxPowerSigma) 
+        
+        e['SP_SystemLoss'] = str(self.SP_SystemLoss )
+        
+        e['SP_SystemLossSigma'] = str(self.SP_SystemLossSigma )
+        
+        e['SP_Exponent'] = str(self.SP_Exponent )
+        
+        e['SP_ExponentSigma'] = str(self.SP_ExponentSigma) 
+        
+        e['SP_Position'] = str(self.SP_Position )
+        
+        e['SP_NoiseFloor'] = str(self.SP_NoiseFloor)
+        
+        e['SP_NoiseFloorSigma:'] = str(self.SP_NoiseFloorSigma )
+        
+        e['SP_TxFreq'] = str(self.SP_TxFreq )
+        
 
-        f.write(str(self.SV_vehiclePositionSigma)) 
-        f.write('\n')
+        e['SV_VehiclePositionSigma'] = str(self.SV_vehiclePositionSigma) 
+        
 
-        f.write(str(self.SS_utmZoneNum)) 
-        f.write('\n')
-        f.write(str(self.SS_utmZone ))
-        f.write('\n')
-        f.write(str(self.SS_vehiclePosition ))
-        f.write('\n')
-        f.write(str(self.SS_vehicleState))
-        f.write('\n')
-        f.write(str(self.SS_startTime ))
-        f.write('\n')
-        f.write(str(self.SS_velocityVector)) 
-        f.write('\n')
-        f.write(str(self.SS_vehicleTarget)) 
-        f.write('\n')
-        f.write(str(self.SS_waypointIdx ))
-        f.write('\n')
-        f.write(str(self.SS_payloadRunning ))
-        f.write('\n')
+        e['SS_utmZoneNum'] = str(self.SS_utmZoneNum) 
+        
+        e['SS_utmZone'] = str(self.SS_utmZone )
+        
+        e['SS_VehiclePosition'] = str(self.SS_vehiclePosition )
+        
+        e['SS_vehicleState'] = str(self.SS_vehicleState)
+        
+        e['SS_startTime'] = str(self.SS_startTime )
+        
+        e['SS_velocityVector'] = str(self.SS_velocityVector) 
+        
+        e['SS_vehicleTarget'] = str(self.SS_vehicleTarget) 
+        
+        e['SS_waypointIdx'] = str(self.SS_waypointIdx )
+        
+        e['SS_payloadRunning'] = str(self.SS_payloadRunning )
+        
 
-        f.write(str(self.HS_run ))
-        f.write('\n')
-        f.close()
+        e['HS_run'] = str(self.HS_run )
+
+        settingsFile = filename + '.json'
+        with open(settingsFile, 'w') as outfile:
+            json.dump(e, outfile)
+        
 
 
 
