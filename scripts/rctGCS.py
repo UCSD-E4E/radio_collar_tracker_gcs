@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 08/14/20  ML  Removed excel sheet outputs
 # 08/11/20  ML  Added export settings, pings, and vehicle path as json file
 # 08/06/20  NH  Refactored map loading code for ease of debugging
 # 07/31/20  ML  Added ability to export pings and vehicle paths as Shapefile
@@ -81,8 +82,6 @@ from qgis.core import QgsProject
 from threading import Thread
 import configparser
 from cmath import exp
-import xlwt 
-from xlwt import Workbook 
 import json
 import numpy as np
 
@@ -182,7 +181,7 @@ class GCS(QMainWindow):
                 self.mapDisplay.plotEstimate(coord, frequency)
                 
             if self.mapOptions is not None:
-                self.mapOptions.estDistance(coord, stale, res)
+                self.mapOptions.estDistance(coord)
 
 
     def __handleNewPing(self):
@@ -1898,25 +1897,12 @@ class MapWidget(QWidget):
         lat = coord[0]
         lon = coord[1]
         
-        if(self.indPing==0):
-            self.wb = Workbook()
-            self.sheet1 = self.wb.add_sheet('pings')
-            self.sheet1.write(0, 0, 'Lat')
-            self.sheet1.write(0, 1, 'Long')
-            self.sheet1.write(0, 2, 'Power')
-            
-        self.indPing = self.indPing + 1
-        self.sheet1.write(self.indPing, 0, str(lat))
-        self.sheet1.write(self.indPing, 1, str(lon))
-        self.sheet1.write(self.indPing, 2, str(power))
-        
-        self.wb.save('points.xls')
-        
         
         change = False
         point = self.transformToWeb.transform(QgsPointXY(lon, lat))
         if self.pingLayer is None:
             return
+
         else:
             if power < self.pingMin:
                 change = True
@@ -1957,7 +1943,6 @@ class MapWidget(QWidget):
                     if rangeObj.label() == 'Red':
                         self.pingRenderer.updateRangeLowerValue(i, self.pingMin + sixth)
                         self.pingRenderer.updateRangeUpperValue(i, self.pingMax)
-
 
             vpr = self.pingLayer.dataProvider()
             
@@ -2015,9 +2000,6 @@ class MapOptions(QWidget):
         self.isWebMap = False
         self.lbl_dist = None
         self.__createWidgets()
-        self.ind=1
-        self.wb=None
-        self.sheet1=None
         
 
 
@@ -2116,7 +2098,7 @@ class MapOptions(QWidget):
         
         self.btn_cacheMap.setEnabled(isWebMap)
         
-    def estDistance(self, coord, stale, res):
+    def estDistance(self, coord):
         '''
         An inner function to display the distance from the 
         current estimate point to the ground truth
@@ -2130,24 +2112,10 @@ class MapOptions(QWidget):
         lon1 = coord[1]
         lat2 = 32.885889
         lon2 = -117.234028
+
         
         dist = self.distance(lat1, lat2, lon1, lon2)
-        
-        if(self.ind==1):
-            self.wb = Workbook() 
-            self.sheet1 = self.wb.add_sheet('res')         
-            self.sheet1.write(0, 0, 'Distance')
-            self.sheet1.write(0, 1, 'staleEst') 
-            self.sheet1.write(0, 2, 'x') 
-            self.sheet1.write(0, 8, 'Result')
-            
-        self.sheet1.write(self.ind, 0, str(dist))
-        self.sheet1.write(self.ind, 1, str(stale))
-        self.sheet1.write(self.ind, 2, str(res.x))
-        self.sheet1.write(self.ind, 8, str(res.fun))
-        
-        self.wb.save('result.xls')
-        self.ind = self.ind + 1
+       
         
         d = '%.3f'%(dist)
 
@@ -2301,7 +2269,8 @@ class WebMap(MapWidget):
         ranges = []
         uri = "Point?crs=epsg:3857"
         layer = QgsVectorLayer(uri, 'Pings', 'memory')
-    
+        
+        
         # make symbols
         symbolBlue = QgsSymbol.defaultSymbol(layer.geometryType())
         symbolBlue.setColor(QColor('#0000FF'))
@@ -2339,12 +2308,22 @@ class WebMap(MapWidget):
         ranges.append(rOrange)
         ranges.append(rORed)
         ranges.append(rRed)
-    
+
         # set renderer to set symbol based on amplitude
         pingRenderer = QgsGraduatedSymbolRenderer('Amp', ranges)
-        myClassificationMethod = QgsApplication.classificationMethodRegistry().method("EqualInterval")
-        pingRenderer.setClassificationMethod(myClassificationMethod)
-        pingRenderer.setClassAttribute('Amp')
+        
+        
+        #myClassificationMethod = QgsApplication.classificationMethodRegistry().method("EqualInterval")
+        #pingRenderer.setClassificationMethod(myClassificationMethod)
+        #pingRenderer.setClassAttribute('Amp')
+        style = QgsStyle().defaultStyle()
+        defaultColorRampNames = style.colorRampNames()
+        ramp = style.colorRamp(defaultColorRampNames[22])
+        pingRenderer.setSourceColorRamp(ramp)
+        pingRenderer.setSourceSymbol( QgsSymbol.defaultSymbol(layer.geometryType()))
+        pingRenderer.sortByValue()
+        
+        
         vpr = layer.dataProvider()
         vpr.addAttributes([QgsField(name='Amp', type=QVariant.Double, len=30)])
         layer.updateFields()
