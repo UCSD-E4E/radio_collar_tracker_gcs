@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 08/14/20  ML  Added ping resampling in estimate calculation
 # 05/25/20  NH  Added getter for pings for LocationEstimator and DataManager
 # 05/18/20  NH  Added logic to convert rctPing to/from rctPingPacket
 # 05/05/20  NH  Added estimator
@@ -38,10 +39,10 @@ import time
 
 
 class rctPing:
-    def __init__(self, lat: float, lon: float, amplitude: float, freq: int, alt: float, time: float):
+    def __init__(self, lat: float, lon: float, power: float, freq: int, alt: float, time: float):
         self.lat = lat
         self.lon = lon
-        self.amplitude = amplitude
+        self.power = power
         self.freq = freq
         self.alt = alt
         self.time = dt.datetime.fromtimestamp(time)
@@ -50,8 +51,8 @@ class rctPing:
     def toNumpy(self):
         # X, Y, Z, A
         easting, northing, _, _ = utm.from_latlon(self.lat, self.lon)
-        #print(20 * np.log10(self.amplitude))
-        return np.array([easting, northing, self.alt, self.amplitude])
+        #print(20 * np.log10(self.power))
+        return np.array([easting, northing, self.alt, self.power])
     
     
 
@@ -59,13 +60,13 @@ class rctPing:
         d = {}
         d['lat'] = int(self.lat * 1e7)
         d['lon'] = int(self.lon * 1e7)
-        d['amp'] = int(self.amplitude)
+        d['amp'] = int(self.power)
         d['txf'] = self.freq
         d['alt'] = self.alt
         d['time'] = int(self.time.timestamp() / 1e3)
 
     def toPacket(self):
-        return rctComms.rctPingPacket(self.lat, self.lon, self.alt, self.amplitude, self.freq, self.time)
+        return rctComms.rctPingPacket(self.lat, self.lon, self.alt, self.power, self.freq, self.time)
 
     @classmethod
     def fromDict(cls, packet: dict):
