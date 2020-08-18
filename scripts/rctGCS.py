@@ -84,6 +84,7 @@ import configparser
 from cmath import exp
 import json
 import numpy as np
+import csv
 
 
 class GCS(QMainWindow):
@@ -116,6 +117,7 @@ class GCS(QMainWindow):
         self.mapDisplay = None
         self.mainThread = None
         self.testFrame = None
+        self.pingSheetCreated = False
         self.__createWidgets()
         for button in self._buttons:
             button.config(state='disabled')
@@ -177,11 +179,13 @@ class GCS(QMainWindow):
             zone, let = self._mavModel.EST_mgr.getUTMZone()
             coord = utm.to_latlon(params[0], params[1], zone, let)
             
+            
+            
             if self.mapDisplay is not None:
                 self.mapDisplay.plotEstimate(coord, frequency)
                 
             if self.mapOptions is not None:
-                self.mapOptions.estDistance(coord)
+                self.mapOptions.estDistance(coord, stale, res)
 
 
     def __handleNewPing(self):
@@ -195,6 +199,15 @@ class GCS(QMainWindow):
             u = (last[0], last[1], zone, let)
             coord = utm.to_latlon(*u)
             power = last[3]
+            '''
+            with open('points.csv', 'w', newline='') as csvfile:
+                fieldnames = ['lat', 'long', 'Power']
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                if not self.pingSheetCreated:
+                    writer.writeheader()
+                    self.pingSheetCreated = True
+                writer.writerow({'Lat': coord[0], 'Long': coord[1], 'Power': power})
+            ''' 
             if self.mapDisplay is not None:
                 self.mapDisplay.plotPing(coord, power)
 
@@ -2000,6 +2013,7 @@ class MapOptions(QWidget):
         self.isWebMap = False
         self.lbl_dist = None
         self.__createWidgets()
+        self.created = False
         
 
 
@@ -2098,7 +2112,7 @@ class MapOptions(QWidget):
         
         self.btn_cacheMap.setEnabled(isWebMap)
         
-    def estDistance(self, coord):
+    def estDistance(self, coord, stale, res):
         '''
         An inner function to display the distance from the 
         current estimate point to the ground truth
@@ -2115,6 +2129,14 @@ class MapOptions(QWidget):
 
         
         dist = self.distance(lat1, lat2, lon1, lon2)
+        
+        with open('results.csv', 'w', newline='') as csvfile:
+                fieldnames = ['Distance', 'res.x', 'residuals']
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                if not self.created:
+                    writer.writeheader()
+                    self.created = True
+                writer.writerow({'Distance': str(dist), 'res.x': str(res.x), 'residuals': str(res.fun)})
        
         
         d = '%.3f'%(dist)
