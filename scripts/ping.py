@@ -226,7 +226,7 @@ class LocationEstimator:
             n_0 = 2
             self.__params = np.array([X_tx_0, Y_tx_0, P_tx_0, n_0])
         res_x = least_squares(self.__residuals, self.__params, 
-            bounds=([0, 167000, -np.inf, 1.9], [833000, 10000000, np.inf, 2.01]))
+            bounds=([0, 167000, -np.inf, 2], [833000, 10000000, np.inf, 6]))
             #bounds=([0, 167000, -np.inf, 2], [833000, 10000000, np.inf, np.inf]))
 
         if res_x.success:
