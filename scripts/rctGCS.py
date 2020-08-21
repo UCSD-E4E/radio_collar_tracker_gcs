@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 08/19/20  ML  Added config object to gcs, added appDirs for tiles output
 # 08/14/20  ML  Removed excel sheet outputs
 # 08/11/20  ML  Added export settings, pings, and vehicle path as json file
 # 08/06/20  NH  Refactored map loading code for ease of debugging
@@ -84,7 +85,7 @@ import configparser
 from cmath import exp
 import json
 import numpy as np
-
+from appdirs import AppDirs
 
 class GCS(QMainWindow):
     '''
@@ -95,9 +96,11 @@ class GCS(QMainWindow):
 
     defaultTimeout = 5
 
-    def __init__(self):
+    def __init__(self, configObj):
         '''
         Creates the GCS Application Object
+        Args:
+            configObj: a configparser object
         '''
         super().__init__()
         self.__log = logging.getLogger('rctGCS.GCS')
@@ -116,6 +119,7 @@ class GCS(QMainWindow):
         self.mapDisplay = None
         self.mainThread = None
         self.testFrame = None
+        self.config = configObj
         self.__createWidgets()
         for button in self._buttons:
             button.config(state='disabled')
@@ -406,15 +410,14 @@ class GCS(QMainWindow):
 
             
             config_path = 'gcsConfig.ini'   
-            config = configparser.ConfigParser()
-            config.read(config_path)
-            config['LastCoords'] = {}
-            config['LastCoords']['Lat1'] = str(lat1)
-            config['LastCoords']['Lon1'] = str(lon1)
-            config['LastCoords']['Lat2'] = str(lat2)
-            config['LastCoords']['Lon2'] = str(lon2)
+
+            self.config['LastCoords'] = {}
+            self.config['LastCoords']['Lat1'] = str(lat1)
+            self.config['LastCoords']['Lon1'] = str(lon1)
+            self.config['LastCoords']['Lat2'] = str(lat2)
+            self.config['LastCoords']['Lon2'] = str(lon2)
             with open(config_path, 'w') as configFile:
-                config.write(configFile)
+                self.config.write(configFile)
             
         if self._mavModel is not None:
             self._mavModel.stop()
@@ -1565,14 +1568,12 @@ class MapControl(CollapseFrame):
         Internal function to pull past coordinates from the config
         file if they exist
         '''
-        config_path = 'gcsConfig.ini'
-        config = configparser.ConfigParser()
-        config.read(config_path)
+
         try:
-            lat1 = config['LastCoords']['lat1']
-            lon1 = config['LastCoords']['lon1']
-            lat2 = config['LastCoords']['lat2']
-            lon2 = config['LastCoords']['lon2']
+            lat1 = self.__root.config['LastCoords']['lat1']
+            lon1 = self.__root.config['LastCoords']['lon1']
+            lat2 = self.__root.config['LastCoords']['lat2']
+            lon2 = self.__root.config['LastCoords']['lon2']
             return lat1, lon1, lat2, lon2
         except KeyError:
             return None, None, None, None
@@ -1626,10 +1627,33 @@ class MapControl(CollapseFrame):
         '''
         Internal function to load map from cached tiles
         '''
-        p1lat = float(self.__p1latEntry.text())
-        p1lon = float(self.__p1lonEntry.text())
-        p2lat = float(self.__p2latEntry.text())
-        p2lon = float(self.__p2lonEntry.text())
+        lat1 = self.__p1latEntry.text()
+        lon1 = self.__p1lonEntry.text()
+        lat2 = self.__p2latEntry.text()
+        lon2 = self.__p2lonEntry.text()
+        
+        if (lat1 == '') or (lon1 == '') or (lat2 == '') or (lon2 == ''):
+            lat1, lon1, lat2, lon2 = self.__coordsFromConf()
+            
+            self.__p1latEntry.setText(lat1)
+            self.__p1lonEntry.setText(lon1)
+            self.__p2latEntry.setText(lat2)
+            self.__p2lonEntry.setText(lon2)
+        
+        if lat1 is None or lat2 is None or lon1 is None or lon2 is None:
+            lat1 = 90
+            lat2 = -90
+            lon1 = -180
+            lon2 = 180
+            self.__p1latEntry.setText(lat1)
+            self.__p1lonEntry.setText(lon1)
+            self.__p2latEntry.setText(lat2)
+            self.__p2lonEntry.setText(lon2)
+        p1lat = float(lat1)
+        p1lon = float(lon1)
+        p2lat = float(lat2)
+        p2lon = float(lon2)
+        
         self.__mapFrame.setParent(None)
         self.__mapFrame = WebMap(self.__holder, p1lat, p1lon, 
                 p2lat, p2lon, True)
@@ -2244,9 +2268,8 @@ class WebMap(MapWidget):
         vehiclePathlayer = QgsVectorLayer(uriLine, 'VehiclePath', "memory")
         
         # Set drone image for marker symbol
-        path = QDir().currentPath()
-        full = path + '/camera.svg'
-        symbolSVG = QgsSvgMarkerSymbolLayer(full)
+        path = QDir().filePath('../resources/vehicleSymbol.svg')
+        symbolSVG = QgsSvgMarkerSymbolLayer(path)
         symbolSVG.setSize(4)
         symbolSVG.setFillColor(QColor('#0000ff'))
         symbolSVG.setStrokeColor(QColor('#ff0000'))
@@ -2351,7 +2374,8 @@ class WebMap(MapWidget):
         
         #load from cached tiles if true, otherwise loads from web    
         if self.loadCached:
-            path = QDir().currentPath()
+            dirs = AppDirs("GCS", "E4E")
+            path = dirs.site_data_dir.replace("\\", "/")
             urlWithParams = 'type=xyz&url=file:///'+ path+'/tiles/%7Bz%7D/%7Bx%7D/%7By%7D.png'
         else:
             urlWithParams = 'type=xyz&url=http://a.tile.openstreetmap.org/%7Bz%7D/%7Bx%7D/%7By%7D.png&zmax=19&zmin=0&crs=EPSG3857'    
@@ -2450,8 +2474,12 @@ class WebMap(MapWidget):
         Helper Function to facilitate the downloading of web tiles
         '''
         url = "http://c.tile.openstreetmap.org/%d/%d/%d.png" % (zoom, xtile, ytile)
-        dir_path = "tiles/%d/%d/" % (zoom, xtile)
-        download_path = "tiles/%d/%d/%d.png" % (zoom, xtile, ytile)
+        dirs = AppDirs("GCS", "E4E")
+        cachePath = dirs.site_data_dir.replace('\\', '/')
+         
+        tilePath = '/tiles/%d/%d/' % (zoom, xtile)
+        dir_path = cachePath + tilePath
+        download_path = cachePath +"/tiles/%d/%d/%d.png" % (zoom, xtile, ytile)
         
         if not os.path.exists(dir_path):
             os.makedirs(dir_path)
@@ -2622,27 +2650,24 @@ def configSetup():
     '''
     config_path = 'gcsConfig.ini'
     if(not os.path.isfile(config_path)):
-        prefix_path = QFileDialog.getExistingDirectory(None, 
-                'Select the Qgis directory')
-        if ("qgis" in prefix_path):            
-            config = configparser.ConfigParser()
-            config['FilePaths'] = {}
-            config['FilePaths']['PrefixPath'] = prefix_path
-            with open(config_path, 'w') as configFile:
-                config.write(configFile)
-                return prefix_path
-        else:
+        prefix_path = QFileDialog.getExistingDirectory(None, 'Select the Qgis directory')          
+        config = configparser.ConfigParser()
+        config['FilePaths'] = {}
+        config['FilePaths']['PrefixPath'] = prefix_path
+        if ("qgis" not in prefix_path):
             msg = QMessageBox()
-            msg.setText("Wrong file. Choose qgis file")
+            msg.setText("Warning, incorrect file chosen. Map tools may not function as expected")
             msg.setWindowTitle("Alert")
             msg.setIcon(QMessageBox.Critical)
             msg.exec_()
-            configSetup()
+        with open(config_path, 'w') as configFile:
+            config.write(configFile)
+            return config, prefix_path
     else:
         config = configparser.ConfigParser()
         config.read(config_path)
         prefix_path = config['FilePaths']['PrefixPath']
-        return prefix_path
+        return config, prefix_path
    
 
 
@@ -2662,15 +2687,18 @@ if __name__ == '__main__':
     ch.setFormatter(formatter)
     logger.addHandler(ch)
     
+  
     app = QgsApplication([], True)
-    prefix_path = configSetup() 
-    #prefix_path = config['FilePaths']['PrefixPath']
-    app.setPrefixPath(prefix_path, True) 
+    
+    configObj, prefix_path = configSetup()
+    
+    QgsApplication.setPrefixPath(prefix_path)
+
     app.initQgis()
 
-    ex = GCS()
+    ex = GCS(configObj)
     ex.show()
 
     exitcode = app.exec_()
-    QgsApplication.exitQgis()
+    app.exitQgis()
     sys.exit(exitcode)
