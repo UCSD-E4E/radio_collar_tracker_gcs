@@ -60,11 +60,9 @@
 import datetime as dt
 import utm
 import math
-from math import radians, cos, sin, asin, sqrt 
 import time
 import logging
 import sys
-from sys import argv
 import os
 import os.path
 import requests
@@ -75,16 +73,14 @@ from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5 import QtNetwork
-import qgis
+#import qgis
 from qgis.core import *    
 from qgis.gui import *  
 from qgis.utils import *
-from qgis.core import QgsProject
-from threading import Thread
 import configparser
-from cmath import exp
 import json
 import numpy as np
+from threading import Thread
 from appdirs import AppDirs
 
 class GCS(QMainWindow):

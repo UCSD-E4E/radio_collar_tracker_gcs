@@ -33,9 +33,7 @@ import numpy as np
 from scipy.optimize import least_squares
 import utm
 import rctComms
-import time
 
-#from Library.python.plugins.processing.tests import GdalAlgorithmsGeneralTest
 
 
 class rctPing:
