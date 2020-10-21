@@ -59,11 +59,9 @@
 import datetime as dt
 import utm
 import math
-from math import radians, cos, sin, asin, sqrt 
 import time
 import logging
 import sys
-from sys import argv
 import os
 import os.path
 import requests
@@ -74,14 +72,12 @@ from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5 import QtNetwork
-import qgis
 from qgis.core import *    
 from qgis.gui import *  
 from qgis.utils import *
 from qgis.core import QgsProject
 from threading import Thread
 import configparser
-from cmath import exp
 import json
 import numpy as np
 import csv
@@ -522,6 +518,12 @@ class GCS(QMainWindow):
         
         btn_exportAll = QPushButton('Export Info')
         btn_exportAll.clicked.connect(lambda:self.exportAll())
+        
+        btn_precision = QPushButton('Do Precision')
+        btn_precision.clicked.connect(lambda:self._mavModel.EST_mgr.doPrecisions(173500000))
+        
+        btn_heatMap = QPushButton('Display Heatmap')
+        btn_heatMap.clicked.connect(lambda:self.mapDisplay.setupHeatMap())
 
         wlay.addWidget(self._systemConnectionTab)
         wlay.addWidget(self.statusWidget)
@@ -530,6 +532,9 @@ class GCS(QMainWindow):
         wlay.addWidget(self.upgradeDisplay)
         wlay.addWidget(btn_startRecord)
         wlay.addWidget(btn_exportAll)
+        wlay.addWidget(btn_precision)
+        wlay.addWidget(btn_heatMap)
+        
         wlay.addStretch()
         content.resize(self.SBWidth, 400)
         frm_sideControl.setMinimumWidth(self.SBWidth)
@@ -1776,6 +1781,7 @@ class MapWidget(QWidget):
         '''
         QWidget.__init__(self)
         self.holder = QVBoxLayout()
+        self.groundTruth = None
         self.mapLayer = None
         self.vehicle = None
         self.vehiclePath = None
@@ -1783,6 +1789,7 @@ class MapWidget(QWidget):
         self.pingLayer = None
         self.pingRenderer = None
         self.estimate = None
+        self.heatMap = None
         self.pingMin = 800
         self.pingMax = 0
         self.indPing = 0
@@ -1800,13 +1807,47 @@ class MapWidget(QWidget):
                 QgsCoordinateReferenceSystem("EPSG:3857"), 
                 QgsCoordinateReferenceSystem("EPSG:4326"),
                 QgsProject.instance())
+        
+    
+    def setupHeatMap(self):
+        '''
+        Sets up the heatMap maplayer
+        Args:
+        '''
+        fileName = QFileDialog.getOpenFileName()
+        if fileName is not None:
+            self.heatMap = QgsRasterLayer(fileName[0], "heatMap")   
+            QgsProject.instance().addMapLayer(self.heatMap)
+            destCrs = self.mapLayer.crs()
+            rasterCrs = self.heatMap.crs()
+            
+            self.heatMap.setCrs(rasterCrs)
+            self.canvas.setDestinationCrs(destCrs)
+            
+            
+            fcn = QgsColorRampShader()
+            fcn.setColorRampType(QgsColorRampShader.Interpolated)
+            lst = [ QgsColorRampShader.ColorRampItem(0, QColor(0,0,255)), QgsColorRampShader.ColorRampItem(0.000075, QColor(255,255,0)),  QgsColorRampShader.ColorRampItem(0.00015, QColor(255,0,0))]
+            fcn.setColorRampItemList(lst)
+            shader = QgsRasterShader()
+            shader.setRasterShaderFunction(fcn)
+            renderer = QgsSingleBandPseudoColorRenderer(self.heatMap.dataProvider(), 1, shader)
+            renderer.setOpacity(0.6)
+            self.heatMap.setRenderer(renderer)
+            
 
+            self.canvas.setLayers([self.estimate, self.groundTruth,
+                               self.vehicle, self.pingLayer, 
+                               self.vehiclePath, self.heatMap, self.mapLayer]) 
+            
+
+        
     def adjustCanvas(self):
         '''
         Helper function to set and adjust the camvas' layers
         '''
         self.canvas.setExtent(self.mapLayer.extent())  
-        self.canvas.setLayers([self.estimate,
+        self.canvas.setLayers([self.estimate, self.groundTruth,
                                self.vehicle, self.pingLayer, 
                                self.vehiclePath, self.mapLayer]) 
         #self.canvas.setLayers([self.mapLayer])
@@ -2014,6 +2055,8 @@ class MapOptions(QWidget):
         self.lbl_dist = None
         self.__createWidgets()
         self.created = False
+        self.writer = None
+        self.hasPoint = False
         
 
 
@@ -2124,19 +2167,55 @@ class MapOptions(QWidget):
         '''
         lat1 = coord[0]
         lon1 = coord[1]
-        lat2 = 32.885889
-        lon2 = -117.234028
+        #lat2 = 32.885889
+        #lon2 = -117.234028
+        
+        # Center
+        #lat2 = 32.88736856384841
+        #lon2 = -117.23403141301122
+        
+        #20m beyond
+        #lat2 = 32.886060596190255
+        #lon2 = -117.23402797486396
+        
+        #20m right
+        #lat2 = 32.88736896379847
+        #lon2 = -117.23381758959809
+        
+        #50m right
+        #lat2 = 32.88736956303811
+        #lon2 = -117.23349685447043
+        
+        #diagonal
+        lat2 = 32.88606139568502
+        lon2 = -117.23360033431585
+        
+        if not self.hasPoint:
+            point = self.mapWidget.transformToWeb.transform(QgsPointXY(lon2, lat2))
+            vpr = self.mapWidget.groundTruth.dataProvider()
+            pnt = QgsGeometry.fromPointXY(point)
+            f = QgsFeature()
+            f.setGeometry(pnt)
+            vpr.addFeatures([f])
+            self.mapWidget.groundTruth.updateExtents()
+            self.hasPoint = True
 
         
         dist = self.distance(lat1, lat2, lon1, lon2)
         
-        with open('results.csv', 'w', newline='') as csvfile:
+        if not self.created:
+            with open('results.csv', 'w', newline='') as csvfile:
                 fieldnames = ['Distance', 'res.x', 'residuals']
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                if not self.created:
-                    writer.writeheader()
-                    self.created = True
-                writer.writerow({'Distance': str(dist), 'res.x': str(res.x), 'residuals': str(res.fun)})
+                self.writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                self.writer.writeheader()
+                self.created = True
+                self.writer.writerow({'Distance': str(dist), 'res.x': str(res.x), 'residuals': str(res.fun)})
+        else:
+            with open('results.csv', 'a+', newline='') as csvfile:
+                fieldnames = ['Distance', 'res.x', 'residuals']
+                self.writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                self.writer.writerow({'Distance': str(dist), 'res.x': str(res.x), 'residuals': str(res.fun)})
+                
        
         
         d = '%.3f'%(dist)
@@ -2152,17 +2231,17 @@ class MapOptions(QWidget):
             lon1: float value indicating the long value of a point
             lon2: float value indicating the long value of a second point
         '''
-        lon1 = radians(lon1) 
-        lon2 = radians(lon2) 
-        lat1 = radians(lat1) 
-        lat2 = radians(lat2) 
+        lon1 = math.radians(lon1) 
+        lon2 = math.radians(lon2) 
+        lat1 = math.radians(lat1) 
+        lat2 = math.radians(lat2) 
            
         # Haversine formula  
         dlon = lon2 - lon1  
         dlat = lat2 - lat1 
-        a = sin(dlat / 2)**2 + cos(lat1) * cos(lat2) * sin(dlon / 2)**2
+        a = math.sin(dlat / 2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2
       
-        c = 2 * asin(sqrt(a))  
+        c = 2 * math.asin(math.sqrt(a))  
          
         # Radius of earth in kilometers. Use 3956 for miles 
         r = 6371
@@ -2253,7 +2332,22 @@ class WebMap(MapWidget):
         layer.setAutoRefreshEnabled(True)
         
         return layer
+    
+    def setupGroundTruth(self):
+        '''
+        Sets up the groundTruth maplayer
+        Args:
+        '''
+        uri = "Point?crs=epsg:3857"
+        layer = QgsVectorLayer(uri, 'Estimate', "memory")
+        symbol = QgsMarkerSymbol.createSimple({'name':'square', 
+                'color':'cyan'})
+        layer.renderer().setSymbol(symbol)
+        
+        return layer
 
+   
+        
 
     def setupVehicleLayers(self):
         '''
@@ -2370,6 +2464,9 @@ class WebMap(MapWidget):
             
         if self.pingLayer is None:
             self.pingLayer, self.pingRenderer = self.setupPingLayer()
+            
+        if self.groundTruth is None:
+            self.groundTruth = self.setupGroundTruth()
         
         #load from cached tiles if true, otherwise loads from web    
         if self.loadCached:
@@ -2386,6 +2483,7 @@ class WebMap(MapWidget):
             
             #add all layers to map
             QgsProject.instance().addMapLayer(self.mapLayer)
+            QgsProject.instance().addMapLayer(self.groundTruth)
             QgsProject.instance().addMapLayer(self.estimate)
             QgsProject.instance().addMapLayer(self.vehicle)
             QgsProject.instance().addMapLayer(self.vehiclePath)
@@ -2444,7 +2542,7 @@ class WebMap(MapWidget):
             print("Rectangle:", r.xMinimum(),
                     r.yMinimum(), r.xMaximum(), r.yMaximum()
                  )
-            
+            '''
             if (r != None):
                 zoomStart = 17
                 tilecount = 0
@@ -2466,6 +2564,7 @@ class WebMap(MapWidget):
                 print("Download Complete")
             else:
                 print("Download Failed")
+            '''
             
     def downloadTile(self, xtile, ytile, zoom):
         '''
