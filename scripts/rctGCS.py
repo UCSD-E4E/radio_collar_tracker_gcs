@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 10/21/20  ML  Removed testing components
 # 08/19/20  ML  Added config object to gcs, added appDirs for tiles output
 # 08/14/20  ML  Removed excel sheet outputs
 # 08/11/20  ML  Added export settings, pings, and vehicle path as json file
@@ -180,8 +181,6 @@ class GCS(QMainWindow):
             if self.mapDisplay is not None:
                 self.mapDisplay.plotEstimate(coord, frequency)
                 
-            if self.mapOptions is not None:
-                self.mapOptions.estDistance(coord)
 
 
     def __handleNewPing(self):
@@ -2018,7 +2017,6 @@ class MapOptions(QWidget):
         self.mapWidget = None
         self.btn_cacheMap = None
         self.isWebMap = False
-        self.lbl_dist = None
         self.__createWidgets()
         
 
@@ -2053,38 +2051,14 @@ class MapOptions(QWidget):
         lay_export.addWidget(btn_vehiclePathExport)
         exportTab.setContentLayout(lay_export)
         
-        lay_mapOptions.addWidget(exportTab)        
+        lay_mapOptions.addWidget(exportTab)    
         
-        distWidg = QWidget()
-        distLay = QHBoxLayout()
-        lbl_dist = QLabel('Distance from Actual')
-        self.lbl_dist = QLabel('')
-        distLay.addWidget(lbl_dist)
-        distLay.addWidget(self.lbl_dist)
-        distWidg.setLayout(distLay)
         
-        lay_mapOptions.addWidget(distWidg)
+        
 
         self.setLayout(lay_mapOptions)
 
 
-        '''
-        # MAP LEGEND
-        frm_mapLegend = tk.Frame(master=frm_mapGrid, width=self.SBWidth)
-        frm_mapLegend.pack(side=tk.BOTTOM)
-
-        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
-                              bg='gray', text='Map Legend')
-        lbl_legend.grid(column=0, row=0, sticky='ew')
-
-        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
-                              bg='light gray', text='Vehicle')
-        lbl_legend.grid(column=0, row=1, sticky='ew')
-
-        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
-                              bg='light gray', text='Target')
-        lbl_legend.grid(column=0, row=2, sticky='ew')
-        '''
     def __cacheMap(self):
         '''
         Inner function to facilitate map caching
@@ -2115,57 +2089,31 @@ class MapOptions(QWidget):
         '''
         self.isWebMap = isWebMap
         self.mapWidget = mapWidg
+        self.addLegend()
         
         self.btn_cacheMap.setEnabled(isWebMap)
         
-    def estDistance(self, coord):
+    def addLegend(self):
         '''
-        An inner function to display the distance from the 
-        current estimate point to the ground truth
-        Args:
-            coord: A tuple of float values indicating an EPSG:4326 lat/Long 
-                   coordinate pair
-            stale: A boolean
-            res: The residuals vector
+        Function to add Map Legend widget when map is loaded
         '''
-        lat1 = coord[0]
-        lon1 = coord[1]
-        lat2 = 32.885889
-        lon2 = -117.234028
+        #TODO add labels and symbols for vehicle, pings, and vehicle path
+        '''
+        # MAP LEGEND
+        frm_mapLegend = tk.Frame(master=frm_mapGrid, width=self.SBWidth)
+        frm_mapLegend.pack(side=tk.BOTTOM)
+        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
+                              bg='gray', text='Map Legend')
+        lbl_legend.grid(column=0, row=0, sticky='ew')
+        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
+                              bg='light gray', text='Vehicle')
+        lbl_legend.grid(column=0, row=1, sticky='ew')
+        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
+                              bg='light gray', text='Target')
+        lbl_legend.grid(column=0, row=2, sticky='ew')
+        '''
+        
 
-        
-        dist = self.distance(lat1, lat2, lon1, lon2)
-       
-        
-        d = '%.3f'%(dist)
-
-        self.lbl_dist.setText(d + '(m.)')
-        
-    def distance(self, lat1, lat2, lon1, lon2): 
-        '''
-        Helper function to calculate distance
-        Args:
-            lat1: float value indicating the lat value of a point
-            lat2: float value indicating the lat value of a second point
-            lon1: float value indicating the long value of a point
-            lon2: float value indicating the long value of a second point
-        '''
-        lon1 = radians(lon1) 
-        lon2 = radians(lon2) 
-        lat1 = radians(lat1) 
-        lat2 = radians(lat2) 
-           
-        # Haversine formula  
-        dlon = lon2 - lon1  
-        dlat = lat2 - lat1 
-        a = sin(dlat / 2)**2 + cos(lat1) * cos(lat2) * sin(dlon / 2)**2
-      
-        c = 2 * asin(sqrt(a))  
-         
-        # Radius of earth in kilometers. Use 3956 for miles 
-        r = 6371
-           
-        return(c * r * 1000)
     
     def exportPing(self):
         '''
