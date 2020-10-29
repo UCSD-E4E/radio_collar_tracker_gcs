@@ -412,8 +412,9 @@ class LocationEstimator:
         freq = 17350000
 
         f_pings = self.__pings
-        if len(f_pings) <= 6:
-            return
+        #if len(f_pings) <= 6:
+        #    return
+        #f_pings = [f_pings[0], f_pings[1], f_pings[2]]
 
         print("%03.3f has %d pings" % (freq / 1e6, len(f_pings)))
 
@@ -424,7 +425,7 @@ class LocationEstimator:
         eastings = [ping[0] for ping in f_pings]
         northings = [ping[1] for ping in f_pings]
         
-        newAmplitudes, newEastings, newNorthings = self.resampleLocation(amplitudes, eastings, northings)
+        #newAmplitudes, newEastings, newNorthings = self.resampleLocation(amplitudes, eastings, northings)
         zonenum = 11
         
         zone = 'S'
@@ -432,7 +433,7 @@ class LocationEstimator:
         x0 = np.array([40, 2, np.mean(eastings), np.mean(northings), 0])
 
         data = np.array([amplitudes, eastings, northings]).transpose()
-        data2 = np.array([newAmplitudes, newEastings, newNorthings]).transpose()
+        #data2 = np.array([newAmplitudes, newEastings, newNorthings]).transpose()
         res_x = least_squares(residuals, x0, bounds=([0, 1.5, 0, 0, 0], [np.inf, 6, 1e9, 1e9, 20]), kwargs={'data':data})
         if not res_x.status:
             print("Failed to converge!")
@@ -452,11 +453,11 @@ class LocationEstimator:
 
         d = np.linalg.norm(np.array([dx, dy]).transpose() - np.array([tx, ty]), axis=1)
         
-        d2x = data2[:,1]
-        d2y = data2[:,2]
-        R2 = newAmplitudes
+        #d2x = data2[:,1]
+        #d2y = data2[:,2]
+        #R2 = newAmplitudes
 
-        d2 = np.linalg.norm(np.array([d2x, d2y]).transpose() - np.array([tx, ty]), axis=1)
+        #d2 = np.linalg.norm(np.array([d2x, d2y]).transpose() - np.array([tx, ty]), axis=1)
 
 
         # data
@@ -471,21 +472,21 @@ class LocationEstimator:
         print("P variation: %.3f" % (sigma_P))
 
         margin = 10
-        tiffXSize = int(2 * np.max(d2) + margin) #constant indicates resolution
-        tiffYSize = int(2 * np.max(d2) + margin)
+        tiffXSize = int(2 * np.max(d) + margin) #constant indicates resolution
+        tiffYSize = int(2 * np.max(d) + margin)
         pixelSize = 1
         heatMapArea = np.ones((tiffYSize, tiffXSize)) # [y, x]
-        minY = ty - np.max(d2) - margin / 2
-        refY = ty + np.max(d2) + margin / 2
-        refX = tx - np.max(d2) - margin / 2
-        maxX = tx + np.max(d2) + margin / 2
+        minY = ty - np.max(d) - margin / 2
+        refY = ty + np.max(d) + margin / 2
+        refX = tx - np.max(d) - margin / 2
+        maxX = tx + np.max(d) + margin / 2
 
-        models = [SignalModel(mu_P, sigma_P, n, k, powers) for powers in R2]
+        models = [SignalModel(mu_P, sigma_P, n, k, powers) for powers in R]
 
         for x in range(tiffXSize):
             for y in range(tiffYSize):
                 # for i in [0]:
-                for i in range(len(R2)):
+                for i in range(len(R)):
                     heatMapArea[y, x] += models[i].p_x(np.array([refX + x, refY - y]), np.array([tx, ty]))
 
         if np.isnan(np.min(heatMapArea)):
