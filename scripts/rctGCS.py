@@ -2098,21 +2098,8 @@ class MapOptions(QWidget):
         Function to add Map Legend widget when map is loaded
         '''
         #TODO add labels and symbols for vehicle, pings, and vehicle path
-        '''
-        # MAP LEGEND
-        frm_mapLegend = tk.Frame(master=frm_mapGrid, width=self.SBWidth)
-        frm_mapLegend.pack(side=tk.BOTTOM)
-        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
-                              bg='gray', text='Map Legend')
-        lbl_legend.grid(column=0, row=0, sticky='ew')
-        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
-                              bg='light gray', text='Vehicle')
-        lbl_legend.grid(column=0, row=1, sticky='ew')
-        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
-                              bg='light gray', text='Target')
-        lbl_legend.grid(column=0, row=2, sticky='ew')
-        '''
-        
+        curLayout = self.layout()
+        #curLayout.addWidget(legendWidget)
 
     
     def exportPing(self):
