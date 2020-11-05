@@ -1668,7 +1668,41 @@ class MapControl(CollapseFrame):
 
 
 
+class PolygonMapTool(QgsMapToolEmitPoint):
+    def __init__(self, canvas):
+        self.canvas = canvas
+        QgsMapToolEmitPoint.__init__(self, self.canvas)
+        self.rubberBand = QgsRubberBand(self.canvas, True)
+        self.rubberBand.setColor(Qt.red)
+        self.rubberBand.setWidth(1)
+        self.reset()
 
+    def reset(self):
+        self.startPoint = self.endPoint = None
+        self.isEmittingPoint = False
+        self.rubberBand.reset(True)
+
+    def canvasPressEvent(self, e):
+        self.startPoint = self.toMapCoordinates(e.pos())
+        self.endPoint = self.startPoint
+        self.isEmittingPoint = True
+        self.showLine(self.startPoint, self.endPoint)
+
+    def canvasReleaseEvent(self, e):
+        self.isEmittingPoint = False
+
+    def canvasMoveEvent(self, e):
+        if not self.isEmittingPoint:
+            return
+
+        self.endPoint = self.toMapCoordinates(e.pos())
+
+    def showLine(self, startPoint, endPoint):
+        return
+
+    def deactivate(self):
+        QgsMapTool.deactivate(self)
+        self.deactivated.emit()
 
 
 class RectangleMapTool(QgsMapToolEmitPoint):
@@ -1789,6 +1823,8 @@ class MapWidget(QWidget):
         self.pingLayer = None
         self.pingRenderer = None
         self.estimate = None
+        self.toolPolygon = None
+        self.polygonAction = None
         self.pingMin = 800
         self.pingMax = 0
         self.indPing = 0
@@ -1850,7 +1886,22 @@ class MapWidget(QWidget):
         self.toolZoomIn.setAction(self.actionZoomIn)
         self.toolZoomOut = QgsMapToolZoom(self.canvas, True) # true = out
         self.toolZoomOut.setAction(self.actionZoomOut)
-
+        
+        self.polygonAction = QAction("Polygon", self)
+        self.polygonAction.setCheckable(True)
+        self.polygonAction.triggered.connect(self.polygon)
+        self.toolbar.addAction(self.polygonAction)
+        
+        self.toolPolygon = PolygonMapTool(self.canvas)
+        self.toolPolygon.setAction(self.polygonAction)
+        
+    def polygon(self):
+        '''
+        Helper function to set polygon tool when it is selected from 
+        the toolbar
+        '''
+        self.canvas.setMapTool(self.toolPolygon)
+        
 
 
     def zoomIn(self):
