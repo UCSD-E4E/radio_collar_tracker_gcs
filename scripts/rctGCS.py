@@ -74,6 +74,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5 import QtNetwork
+from PyQt5.Qt import QSvgWidget
 #import qgis
 from qgis.core import *    
 from qgis.gui import *  
@@ -2097,7 +2098,9 @@ class MapOptions(QWidget):
         '''
         Function to add Map Legend widget when map is loaded
         '''
-        #TODO add labels and symbols for vehicle, pings, and vehicle path
+        mapLegend = MapLegend()
+        mapLegend.__init__()
+
         '''
         # MAP LEGEND
         frm_mapLegend = tk.Frame(master=frm_mapGrid, width=self.SBWidth)
@@ -2587,6 +2590,106 @@ class StaticMap(MapWidget):
         else:
             print('invalid layer')
 
+class MapLegend(QWidget):
+    '''
+    Custom widget to display map legend
+    '''
+    def __init__(self):
+            QWidget.__init__(self)
+
+            self.__createWidget()
+
+    def __createWidget(self):
+        '''
+        Helper function that creates layout of legend
+        '''
+
+        self.__layMapLegend = QGridLayout()
+        self.setLayout(self.__layMapLegend)
+        self.__layMapLegend.setSpacing(10)
+
+        #Creating the labels for legend
+        lbl_vehicleSymb = QLabel('Vehicle Location', self)
+        lbl_vehicleTravel = QLabel('Vehicle Path', self)
+        lbl_symbolBlue = QLabel('Weakest', self)
+        lbl_symbolGreen = QLabel('Weak', self)
+        lbl_symbolYellow = QLabel('Neutral', self)
+        lbl_symbolOrange = QLabel('Strong', self)
+        lbl_symbolRed = QLabel('Strongest', self)
+        lbl_estimatePoint = QLabel('Estimated point', self)
+
+
+        #Adds vehicle locations icon
+        img_vehicleSymb = QSvgWidget('vehicleSymbol.svg', self)
+        img_vehicleSymb.load('vehicleSymbol.svg')
+        img_vehicleSymb.setFixedWidth(50)
+        img_vehicleSymb.setFixedHeight(50)
+
+        #Adding weakest ping
+        img_symbolBlue = QSvgWidget('symbBlue.svg', self)
+        img_symbolBlue.load('symbBlue.svg')
+        img_symbolBlue.setFixedWidth(50)
+        img_symbolBlue.setFixedHeight(50)
+
+        #Adding weak ping
+        img_symbolGreen = QSvgWidget('symbGreen.svg', self)
+        img_symbolGreen.load('symbGreen.svg')
+        img_symbolGreen.setFixedWidth(50)
+        img_symbolGreen.setFixedHeight(50)
+
+        #Adding Neutral ping
+        img_symbolYellow = QSvgWidget('symbYellow.svg', self)
+        img_symbolYellow.load('symbYellow.svg')
+        img_symbolYellow.setFixedWidth(50)
+        img_symbolYellow.setFixedHeight(50)
+
+        #Adding Strong ping
+        img_symbolOrange = QSvgWidget('symbOrange.svg', self)
+        img_symbolOrange.load('symbOrange.svg')
+        img_symbolOrange.setFixedWidth(50)
+        img_symbolOrange.setFixedHeight(50)           
+
+        #Adding Strongest ping
+        img_symbolRed = QSvgWidget('symbRed.svg', self)
+        img_symbolRed.load('symbRed.svg')
+        img_symbolRed.setFixedWidth(50)
+        img_symbolRed.setFixedHeight(50)
+
+        #Adding Estimated Point
+        img_symbolEstPoint = QSvgWidget('symbEstPoint.svg', self)
+        img_symbolEstPoint.load('symbEstPoint.svg')
+        img_symbolEstPoint.setFixedWidth(50)
+        img_symbolEstPoint.setFixedHeight(50)
+
+        #Adding Vehicle Path
+        img_symbolVPath = QSvgWidget('symbVehiclePath.svg', self)
+        img_symbolVPath.load('symbVehiclePath.svg')
+        img_symbolVPath.setFixedWidth(50)
+        img_symbolVPath.setFixedHeight(50)
+
+
+        #Adding Labels to the layout
+        self.__layMapLegend.addWidget(lbl_estimatePoint, 1, 1)
+        self.__layMapLegend.addWidget(lbl_vehicleSymb, 2, 1)
+        self.__layMapLegend.addWidget(lbl_vehicleTravel, 3, 1)
+        self.__layMapLegend.addWidget(lbl_symbolBlue, 4, 1)
+        self.__layMapLegend.addWidget(lbl_symbolGreen, 5, 1)
+        self.__layMapLegend.addWidget(lbl_symbolYellow, 6, 1)
+        self.__layMapLegend.addWidget(lbl_symbolOrange, 7, 1)
+        self.__layMapLegend.addWidget(lbl_symbolRed, 8, 1)
+
+        #Adding label images to the layout
+        self.__layMapLegend.addWidget(img_symbolEstPoint, 1, 2)
+        self.__layMapLegend.addWidget(img_vehicleSymb,2,2)
+        self.__layMapLegend.addWidget(img_symbolVPath,3,2)
+        self.__layMapLegend.addWidget(img_symbolBlue,4,2)
+        self.__layMapLegend.addWidget(img_symbolGreen,5,2)
+        self.__layMapLegend.addWidget(img_symbolYellow,6,2)
+        self.__layMapLegend.addWidget(img_symbolOrange, 7, 2)
+        self.__layMapLegend.addWidget(img_symbolRed,8,2)
+
+        self.show()
+
 def configSetup():
     '''
     Helper function to set up paths to QGIS lbrary files, and 
@@ -2612,6 +2715,7 @@ def configSetup():
         config.read(config_path)
         prefix_path = config['FilePaths']['PrefixPath']
         return config, prefix_path
+
    
 
 
