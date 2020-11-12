@@ -195,15 +195,7 @@ class GCS(QMainWindow):
             u = (last[0], last[1], zone, let)
             coord = utm.to_latlon(*u)
             power = last[3]
-            '''
-            with open('points.csv', 'w', newline='') as csvfile:
-                fieldnames = ['lat', 'long', 'Power']
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                if not self.pingSheetCreated:
-                    writer.writeheader()
-                    self.pingSheetCreated = True
-                writer.writerow({'Lat': coord[0], 'Long': coord[1], 'Power': power})
-            ''' 
+
             if self.mapDisplay is not None:
                 self.mapDisplay.plotPing(coord, power)
 
@@ -347,7 +339,7 @@ class GCS(QMainWindow):
                     zone, let = self._mavModel.EST_mgr.getUTMZone()
                     u = (pingArr[0], pingArr[1], zone, let)
                     coord = utm.to_latlon(*u)
-                    amp = pingArr[4]
+                    amp = pingArr[3]
                     newPing = {}
                     newPing['Frequency'] = frequency
                     newPing['Coordinate'] = coord
@@ -373,24 +365,25 @@ class GCS(QMainWindow):
                     optionDict[key] = optionVars[key].text()
                     
             final['System Settings'] = optionDict
-                
-        varDict = self._mavModel.state
-        newVarDict = {}
-        
-        for key in varDict.keys():
-            if ((key == 'STS_sdrStatus') or (key == 'STS_dirStatus') or 
-                (key == 'STS_gpsStatus') or (key == 'STS_sysStatus')):
-                temp = {}
-                temp['name'] = varDict[key].name
-                temp['value'] = varDict[key].value
-                newVarDict[key] = temp
-            elif(key == 'VCL_track'):
-                pass
-            else:
-                newVarDict[key] = varDict[key]
-
+          
+        if self._mavModel is not None:      
+            varDict = self._mavModel.state
+            newVarDict = {}
             
-        final['States'] = newVarDict
+            for key in varDict.keys():
+                if ((key == 'STS_sdrStatus') or (key == 'STS_dirStatus') or 
+                    (key == 'STS_gpsStatus') or (key == 'STS_sysStatus')):
+                    temp = {}
+                    temp['name'] = varDict[key].name
+                    temp['value'] = varDict[key].value
+                    newVarDict[key] = temp
+                elif(key == 'VCL_track'):
+                    pass
+                else:
+                    newVarDict[key] = varDict[key]
+    
+                
+            final['States'] = newVarDict
             
         with open('data.json', 'w') as outfile:
             json.dump(final, outfile)
@@ -1824,18 +1817,6 @@ class MapWidget(QWidget):
             self.heatMap.setCrs(rasterCrs)
             self.canvas.setDestinationCrs(destCrs)
             
-            '''
-            fcn = QgsColorRampShader()
-            fcn.setColorRampType(QgsColorRampShader.Interpolated)
-            lst = [ QgsColorRampShader.ColorRampItem(0, QColor(0,0,255)), QgsColorRampShader.ColorRampItem(0.000075, QColor(255,255,0)),  QgsColorRampShader.ColorRampItem(0.00015, QColor(255,0,0))]
-            fcn.setColorRampItemList(lst)
-            shader = QgsRasterShader()
-            shader.setRasterShaderFunction(fcn)
-            renderer = QgsSingleBandPseudoColorRenderer(self.heatMap.dataProvider(), 1, shader)
-            renderer.setOpacity(0.6)
-            self.heatMap.setRenderer(renderer)
-            '''
-            
 
             self.canvas.setLayers([self.estimate, self.groundTruth,
                                self.vehicle, self.pingLayer, 
@@ -2106,23 +2087,6 @@ class MapOptions(QWidget):
         self.setLayout(lay_mapOptions)
 
 
-        '''
-        # MAP LEGEND
-        frm_mapLegend = tk.Frame(master=frm_mapGrid, width=self.SBWidth)
-        frm_mapLegend.pack(side=tk.BOTTOM)
-
-        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
-                              bg='gray', text='Map Legend')
-        lbl_legend.grid(column=0, row=0, sticky='ew')
-
-        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
-                              bg='light gray', text='Vehicle')
-        lbl_legend.grid(column=0, row=1, sticky='ew')
-
-        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
-                              bg='light gray', text='Target')
-        lbl_legend.grid(column=0, row=2, sticky='ew')
-        '''
     def __cacheMap(self):
         '''
         Inner function to facilitate map caching
@@ -2362,7 +2326,7 @@ class WebMap(MapWidget):
         
         # Set drone image for marker symbol
         path = QDir().currentPath()
-        full = path + '/camera.svg'
+        full = path + '/../resources/vehicleSymbol.svg'
         symbolSVG = QgsSvgMarkerSymbolLayer(full)
         symbolSVG.setSize(4)
         symbolSVG.setFillColor(QColor('#0000ff'))
@@ -2430,9 +2394,6 @@ class WebMap(MapWidget):
         pingRenderer = QgsGraduatedSymbolRenderer('Amp', ranges)
         
         
-        #myClassificationMethod = QgsApplication.classificationMethodRegistry().method("EqualInterval")
-        #pingRenderer.setClassificationMethod(myClassificationMethod)
-        #pingRenderer.setClassAttribute('Amp')
         style = QgsStyle().defaultStyle()
         defaultColorRampNames = style.colorRampNames()
         ramp = style.colorRamp(defaultColorRampNames[22])
