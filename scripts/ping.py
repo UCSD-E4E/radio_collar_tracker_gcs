@@ -429,24 +429,21 @@ class LocationEstimator:
         eastings = [ping[0] for ping in f_pings]
         northings = [ping[1] for ping in f_pings]
         
-        newAmplitudes, newEastings, newNorthings = self.resampleLocation(amplitudes, eastings, northings)
+        #newAmplitudes, newEastings, newNorthings = self.resampleLocation(amplitudes, eastings, northings)
         zonenum = 11
         
         zone = 'S'
 
-        x0 = np.array([40, 2, np.mean(eastings), np.mean(northings), 0])
 
         data = np.array([amplitudes, eastings, northings]).transpose()
-        res_x = least_squares(residuals, x0, bounds=([0, 1.5, 0, 0, 0], [np.inf, 6, 1e9, 1e9, 20]), kwargs={'data':data})
-        if not res_x.status:
-            print("Failed to converge!")
-            return
+        res_x = self.result
 
-        P = res_x.x[0]
-        n = res_x.x[1]
-        tx = res_x.x[2]
-        ty = res_x.x[3]
-        k = res_x.x[4]
+
+        P = res_x.x[2]
+        n = res_x.x[3]
+        tx = res_x.x[0]
+        ty = res_x.x[1]
+        k = 0
 
         print("Params: %.3f, %.3f, %.0f, %.0f, %.3f" % (P, n, tx, ty, k))
 
@@ -464,7 +461,7 @@ class LocationEstimator:
         with open(outputFileName, 'w') as ofile:
             for i in range(len(R)):
                 ofile.write("%f,%f\n" % (R[i], d[i]))
-        P_samp = R - k + 10 * n * np.log10(d)
+        P_samp = np.array(R) - k + 10 * n * np.log10(d)
         mu_P = np.mean(P_samp)
         sigma_P = np.var(P_samp)
         print("P variation: %.3f" % (sigma_P))
