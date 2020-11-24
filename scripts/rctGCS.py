@@ -2099,7 +2099,7 @@ class MapOptions(QWidget):
         Function to add Map Legend widget when map is loaded
         '''
         mapLegend = MapLegend()
-        mapLegend.__init__()
+        self.layout().addWidget(mapLegend)
 
         '''
         # MAP LEGEND
@@ -2620,50 +2620,50 @@ class MapLegend(QWidget):
 
 
         #Adds vehicle locations icon
-        img_vehicleSymb = QSvgWidget('vehicleSymbol.svg', self)
-        img_vehicleSymb.load('vehicleSymbol.svg')
+        img_vehicleSymb = QSvgWidget('../resources/vehicleSymbol.svg', self)
+        img_vehicleSymb.load('../resources/vehicleSymbol.svg')
         img_vehicleSymb.setFixedWidth(50)
         img_vehicleSymb.setFixedHeight(50)
 
         #Adding weakest ping
-        img_symbolBlue = QSvgWidget('symbBlue.svg', self)
-        img_symbolBlue.load('symbBlue.svg')
+        img_symbolBlue = QSvgWidget('../resources/symbBlue.svg', self)
+        img_symbolBlue.load('../resources/symbBlue.svg')
         img_symbolBlue.setFixedWidth(50)
         img_symbolBlue.setFixedHeight(50)
 
         #Adding weak ping
-        img_symbolGreen = QSvgWidget('symbGreen.svg', self)
-        img_symbolGreen.load('symbGreen.svg')
+        img_symbolGreen = QSvgWidget('../resources/symbGreen.svg', self)
+        img_symbolGreen.load('../resources/symbGreen.svg')
         img_symbolGreen.setFixedWidth(50)
         img_symbolGreen.setFixedHeight(50)
 
         #Adding Neutral ping
-        img_symbolYellow = QSvgWidget('symbYellow.svg', self)
-        img_symbolYellow.load('symbYellow.svg')
+        img_symbolYellow = QSvgWidget('../resources/symbYellow.svg', self)
+        img_symbolYellow.load('../resources/symbYellow.svg')
         img_symbolYellow.setFixedWidth(50)
         img_symbolYellow.setFixedHeight(50)
 
         #Adding Strong ping
-        img_symbolOrange = QSvgWidget('symbOrange.svg', self)
-        img_symbolOrange.load('symbOrange.svg')
+        img_symbolOrange = QSvgWidget('../resources/symbOrange.svg', self)
+        img_symbolOrange.load('../resources/symbOrange.svg')
         img_symbolOrange.setFixedWidth(50)
         img_symbolOrange.setFixedHeight(50)           
 
         #Adding Strongest ping
-        img_symbolRed = QSvgWidget('symbRed.svg', self)
-        img_symbolRed.load('symbRed.svg')
+        img_symbolRed = QSvgWidget('../resources/symbRed.svg', self)
+        img_symbolRed.load('../resources/symbRed.svg')
         img_symbolRed.setFixedWidth(50)
         img_symbolRed.setFixedHeight(50)
 
         #Adding Estimated Point
-        img_symbolEstPoint = QSvgWidget('symbEstPoint.svg', self)
-        img_symbolEstPoint.load('symbEstPoint.svg')
+        img_symbolEstPoint = QSvgWidget('../resources/symbEstPoint.svg', self)
+        img_symbolEstPoint.load('../resources/symbEstPoint.svg')
         img_symbolEstPoint.setFixedWidth(50)
         img_symbolEstPoint.setFixedHeight(50)
 
         #Adding Vehicle Path
-        img_symbolVPath = QSvgWidget('symbVehiclePath.svg', self)
-        img_symbolVPath.load('symbVehiclePath.svg')
+        img_symbolVPath = QSvgWidget('../resources/symbVehiclePath.svg', self)
+        img_symbolVPath.load('../resources/symbVehiclePath.svg')
         img_symbolVPath.setFixedWidth(50)
         img_symbolVPath.setFixedHeight(50)
 
@@ -2687,8 +2687,6 @@ class MapLegend(QWidget):
         self.__layMapLegend.addWidget(img_symbolYellow,6,2)
         self.__layMapLegend.addWidget(img_symbolOrange, 7, 2)
         self.__layMapLegend.addWidget(img_symbolRed,8,2)
-
-        self.show()
 
 def configSetup():
     '''
