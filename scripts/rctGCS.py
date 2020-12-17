@@ -2178,6 +2178,22 @@ class MapOptions(QWidget):
         mapLegend = MapLegend()
         self.layout().addWidget(mapLegend)
 
+        '''
+        # MAP LEGEND
+        frm_mapLegend = tk.Frame(master=frm_mapGrid, width=self.SBWidth)
+        frm_mapLegend.pack(side=tk.BOTTOM)
+        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
+                              bg='gray', text='Map Legend')
+        lbl_legend.grid(column=0, row=0, sticky='ew')
+        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
+                              bg='light gray', text='Vehicle')
+        lbl_legend.grid(column=0, row=1, sticky='ew')
+        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
+                              bg='light gray', text='Target')
+        lbl_legend.grid(column=0, row=2, sticky='ew')
+        '''
+        
+
     
     def exportPing(self):
         '''
@@ -2749,7 +2765,6 @@ class MapLegend(QWidget):
         self.__layMapLegend.addWidget(img_symbolOrange, 7, 2)
         self.__layMapLegend.addWidget(img_symbolRed,8,2)
 
-
 def configSetup():
     '''
     Helper function to set up paths to QGIS lbrary files, and 
@@ -2775,6 +2790,7 @@ def configSetup():
         config.read(config_path)
         prefix_path = config['FilePaths']['PrefixPath']
         return config, prefix_path
+
    
 
 
