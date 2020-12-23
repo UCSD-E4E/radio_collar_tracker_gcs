@@ -20,6 +20,8 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 10/21/20  ML  Removed testing components
+# 08/19/20  ML  Added config object to gcs, added appDirs for tiles output
 # 08/14/20  ML  Removed excel sheet outputs
 # 08/11/20  ML  Added export settings, pings, and vehicle path as json file
 # 08/06/20  NH  Refactored map loading code for ease of debugging
@@ -72,16 +74,19 @@ from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5 import QtNetwork
+from PyQt5.Qt import QSvgWidget
+#import qgis
 from qgis.core import *    
 from qgis.gui import *  
 from qgis.utils import *
-from qgis.core import QgsProject
-from threading import Thread
 import configparser
 import json
 import numpy as np
+<<<<<<< HEAD
 import csv
 
+from threading import Thread
+from appdirs import AppDirs
 
 class GCS(QMainWindow):
     '''
@@ -92,9 +97,11 @@ class GCS(QMainWindow):
 
     defaultTimeout = 5
 
-    def __init__(self):
+    def __init__(self, configObj):
         '''
         Creates the GCS Application Object
+        Args:
+            configObj: a configparser object
         '''
         super().__init__()
         self.__log = logging.getLogger('rctGCS.GCS')
@@ -114,6 +121,7 @@ class GCS(QMainWindow):
         self.mainThread = None
         self.testFrame = None
         self.pingSheetCreated = False
+        self.config = configObj
         self.__createWidgets()
         for button in self._buttons:
             button.config(state='disabled')
@@ -180,8 +188,6 @@ class GCS(QMainWindow):
             if self.mapDisplay is not None:
                 self.mapDisplay.plotEstimate(coord, frequency)
                 
-            if self.mapOptions is not None:
-                self.mapOptions.estDistance(coord, stale, res)
 
 
     def __handleNewPing(self):
@@ -408,15 +414,14 @@ class GCS(QMainWindow):
 
             
             config_path = 'gcsConfig.ini'   
-            config = configparser.ConfigParser()
-            config.read(config_path)
-            config['LastCoords'] = {}
-            config['LastCoords']['Lat1'] = str(lat1)
-            config['LastCoords']['Lon1'] = str(lon1)
-            config['LastCoords']['Lat2'] = str(lat2)
-            config['LastCoords']['Lon2'] = str(lon2)
+
+            self.config['LastCoords'] = {}
+            self.config['LastCoords']['Lat1'] = str(lat1)
+            self.config['LastCoords']['Lon1'] = str(lon1)
+            self.config['LastCoords']['Lat2'] = str(lat2)
+            self.config['LastCoords']['Lon2'] = str(lon2)
             with open(config_path, 'w') as configFile:
-                config.write(configFile)
+                self.config.write(configFile)
             
         if self._mavModel is not None:
             self._mavModel.stop()
@@ -1576,14 +1581,12 @@ class MapControl(CollapseFrame):
         Internal function to pull past coordinates from the config
         file if they exist
         '''
-        config_path = 'gcsConfig.ini'
-        config = configparser.ConfigParser()
-        config.read(config_path)
+
         try:
-            lat1 = config['LastCoords']['lat1']
-            lon1 = config['LastCoords']['lon1']
-            lat2 = config['LastCoords']['lat2']
-            lon2 = config['LastCoords']['lon2']
+            lat1 = self.__root.config['LastCoords']['lat1']
+            lon1 = self.__root.config['LastCoords']['lon1']
+            lat2 = self.__root.config['LastCoords']['lat2']
+            lon2 = self.__root.config['LastCoords']['lon2']
             return lat1, lon1, lat2, lon2
         except KeyError:
             return None, None, None, None
@@ -1637,10 +1640,33 @@ class MapControl(CollapseFrame):
         '''
         Internal function to load map from cached tiles
         '''
-        p1lat = float(self.__p1latEntry.text())
-        p1lon = float(self.__p1lonEntry.text())
-        p2lat = float(self.__p2latEntry.text())
-        p2lon = float(self.__p2lonEntry.text())
+        lat1 = self.__p1latEntry.text()
+        lon1 = self.__p1lonEntry.text()
+        lat2 = self.__p2latEntry.text()
+        lon2 = self.__p2lonEntry.text()
+        
+        if (lat1 == '') or (lon1 == '') or (lat2 == '') or (lon2 == ''):
+            lat1, lon1, lat2, lon2 = self.__coordsFromConf()
+            
+            self.__p1latEntry.setText(lat1)
+            self.__p1lonEntry.setText(lon1)
+            self.__p2latEntry.setText(lat2)
+            self.__p2lonEntry.setText(lon2)
+        
+        if lat1 is None or lat2 is None or lon1 is None or lon2 is None:
+            lat1 = 90
+            lat2 = -90
+            lon1 = -180
+            lon2 = 180
+            self.__p1latEntry.setText(lat1)
+            self.__p1lonEntry.setText(lon1)
+            self.__p2latEntry.setText(lat2)
+            self.__p2lonEntry.setText(lon2)
+        p1lat = float(lat1)
+        p1lon = float(lon1)
+        p2lat = float(lat2)
+        p2lon = float(lon2)
+        
         self.__mapFrame.setParent(None)
         self.__mapFrame = WebMap(self.__holder, p1lat, p1lon, 
                 p2lat, p2lon, True)
@@ -1660,7 +1686,67 @@ class MapControl(CollapseFrame):
 
 
 
+class PolygonMapTool(QgsMapToolEmitPoint):
+    def __init__(self, canvas):
+        self.canvas = canvas
+        QgsMapToolEmitPoint.__init__(self, self.canvas)
+        self.rubberBand = QgsRubberBand(self.canvas, True)
+        self.rubberBand.setColor(Qt.red)
+        self.rubberBand.setWidth(1)
+        self.reset()
 
+    def reset(self):
+        self.startPoint = self.endPoint = None
+        self.isEmittingPoint = False
+        self.rubberBand.reset(True)
+
+    def canvasPressEvent(self, e):
+        self.startPoint = self.toMapCoordinates(e.pos())
+        self.endPoint = self.startPoint
+        self.isEmittingPoint = True
+        self.addVertex(self.startPoint, self.canvas)
+        self.showLine(self.startPoint, self.endPoint)
+
+    
+        
+
+    def canvasReleaseEvent(self, e):
+        self.isEmittingPoint = False
+
+    def canvasMoveEvent(self, e):
+        if not self.isEmittingPoint:
+            return
+
+        self.endPoint = self.toMapCoordinates(e.pos())
+        self.showLine(self.startPoint, self.endPoint)
+
+    def addVertex(self, selectPoint, canvas):
+        m1 = QgsVertexMarker(canvas)
+        
+        print(selectPoint)
+        m1.setCenter(QgsPointXY(selectPoint))
+        m1.setColor(QColor(255,0, 0)) #(R,G,B)
+        m1.setIconSize(5)
+        m1.setIconType(QgsVertexMarker.ICON_X)
+        m1.setPenWidth(3)
+
+        point1 = QgsPointXY(selectPoint)
+        m1.show() 
+
+    def showLine(self, startPoint, endPoint):
+        self.rubberBand.reset(QgsWkbTypes.PolygonGeometry)
+        if startPoint.x() == endPoint.x() or startPoint.y() == endPoint.y():
+            return
+        
+        point1 = QgsPointXY(startPoint.x(), startPoint.y())
+
+        self.rubberBand.addPoint(point1, True)
+
+        self.rubberBand.show()
+
+    def deactivate(self):
+        QgsMapTool.deactivate(self)
+        self.deactivated.emit()
 
 
 class RectangleMapTool(QgsMapToolEmitPoint):
@@ -1783,6 +1869,8 @@ class MapWidget(QWidget):
         self.pingRenderer = None
         self.estimate = None
         self.heatMap = None
+        self.toolPolygon = None
+        self.polygonAction = None
         self.pingMin = 800
         self.pingMax = 0
         self.indPing = 0
@@ -1869,7 +1957,22 @@ class MapWidget(QWidget):
         self.toolZoomIn.setAction(self.actionZoomIn)
         self.toolZoomOut = QgsMapToolZoom(self.canvas, True) # true = out
         self.toolZoomOut.setAction(self.actionZoomOut)
-
+        
+        self.polygonAction = QAction("Polygon", self)
+        self.polygonAction.setCheckable(True)
+        self.polygonAction.triggered.connect(self.polygon)
+        self.toolbar.addAction(self.polygonAction)
+        
+        self.toolPolygon = PolygonMapTool(self.canvas)
+        self.toolPolygon.setAction(self.polygonAction)
+        
+    def polygon(self):
+        '''
+        Helper function to set polygon tool when it is selected from 
+        the toolbar
+        '''
+        self.canvas.setMapTool(self.toolPolygon)
+        
 
 
     def zoomIn(self):
@@ -2036,7 +2139,6 @@ class MapOptions(QWidget):
         self.mapWidget = None
         self.btn_cacheMap = None
         self.isWebMap = False
-        self.lbl_dist = None
         self.__createWidgets()
         self.created = False
         self.writer = None
@@ -2074,17 +2176,10 @@ class MapOptions(QWidget):
         lay_export.addWidget(btn_vehiclePathExport)
         exportTab.setContentLayout(lay_export)
         
-        lay_mapOptions.addWidget(exportTab)        
+        lay_mapOptions.addWidget(exportTab)    
         
-        distWidg = QWidget()
-        distLay = QHBoxLayout()
-        lbl_dist = QLabel('Distance from Actual')
-        self.lbl_dist = QLabel('')
-        distLay.addWidget(lbl_dist)
-        distLay.addWidget(self.lbl_dist)
-        distWidg.setLayout(distLay)
         
-        lay_mapOptions.addWidget(distWidg)
+        
 
         self.setLayout(lay_mapOptions)
 
@@ -2119,101 +2214,18 @@ class MapOptions(QWidget):
         '''
         self.isWebMap = isWebMap
         self.mapWidget = mapWidg
+        self.addLegend()
         
         self.btn_cacheMap.setEnabled(isWebMap)
         
-    def estDistance(self, coord, stale, res):
+    def addLegend(self):
         '''
-        An inner function to display the distance from the 
-        current estimate point to the ground truth
-        Args:
-            coord: A tuple of float values indicating an EPSG:4326 lat/Long 
-                   coordinate pair
-            stale: A boolean
-            res: The residuals vector
+        Function to add Map Legend widget when map is loaded
         '''
-        lat1 = coord[0]
-        lon1 = coord[1]
-        #lat2 = 32.885889
-        #lon2 = -117.234028
-        
-        # Center
-        #lat2 = 32.88736856384841
-        #lon2 = -117.23403141301122
-        
-        #20m beyond
-        #lat2 = 32.886060596190255
-        #lon2 = -117.23402797486396
-        
-        #20m right
-        #lat2 = 32.88736896379847
-        #lon2 = -117.23381758959809
-        
-        #50m right
-        #lat2 = 32.88736956303811
-        #lon2 = -117.23349685447043
-        
-        #diagonal
-        lat2 = 32.88606139568502
-        lon2 = -117.23360033431585
-        
-        if not self.hasPoint:
-            point = self.mapWidget.transformToWeb.transform(QgsPointXY(lon2, lat2))
-            vpr = self.mapWidget.groundTruth.dataProvider()
-            pnt = QgsGeometry.fromPointXY(point)
-            f = QgsFeature()
-            f.setGeometry(pnt)
-            vpr.addFeatures([f])
-            self.mapWidget.groundTruth.updateExtents()
-            self.hasPoint = True
+        mapLegend = MapLegend()
+        self.layout().addWidget(mapLegend)
 
         
-        dist = self.distance(lat1, lat2, lon1, lon2)
-        
-        if not self.created:
-            with open('results.csv', 'w', newline='') as csvfile:
-                fieldnames = ['Distance', 'res.x', 'residuals']
-                self.writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                self.writer.writeheader()
-                self.created = True
-                self.writer.writerow({'Distance': str(dist), 'res.x': str(res.x), 'residuals': str(res.fun)})
-        else:
-            with open('results.csv', 'a+', newline='') as csvfile:
-                fieldnames = ['Distance', 'res.x', 'residuals']
-                self.writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                self.writer.writerow({'Distance': str(dist), 'res.x': str(res.x), 'residuals': str(res.fun)})
-                
-       
-        
-        d = '%.3f'%(dist)
-
-        self.lbl_dist.setText(d + '(m.)')
-        
-    def distance(self, lat1, lat2, lon1, lon2): 
-        '''
-        Helper function to calculate distance
-        Args:
-            lat1: float value indicating the lat value of a point
-            lat2: float value indicating the lat value of a second point
-            lon1: float value indicating the long value of a point
-            lon2: float value indicating the long value of a second point
-        '''
-        lon1 = math.radians(lon1) 
-        lon2 = math.radians(lon2) 
-        lat1 = math.radians(lat1) 
-        lat2 = math.radians(lat2) 
-           
-        # Haversine formula  
-        dlon = lon2 - lon1  
-        dlat = lat2 - lat1 
-        a = math.sin(dlat / 2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2
-      
-        c = 2 * math.asin(math.sqrt(a))  
-         
-        # Radius of earth in kilometers. Use 3956 for miles 
-        r = 6371
-           
-        return(c * r * 1000)
     
     def exportPing(self):
         '''
@@ -2327,9 +2339,8 @@ class WebMap(MapWidget):
         vehiclePathlayer = QgsVectorLayer(uriLine, 'VehiclePath', "memory")
         
         # Set drone image for marker symbol
-        path = QDir().currentPath()
-        full = path + '/../resources/vehicleSymbol.svg'
-        symbolSVG = QgsSvgMarkerSymbolLayer(full)
+        path = QDir().filePath('../resources/vehicleSymbol.svg')
+        symbolSVG = QgsSvgMarkerSymbolLayer(path)
         symbolSVG.setSize(4)
         symbolSVG.setFillColor(QColor('#0000ff'))
         symbolSVG.setStrokeColor(QColor('#ff0000'))
@@ -2434,7 +2445,8 @@ class WebMap(MapWidget):
         
         #load from cached tiles if true, otherwise loads from web    
         if self.loadCached:
-            path = QDir().currentPath()
+            dirs = AppDirs("GCS", "E4E")
+            path = dirs.site_data_dir.replace("\\", "/")
             urlWithParams = 'type=xyz&url=file:///'+ path+'/tiles/%7Bz%7D/%7Bx%7D/%7By%7D.png'
         else:
             urlWithParams = 'type=xyz&url=http://a.tile.openstreetmap.org/%7Bz%7D/%7Bx%7D/%7By%7D.png&zmax=19&zmin=0&crs=EPSG3857'    
@@ -2535,8 +2547,12 @@ class WebMap(MapWidget):
         Helper Function to facilitate the downloading of web tiles
         '''
         url = "http://c.tile.openstreetmap.org/%d/%d/%d.png" % (zoom, xtile, ytile)
-        dir_path = "tiles/%d/%d/" % (zoom, xtile)
-        download_path = "tiles/%d/%d/%d.png" % (zoom, xtile, ytile)
+        dirs = AppDirs("GCS", "E4E")
+        cachePath = dirs.site_data_dir.replace('\\', '/')
+         
+        tilePath = '/tiles/%d/%d/' % (zoom, xtile)
+        dir_path = cachePath + tilePath
+        download_path = cachePath +"/tiles/%d/%d/%d.png" % (zoom, xtile, ytile)
         
         if not os.path.exists(dir_path):
             os.makedirs(dir_path)
@@ -2700,6 +2716,104 @@ class StaticMap(MapWidget):
         else:
             print('invalid layer')
 
+class MapLegend(QWidget):
+    '''
+    Custom widget to display map legend
+    '''
+    def __init__(self):
+            QWidget.__init__(self)
+
+            self.__createWidget()
+
+    def __createWidget(self):
+        '''
+        Helper function that creates layout of legend
+        '''
+
+        self.__layMapLegend = QGridLayout()
+        self.setLayout(self.__layMapLegend)
+        self.__layMapLegend.setSpacing(10)
+
+        #Creating the labels for legend
+        lbl_vehicleSymb = QLabel('Vehicle Location', self)
+        lbl_vehicleTravel = QLabel('Vehicle Path', self)
+        lbl_symbolBlue = QLabel('Weakest', self)
+        lbl_symbolGreen = QLabel('Weak', self)
+        lbl_symbolYellow = QLabel('Neutral', self)
+        lbl_symbolOrange = QLabel('Strong', self)
+        lbl_symbolRed = QLabel('Strongest', self)
+        lbl_estimatePoint = QLabel('Estimated point', self)
+
+
+        #Adds vehicle locations icon
+        img_vehicleSymb = QSvgWidget('../resources/vehicleSymbol.svg', self)
+        img_vehicleSymb.load('../resources/vehicleSymbol.svg')
+        img_vehicleSymb.setFixedWidth(50)
+        img_vehicleSymb.setFixedHeight(50)
+
+        #Adding weakest ping
+        img_symbolBlue = QSvgWidget('../resources/symbBlue.svg', self)
+        img_symbolBlue.load('../resources/symbBlue.svg')
+        img_symbolBlue.setFixedWidth(50)
+        img_symbolBlue.setFixedHeight(50)
+
+        #Adding weak ping
+        img_symbolGreen = QSvgWidget('../resources/symbGreen.svg', self)
+        img_symbolGreen.load('../resources/symbGreen.svg')
+        img_symbolGreen.setFixedWidth(50)
+        img_symbolGreen.setFixedHeight(50)
+
+        #Adding Neutral ping
+        img_symbolYellow = QSvgWidget('../resources/symbYellow.svg', self)
+        img_symbolYellow.load('../resources/symbYellow.svg')
+        img_symbolYellow.setFixedWidth(50)
+        img_symbolYellow.setFixedHeight(50)
+
+        #Adding Strong ping
+        img_symbolOrange = QSvgWidget('../resources/symbOrange.svg', self)
+        img_symbolOrange.load('../resources/symbOrange.svg')
+        img_symbolOrange.setFixedWidth(50)
+        img_symbolOrange.setFixedHeight(50)           
+
+        #Adding Strongest ping
+        img_symbolRed = QSvgWidget('../resources/symbRed.svg', self)
+        img_symbolRed.load('../resources/symbRed.svg')
+        img_symbolRed.setFixedWidth(50)
+        img_symbolRed.setFixedHeight(50)
+
+        #Adding Estimated Point
+        img_symbolEstPoint = QSvgWidget('../resources/symbEstPoint.svg', self)
+        img_symbolEstPoint.load('../resources/symbEstPoint.svg')
+        img_symbolEstPoint.setFixedWidth(50)
+        img_symbolEstPoint.setFixedHeight(50)
+
+        #Adding Vehicle Path
+        img_symbolVPath = QSvgWidget('../resources/symbVehiclePath.svg', self)
+        img_symbolVPath.load('../resources/symbVehiclePath.svg')
+        img_symbolVPath.setFixedWidth(50)
+        img_symbolVPath.setFixedHeight(50)
+
+
+        #Adding Labels to the layout
+        self.__layMapLegend.addWidget(lbl_estimatePoint, 1, 1)
+        self.__layMapLegend.addWidget(lbl_vehicleSymb, 2, 1)
+        self.__layMapLegend.addWidget(lbl_vehicleTravel, 3, 1)
+        self.__layMapLegend.addWidget(lbl_symbolBlue, 4, 1)
+        self.__layMapLegend.addWidget(lbl_symbolGreen, 5, 1)
+        self.__layMapLegend.addWidget(lbl_symbolYellow, 6, 1)
+        self.__layMapLegend.addWidget(lbl_symbolOrange, 7, 1)
+        self.__layMapLegend.addWidget(lbl_symbolRed, 8, 1)
+
+        #Adding label images to the layout
+        self.__layMapLegend.addWidget(img_symbolEstPoint, 1, 2)
+        self.__layMapLegend.addWidget(img_vehicleSymb,2,2)
+        self.__layMapLegend.addWidget(img_symbolVPath,3,2)
+        self.__layMapLegend.addWidget(img_symbolBlue,4,2)
+        self.__layMapLegend.addWidget(img_symbolGreen,5,2)
+        self.__layMapLegend.addWidget(img_symbolYellow,6,2)
+        self.__layMapLegend.addWidget(img_symbolOrange, 7, 2)
+        self.__layMapLegend.addWidget(img_symbolRed,8,2)
+
 def configSetup():
     '''
     Helper function to set up paths to QGIS lbrary files, and 
@@ -2707,27 +2821,25 @@ def configSetup():
     '''
     config_path = 'gcsConfig.ini'
     if(not os.path.isfile(config_path)):
-        prefix_path = QFileDialog.getExistingDirectory(None, 
-                'Select the Qgis directory')
-        if ("qgis" in prefix_path):            
-            config = configparser.ConfigParser()
-            config['FilePaths'] = {}
-            config['FilePaths']['PrefixPath'] = prefix_path
-            with open(config_path, 'w') as configFile:
-                config.write(configFile)
-                return prefix_path
-        else:
+        prefix_path = QFileDialog.getExistingDirectory(None, 'Select the Qgis directory')          
+        config = configparser.ConfigParser()
+        config['FilePaths'] = {}
+        config['FilePaths']['PrefixPath'] = prefix_path
+        if ("qgis" not in prefix_path):
             msg = QMessageBox()
-            msg.setText("Wrong file. Choose qgis file")
+            msg.setText("Warning, incorrect file chosen. Map tools may not function as expected")
             msg.setWindowTitle("Alert")
             msg.setIcon(QMessageBox.Critical)
             msg.exec_()
-            configSetup()
+        with open(config_path, 'w') as configFile:
+            config.write(configFile)
+            return config, prefix_path
     else:
         config = configparser.ConfigParser()
         config.read(config_path)
         prefix_path = config['FilePaths']['PrefixPath']
-        return prefix_path
+        return config, prefix_path
+
    
 
 
@@ -2747,15 +2859,18 @@ if __name__ == '__main__':
     ch.setFormatter(formatter)
     logger.addHandler(ch)
     
+  
     app = QgsApplication([], True)
-    prefix_path = configSetup() 
-    #prefix_path = config['FilePaths']['PrefixPath']
-    app.setPrefixPath(prefix_path, True) 
+    
+    configObj, prefix_path = configSetup()
+    
+    QgsApplication.setPrefixPath(prefix_path)
+
     app.initQgis()
 
-    ex = GCS()
+    ex = GCS(configObj)
     ex.show()
 
     exitcode = app.exec_()
-    QgsApplication.exitQgis()
+    app.exitQgis()
     sys.exit(exitcode)
