@@ -1808,6 +1808,8 @@ class MapWidget(QWidget):
         Args:
         '''
         fileName = QFileDialog.getOpenFileName()
+        if self.heatMap is not None:
+            QgsProject.instance().removeMapLayer(self.heatMap)
         if fileName is not None:
             self.heatMap = QgsRasterLayer(fileName[0], "heatMap")   
             QgsProject.instance().addMapLayer(self.heatMap)
