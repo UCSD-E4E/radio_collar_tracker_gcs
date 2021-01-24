@@ -1673,6 +1673,8 @@ class PolygonMapTool(QgsMapToolEmitPoint):
     def __init__(self, canvas):
         self.canvas = canvas
         QgsMapToolEmitPoint.__init__(self, self.canvas)
+        #Creating a list for all vertex coordinates
+        self.vertices = []
         self.rubberBand = QgsRubberBand(self.canvas, True)
         self.rubberBand.setColor(Qt.red)
         self.rubberBand.setWidth(1)
@@ -1689,9 +1691,7 @@ class PolygonMapTool(QgsMapToolEmitPoint):
         self.isEmittingPoint = True
         self.addVertex(self.startPoint, self.canvas)
         self.showLine(self.startPoint, self.endPoint)
-
-    
-        
+        self.showPolygon()
 
     def canvasReleaseEvent(self, e):
         self.isEmittingPoint = False
@@ -1704,17 +1704,17 @@ class PolygonMapTool(QgsMapToolEmitPoint):
         self.showLine(self.startPoint, self.endPoint)
 
     def addVertex(self, selectPoint, canvas):
-        m1 = QgsVertexMarker(canvas)
-        
-        print(selectPoint)
-        m1.setCenter(QgsPointXY(selectPoint))
-        m1.setColor(QColor(255,0, 0)) #(R,G,B)
-        m1.setIconSize(5)
-        m1.setIconType(QgsVertexMarker.ICON_X)
-        m1.setPenWidth(3)
+        vertex = QgsPointXY(selectPoint)
+        self.vertices.append(vertex)
 
-        point1 = QgsPointXY(selectPoint)
-        m1.show() 
+    def showPolygon(self):
+        if (len(self.vertices) > 1):
+            self.rubberBand.reset(QgsWkbTypes.PolygonGeometry)
+            r = len(self.vertices) - 1
+            for i in range(r):
+                self.rubberBand.addPoint(self.vertices[i], False)
+            self.rubberBand.addPoint(self.vertices[r], True)
+            self.rubberBand.show()
 
     def showLine(self, startPoint, endPoint):
         self.rubberBand.reset(QgsWkbTypes.PolygonGeometry)
@@ -1851,6 +1851,7 @@ class MapWidget(QWidget):
         self.pingRenderer = None
         self.estimate = None
         self.toolPolygon = None
+        self.polygonLayer = None
         self.polygonAction = None
         self.pingMin = 800
         self.pingMax = 0
@@ -1877,9 +1878,11 @@ class MapWidget(QWidget):
         self.canvas.setExtent(self.mapLayer.extent())  
         self.canvas.setLayers([self.estimate,
                                self.vehicle, self.pingLayer, 
-                               self.vehiclePath, self.mapLayer]) 
+                               self.vehiclePath, self.polygonLayer,
+                               self.mapLayer])
+
         #self.canvas.setLayers([self.mapLayer])
-        self.canvas.zoomToFullExtent()   
+        self.canvas.zoomToFullExtent()
         self.canvas.freeze(True)  
         self.canvas.show()     
         self.canvas.refresh()       
@@ -1890,38 +1893,35 @@ class MapWidget(QWidget):
         '''
         Internal function to add tools to the map toolbar
         '''
-        self.actionZoomIn = QAction("Zoom in", self)
-        self.actionZoomOut = QAction("Zoom out", self)
-        self.actionPan = QAction("Pan", self)
-
-        self.actionZoomIn.setCheckable(True)
-        self.actionZoomOut.setCheckable(True)
-        self.actionPan.setCheckable(True)
-
-        self.actionZoomIn.triggered.connect(self.zoomIn)
-        self.actionZoomOut.triggered.connect(self.zoomOut)
-        self.actionPan.triggered.connect(self.pan)
-
-        self.toolbar.addAction(self.actionZoomIn)
-        self.toolbar.addAction(self.actionZoomOut)
-        self.toolbar.addAction(self.actionPan)
-
         # create the map tools
-        self.toolPan = QgsMapToolPan(self.canvas)
-        self.toolPan.setAction(self.actionPan)
+        self.actionZoomIn = QAction("Zoom in", self)
+        self.actionZoomIn.setCheckable(True)
+        self.actionZoomIn.triggered.connect(self.zoomIn)
+        self.toolbar.addAction(self.actionZoomIn)
         self.toolZoomIn = QgsMapToolZoom(self.canvas, False) # false = in
         self.toolZoomIn.setAction(self.actionZoomIn)
+
+        self.actionZoomOut = QAction("Zoom out", self)
+        self.actionZoomOut.setCheckable(True)
+        self.actionZoomOut.triggered.connect(self.zoomOut)
+        self.toolbar.addAction(self.actionZoomOut)
         self.toolZoomOut = QgsMapToolZoom(self.canvas, True) # true = out
         self.toolZoomOut.setAction(self.actionZoomOut)
-        
+
+        self.actionPan = QAction("Pan", self)
+        self.actionPan.setCheckable(True)
+        self.actionPan.triggered.connect(self.pan)
+        self.toolbar.addAction(self.actionPan)
+        self.toolPan = QgsMapToolPan(self.canvas)
+        self.toolPan.setAction(self.actionPan)
+
         self.polygonAction = QAction("Polygon", self)
         self.polygonAction.setCheckable(True)
         self.polygonAction.triggered.connect(self.polygon)
         self.toolbar.addAction(self.polygonAction)
-        
         self.toolPolygon = PolygonMapTool(self.canvas)
         self.toolPolygon.setAction(self.polygonAction)
-        
+
     def polygon(self):
         '''
         Helper function to set polygon tool when it is selected from 
@@ -1929,8 +1929,6 @@ class MapWidget(QWidget):
         '''
         self.canvas.setMapTool(self.toolPolygon)
         
-
-
     def zoomIn(self):
         '''
         Helper function to set the zoomIn map tool when it is selected
@@ -2081,6 +2079,22 @@ class MapWidget(QWidget):
             self.estimate.updateExtents()
             self.indEst = self.indEst + 1
 
+    def addPolygonPoint(self):
+        vpr = self.polygonLayer.dateProvider()
+        if self.toolPolygon is None:
+            return
+        elif self.toolPolygon.vertices.len() == 0:
+            return
+        else:
+            for point in self.toolPolygon.vertices:
+                feature = QgsFeature()
+                feature.setFields(self.polygonLayer.fields())
+                feature.setGeometry(QgsGeometry.fromPointXY(point))
+                vpr.addFeatures([feature])
+                self.polygonLayer.updateExtents()
+
+
+
         
 class MapOptions(QWidget):
     '''
@@ -2117,16 +2131,26 @@ class MapOptions(QWidget):
         self.btn_cacheMap.clicked.connect(lambda:self.__cacheMap())
         self.btn_cacheMap.setEnabled(False)
         lay_mapOptions.addWidget(self.btn_cacheMap)
+
+        self.btn_clearMap = QPushButton('Clear Map');
+        self.btn_clearMap.clicked.connect(self.clear)
+        self.btn_clearMap.setEnabled(False)
+        lay_mapOptions.addWidget(self.btn_clearMap)
+
         
         exportTab = CollapseFrame('Export')
         btn_pingExport = QPushButton('Pings')
         btn_pingExport.clicked.connect(lambda:self.exportPing())
         btn_vehiclePathExport = QPushButton('Vehicle Path')
         btn_vehiclePathExport.clicked.connect(lambda:self.exportVehiclePath())
+
+        btn_polygonExport = QPushButton('Polygon')
+        btn_polygonExport.clicked.connect(lambda:self.exportPolygon())
         
         lay_export = QVBoxLayout()
         lay_export.addWidget(btn_pingExport)
         lay_export.addWidget(btn_vehiclePathExport)
+        lay_export.addWidget(btn_polygonExport)
         exportTab.setContentLayout(lay_export)
         
         lay_mapOptions.addWidget(exportTab)    
@@ -2136,6 +2160,13 @@ class MapOptions(QWidget):
 
         self.setLayout(lay_mapOptions)
 
+    def clear(self):
+        '''
+        Helper function to clear selected map areas 
+        '''
+        self.mapWidget.toolPolygon.rubberBand.reset(QgsWkbTypes.PolygonGeometry)
+        self.mapWidget.toolRect.rubberBand.reset(QgsWkbTypes.PolygonGeometry)
+        self.mapWidget.toolPolygon.vertices.clear()
 
     def __cacheMap(self):
         '''
@@ -2170,6 +2201,7 @@ class MapOptions(QWidget):
         self.addLegend()
         
         self.btn_cacheMap.setEnabled(isWebMap)
+        self.btn_clearMap.setEnabled(isWebMap)
         
     def addLegend(self):
         '''
@@ -2220,6 +2252,19 @@ class MapOptions(QWidget):
         QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.vehiclePath, 
                                         file, 
                                         QgsCoordinateTransformContext(), options)
+
+    def exportPolygon(self):
+        '''
+        Method to export MapWidget's Polygon shape to a shapefile
+        '''
+        folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
+        file = folder + 'polygon.shp'
+        options = QgsVectorFileWriter.SaveVectorOptions()
+        options.driverName = "ESRI Shapefile"
+        
+        QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.polygonLayer, file, 
+                                                QgsCoordinateTransformContext(), options)
+        
            
 
 
