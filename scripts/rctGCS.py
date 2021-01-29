@@ -175,10 +175,11 @@ class GCS(QMainWindow):
             zone, let = self._mavModel.EST_mgr.getUTMZone()
             coord = utm.to_latlon(params[0], params[1], zone, let)
             
-            
+            numPings = self._mavModel.EST_mgr.getNumPings(frequency)
             
             if self.mapDisplay is not None:
                 self.mapDisplay.plotEstimate(coord, frequency)
+                self.mapDisplay.plotPrecision(coord, frequency, numPings)
                 
             if self.mapOptions is not None:
                 self.mapOptions.estDistance(coord, stale, res)
@@ -1778,6 +1779,7 @@ class MapWidget(QWidget):
         self.mapLayer = None
         self.vehicle = None
         self.vehiclePath = None
+        self.precision = None
         self.lastLoc = None
         self.pingLayer = None
         self.pingRenderer = None
@@ -1808,6 +1810,7 @@ class MapWidget(QWidget):
         Args:
         '''
         fileName = QFileDialog.getOpenFileName()
+        print(fileName[0])
         if self.heatMap is not None:
             QgsProject.instance().removeMapLayer(self.heatMap)
         if fileName is not None:
@@ -1820,10 +1823,34 @@ class MapWidget(QWidget):
             self.canvas.setDestinationCrs(destCrs)
             
 
-            self.canvas.setLayers([self.estimate, self.groundTruth,
+            self.canvas.setLayers([self.heatMap, self.estimate, self.groundTruth,
                                self.vehicle, self.pingLayer, 
-                               self.vehiclePath, self.heatMap, self.mapLayer]) 
+                               self.vehiclePath, self.mapLayer]) 
             
+            
+    def plotPrecision(self, coord, freq, numPings):
+        data_dir = 'holder'
+        outputFileName = '/%s/PRECISION_%03.3f_%d_heatmap.tiff' % (data_dir, freq / 1e7, numPings)
+        fileName = QDir().currentPath() + outputFileName
+        print(fileName)
+        print(outputFileName)
+
+        
+        if self.heatMap is not None:
+            QgsProject.instance().removeMapLayer(self.heatMap)
+        if fileName is not None:
+            self.heatMap = QgsRasterLayer(fileName, "heatMap")   
+            QgsProject.instance().addMapLayer(self.heatMap)
+            destCrs = self.mapLayer.crs()
+            rasterCrs = self.heatMap.crs()
+            
+            self.heatMap.setCrs(rasterCrs)
+            self.canvas.setDestinationCrs(destCrs)
+            
+
+            #self.canvas.setLayers([self.heatMap, self.estimate, self.groundTruth,
+            #                   self.vehicle, self.pingLayer, 
+            #                   self.vehiclePath, self.mapLayer]) 
 
         
     def adjustCanvas(self):
@@ -1831,7 +1858,7 @@ class MapWidget(QWidget):
         Helper function to set and adjust the camvas' layers
         '''
         self.canvas.setExtent(self.mapLayer.extent())  
-        self.canvas.setLayers([self.estimate, self.groundTruth,
+        self.canvas.setLayers([self.precision, self.estimate, self.groundTruth, 
                                self.vehicle, self.pingLayer, 
                                self.vehiclePath, self.mapLayer]) 
         #self.canvas.setLayers([self.mapLayer])
@@ -2134,8 +2161,8 @@ class MapOptions(QWidget):
         '''
         lat1 = coord[0]
         lon1 = coord[1]
-        #lat2 = 32.885889
-        #lon2 = -117.234028
+        lat2 = 32.885889
+        lon2 = -117.234028
         
         # Center
         #lat2 = 32.88736856384841
@@ -2154,8 +2181,8 @@ class MapOptions(QWidget):
         #lon2 = -117.23349685447043
         
         #diagonal
-        lat2 = 32.88606139568502
-        lon2 = -117.23360033431585
+        #lat2 = 32.88606139568502
+        #lon2 = -117.23360033431585
         
         if not self.hasPoint:
             point = self.mapWidget.transformToWeb.transform(QgsPointXY(lon2, lat2))
@@ -2327,9 +2354,8 @@ class WebMap(MapWidget):
         vehiclePathlayer = QgsVectorLayer(uriLine, 'VehiclePath', "memory")
         
         # Set drone image for marker symbol
-        path = QDir().currentPath()
-        full = path + '/../resources/vehicleSymbol.svg'
-        symbolSVG = QgsSvgMarkerSymbolLayer(full)
+        path = QDir().filePath('../resources/vehicleSymbol.svg')
+        symbolSVG = QgsSvgMarkerSymbolLayer(path)
         symbolSVG.setSize(4)
         symbolSVG.setFillColor(QColor('#0000ff'))
         symbolSVG.setStrokeColor(QColor('#ff0000'))
@@ -2414,6 +2440,25 @@ class WebMap(MapWidget):
         layer.setAutoRefreshEnabled(True)
         
         return layer, pingRenderer
+    
+    def setupPrecisionLayer(self):
+        path = QDir().currentPath()
+        uri = 'file:///' + path + '/holder/query.csv?encoding=%s&delimiter=%s&xField=%s&yField=%s&crs=%s&value=%s' % ("UTF-8",",", "easting", "northing","epsg:32611", "value")
+        
+        csv_layer= QgsVectorLayer(uri, "query", "delimitedtext")
+        
+        csv_layer.setOpacity(0.5)
+        
+        heatmap = QgsHeatmapRenderer()
+        heatmap.setWeightExpression('value')
+        heatmap.setRadiusUnit(QgsUnitTypes.RenderUnit.RenderMetersInMapUnits)
+        heatmap.setRadius(3)
+        csv_layer.setRenderer(heatmap)
+        
+        csv_layer.setAutoRefreshInterval(500)
+        csv_layer.setAutoRefreshEnabled(True)
+        
+        return csv_layer
 
     def addLayers(self):
         '''
@@ -2431,6 +2476,8 @@ class WebMap(MapWidget):
             
         if self.groundTruth is None:
             self.groundTruth = self.setupGroundTruth()
+            
+        
         
         #load from cached tiles if true, otherwise loads from web    
         if self.loadCached:
@@ -2439,6 +2486,13 @@ class WebMap(MapWidget):
         else:
             urlWithParams = 'type=xyz&url=http://a.tile.openstreetmap.org/%7Bz%7D/%7Bx%7D/%7By%7D.png&zmax=19&zmin=0&crs=EPSG3857'    
         self.mapLayer = QgsRasterLayer(urlWithParams, 'OpenStreetMap', 'wms') 
+        
+        if self.precision is None:
+            self.precision = self.setupPrecisionLayer()
+            destCrs = self.mapLayer.crs()
+            rasterCrs = self.precision.crs()
+            self.precision.setCrs(rasterCrs)
+            self.canvas.setDestinationCrs(destCrs)
         
         if self.mapLayer.isValid():   
             crs = self.mapLayer.crs()
@@ -2452,6 +2506,7 @@ class WebMap(MapWidget):
             QgsProject.instance().addMapLayer(self.vehicle)
             QgsProject.instance().addMapLayer(self.vehiclePath)
             QgsProject.instance().addMapLayer(self.pingLayer)
+            QgsProject.instance().addMapLayer(self.precision)
             print('valid mapLayer')
         else:
             print('invalid mapLayer')

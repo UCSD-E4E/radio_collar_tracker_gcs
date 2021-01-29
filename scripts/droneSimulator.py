@@ -243,10 +243,11 @@ class droneSim:
         self.SM_origin = (478110, 3638925, 0)
         self.SM_end = (478110, 3638400, 0)
         self.SM_TakeoffTarget = (478110, 3638925, 30)
+        '''
+        Triangle
         self.SM_waypoints = [(478110, 3638925, 30),
                              (478080, 3638700, 30),
                              (478140, 3638700, 30)]
-        '''
         Square
         self.SM_waypoints = [(477995, 3638776, 30),
                              (477995, 3638546, 30), 
@@ -283,6 +284,7 @@ class droneSim:
                             (478110.0, 3638731.0, 30)]
 
         OG
+        '''
         self.SM_waypoints = [(477974.06988529314, 3638776.3039655555, 30),
                              (478281.5079546513, 3638711.2010632926, 30),
                              (478274.9146625505, 3638679.2543171947, 30),
@@ -297,7 +299,6 @@ class droneSim:
                              (477943.58029727807, 3638604.5801627054, 30),
                              (477968.0164183045, 3638761.8351352056, 30),
                              (477976.95013863116, 3638774.1124560814, 30)]
-        '''
         self.SM_targetThreshold = 5
         self.SM_loopPeriod = 0.1
         self.SM_TakeoffVel = 5
@@ -318,7 +319,7 @@ class droneSim:
         self.SP_SystemLossSigma = 0
         self.SP_Exponent = 2.5
         self.SP_ExponentSigma = 0
-        #self.SP_Position = (478110, 3638661, 0)
+        self.SP_Position = (478110, 3638661, 0)
 
         #center
         #self.SP_Position = (478110, 3638825, 0)
@@ -333,7 +334,7 @@ class droneSim:
         #self.SP_Position = (478160, 3638825, 0)
 
         #diagonal
-        self.SP_Position = (478150, 3638680, 0)
+        #self.SP_Position = (478150, 3638680, 0)
 
         self.SP_NoiseFloor = 90
         self.SP_NoiseFloorSigma = 0
