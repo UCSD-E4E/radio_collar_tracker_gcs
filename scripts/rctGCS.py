@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 02/11/21  ML  pruned imports
 # 10/21/20  ML  Removed testing components
 # 08/19/20  ML  Added config object to gcs, added appDirs for tiles output
 # 08/14/20  ML  Removed excel sheet outputs
@@ -70,17 +71,15 @@ import requests
 import rctTransport
 import rctComms
 import rctCore
-from PyQt5.QtCore import *
+import PyQt5.QtCore
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import *
-from PyQt5 import QtNetwork
+import PyQt5.QtGui
 #import qgis
-from qgis.core import *    
-from qgis.gui import *  
-from qgis.utils import *
+from qgis.core import *
+import qgis.gui  
+import qgis.utils
 import configparser
 import json
-import numpy as np
 from threading import Thread
 from appdirs import AppDirs
 
@@ -450,7 +449,7 @@ class GCS(QMainWindow):
         '''
         Internal helper to make GUI widgets
         '''
-        self.mainThread = QThread.currentThread()
+        self.mainThread = PyQt5.QtCore.QThread.currentThread()
 
         holder = QGridLayout()
         centr_widget = QFrame()
@@ -518,8 +517,8 @@ class GCS(QMainWindow):
         wlay.addStretch()
         content.resize(self.SBWidth, 400)
         frm_sideControl.setMinimumWidth(self.SBWidth)
-        holder.addWidget(frm_sideControl, 0, 0, alignment=Qt.AlignLeft)
-        holder.addWidget(self.mapOptions, 0, 4, alignment=Qt.AlignTop)
+        holder.addWidget(frm_sideControl, 0, 0, alignment=PyQt5.QtCore.Qt.AlignLeft)
+        holder.addWidget(self.mapOptions, 0, 4, alignment=PyQt5.QtCore.Qt.AlignTop)
         centr_widget.setLayout(holder)
         self.resize(1800, 1100)
         self.show()
@@ -545,9 +544,9 @@ class CollapseFrame(QWidget):
         )
         self.toggle_button.setStyleSheet("QToolButton { border: none; }")
         self.toggle_button.setToolButtonStyle(
-            Qt.ToolButtonTextBesideIcon
+            PyQt5.QtCore.Qt.ToolButtonTextBesideIcon
         )
-        self.toggle_button.setArrowType(Qt.RightArrow)
+        self.toggle_button.setArrowType(PyQt5.QtCore.Qt.RightArrow)
         self.toggle_button.pressed.connect(self.on_pressed)
 
         self.content_area = QWidget()
@@ -570,7 +569,7 @@ class CollapseFrame(QWidget):
         '''
         self.toggle_button.setText(text)
 
-    @pyqtSlot()
+    @PyQt5.QtCore.pyqtSlot()
     def on_pressed(self):
         '''
         Internal Callback to be called when the toggle button is 
@@ -579,7 +578,7 @@ class CollapseFrame(QWidget):
         '''
         checked = self.toggle_button.isChecked()
         self.toggle_button.setArrowType(
-            Qt.DownArrow if not checked else Qt.RightArrow
+            PyQt5.QtCore.Qt.DownArrow if not checked else PyQt5.QtCore.Qt.RightArrow
         )
         self.content_area.setVisible(not checked)
 
@@ -1668,12 +1667,12 @@ class MapControl(CollapseFrame):
 
 
 
-class PolygonMapTool(QgsMapToolEmitPoint):
+class PolygonMapTool(qgis.gui.QgsMapToolEmitPoint):
     def __init__(self, canvas):
         self.canvas = canvas
-        QgsMapToolEmitPoint.__init__(self, self.canvas)
-        self.rubberBand = QgsRubberBand(self.canvas, True)
-        self.rubberBand.setColor(Qt.red)
+        qgis.gui.QgsMapToolEmitPoint.__init__(self, self.canvas)
+        self.rubberBand = qgis.gui.QgsRubberBand(self.canvas, True)
+        self.rubberBand.setColor(PyQt5.QtCore.Qt.red)
         self.rubberBand.setWidth(1)
         self.reset()
 
@@ -1701,11 +1700,11 @@ class PolygonMapTool(QgsMapToolEmitPoint):
         return
 
     def deactivate(self):
-        QgsMapTool.deactivate(self)
+        qgis.gui.QgsMapTool.deactivate(self)
         self.deactivated.emit()
 
 
-class RectangleMapTool(QgsMapToolEmitPoint):
+class RectangleMapTool(qgis.gui.QgsMapToolEmitPoint):
     '''
     Custom QgsMapTool to select a rectangular area of a QgsMapCanvas
     '''
@@ -1717,9 +1716,9 @@ class RectangleMapTool(QgsMapToolEmitPoint):
                     attached to
         '''
         self.canvas = canvas
-        QgsMapToolEmitPoint.__init__(self, self.canvas)
-        self.rubberBand = QgsRubberBand(self.canvas, True)
-        self.rubberBand.setColor(QColor(0,255,255,125))
+        qgis.gui.QgsMapToolEmitPoint.__init__(self, self.canvas)
+        self.rubberBand = qgis.gui.QgsRubberBand(self.canvas, True)
+        self.rubberBand.setColor(PyQt5.QtGui.QColor(0,255,255,125))
         self.rubberBand.setWidth(1)
         self.reset()
 
@@ -1800,7 +1799,7 @@ class RectangleMapTool(QgsMapToolEmitPoint):
         '''
         Function to deactivate the map tool
         '''
-        QgsMapTool.deactivate(self)
+        qgis.gui.QgsMapTool.deactivate(self)
         self.deactivated.emit()
 
 
@@ -1831,8 +1830,8 @@ class MapWidget(QWidget):
         self.ind = 0
         self.indEst = 0
         self.toolbar = QToolBar()
-        self.canvas = QgsMapCanvas()
-        self.canvas.setCanvasColor(Qt.white)
+        self.canvas = qgis.gui.QgsMapCanvas()
+        self.canvas.setCanvasColor(PyQt5.QtCore.Qt.white)
 
         self.transformToWeb = QgsCoordinateTransform(
                 QgsCoordinateReferenceSystem("EPSG:4326"),
@@ -1880,11 +1879,11 @@ class MapWidget(QWidget):
         self.toolbar.addAction(self.actionPan)
 
         # create the map tools
-        self.toolPan = QgsMapToolPan(self.canvas)
+        self.toolPan = qgis.gui.QgsMapToolPan(self.canvas)
         self.toolPan.setAction(self.actionPan)
-        self.toolZoomIn = QgsMapToolZoom(self.canvas, False) # false = in
+        self.toolZoomIn = qgis.gui.QgsMapToolZoom(self.canvas, False) # false = in
         self.toolZoomIn.setAction(self.actionZoomIn)
-        self.toolZoomOut = QgsMapToolZoom(self.canvas, True) # true = out
+        self.toolZoomOut = qgis.gui.QgsMapToolZoom(self.canvas, True) # true = out
         self.toolZoomOut.setAction(self.actionZoomOut)
         
         self.polygonAction = QAction("Polygon", self)
@@ -2250,11 +2249,11 @@ class WebMap(MapWidget):
         vehiclePathlayer = QgsVectorLayer(uriLine, 'VehiclePath', "memory")
         
         # Set drone image for marker symbol
-        path = QDir().filePath('../resources/vehicleSymbol.svg')
+        path = PyQt5.QtCore.QDir().filePath('../resources/vehicleSymbol.svg')
         symbolSVG = QgsSvgMarkerSymbolLayer(path)
         symbolSVG.setSize(4)
-        symbolSVG.setFillColor(QColor('#0000ff'))
-        symbolSVG.setStrokeColor(QColor('#ff0000'))
+        symbolSVG.setFillColor(PyQt5.QtGui.QColor('#0000ff'))
+        symbolSVG.setStrokeColor(PyQt5.QtGui.QColor('#ff0000'))
         symbolSVG.setStrokeWidth(1)
         vehicleLayer.renderer().symbol().changeSymbolLayer(0, symbolSVG)
         
@@ -2278,25 +2277,25 @@ class WebMap(MapWidget):
         
         # make symbols
         symbolBlue = QgsSymbol.defaultSymbol(layer.geometryType())
-        symbolBlue.setColor(QColor('#0000FF'))
+        symbolBlue.setColor(PyQt5.QtGui.QColor('#0000FF'))
         symbolCyan = QgsSymbol.defaultSymbol(
             layer.geometryType())
-        symbolCyan.setColor(QColor('#00FFFF'))
+        symbolCyan.setColor(PyQt5.QtGui.QColor('#00FFFF'))
         symbolGreen = QgsSymbol.defaultSymbol(
             layer.geometryType())
-        symbolGreen.setColor(QColor('#00FF00'))
+        symbolGreen.setColor(PyQt5.QtGui.QColor('#00FF00'))
         symbolYellow = QgsSymbol.defaultSymbol(
             layer.geometryType())
-        symbolYellow.setColor(QColor('#FFFF00'))
+        symbolYellow.setColor(PyQt5.QtGui.QColor('#FFFF00'))
         symbolOrange = QgsSymbol.defaultSymbol(
             layer.geometryType())
-        symbolOrange.setColor(QColor('#FFC400'))
+        symbolOrange.setColor(PyQt5.QtGui.QColor('#FFC400'))
         symbolORed = QgsSymbol.defaultSymbol(
             layer.geometryType())
-        symbolORed.setColor(QColor('#FFA000'))
+        symbolORed.setColor(PyQt5.QtGui.QColor('#FFA000'))
         symbolRed = QgsSymbol.defaultSymbol(
             layer.geometryType())
-        symbolRed.setColor(QColor('#FF0000'))
+        symbolRed.setColor(PyQt5.QtGui.QColor('#FF0000'))
     
         # make ranges
         rBlue = QgsRendererRange(0, 10, symbolBlue, 'Blue')
@@ -2330,7 +2329,7 @@ class WebMap(MapWidget):
         
         
         vpr = layer.dataProvider()
-        vpr.addAttributes([QgsField(name='Amp', type=QVariant.Double, len=30)])
+        vpr.addAttributes([QgsField(name='Amp', type=PyQt5.QtCore.QVariant.Double, len=30)])
         layer.updateFields()
     
         # set the renderer and allow the mapLayer to auto refresh
@@ -2545,12 +2544,12 @@ class StaticMap(MapWidget):
             self.vehiclePath = QgsVectorLayer(uriLine, 'VehiclePath', "memory")
 
             # Set drone image for marker symbol
-            path = QDir().currentPath()
+            path = PyQt5.QtCore.QDir().currentPath()
             full = path +'/camera.svg'
             symbolSVG = QgsSvgMarkerSymbolLayer(full)
             symbolSVG.setSize(4)
-            symbolSVG.setFillColor(QColor('#0000ff'))
-            symbolSVG.setStrokeColor(QColor('#ff0000'))
+            symbolSVG.setFillColor(PyQt5.QtGui.QColor('#0000ff'))
+            symbolSVG.setStrokeColor(PyQt5.QtGui.QColor('#ff0000'))
             symbolSVG.setStrokeWidth(1)
             
             self.vehicle.renderer().symbol().changeSymbolLayer(0, symbolSVG )
@@ -2569,19 +2568,19 @@ class StaticMap(MapWidget):
             # make symbols
             symbolBlue = QgsSymbol.defaultSymbol(
                     self.pingLayer.geometryType())
-            symbolBlue.setColor(QColor('#0000FF'))
+            symbolBlue.setColor(PyQt5.QtGui.QColor('#0000FF'))
             symbolGreen = QgsSymbol.defaultSymbol(
                     self.pingLayer.geometryType())
-            symbolGreen.setColor(QColor('#00FF00'))
+            symbolGreen.setColor(PyQt5.QtGui.QColor('#00FF00'))
             symbolYellow = QgsSymbol.defaultSymbol(
                     self.pingLayer.geometryType())
-            symbolYellow.setColor(QColor('#FFFF00'))
+            symbolYellow.setColor(PyQt5.QtGui.QColor('#FFFF00'))
             symbolOrange = QgsSymbol.defaultSymbol(
                     self.pingLayer.geometryType())
-            symbolOrange.setColor(QColor('#FFA500'))
+            symbolOrange.setColor(PyQt5.QtGui.QColor('#FFA500'))
             symbolRed = QgsSymbol.defaultSymbol(
                     self.pingLayer.geometryType())
-            symbolRed.setColor(QColor('#FF0000'))
+            symbolRed.setColor(PyQt5.QtGui.QColor('#FF0000'))
 
             # make ranges
             rBlue = QgsRendererRange(0, 20, symbolBlue, 'Blue')
@@ -2602,7 +2601,7 @@ class StaticMap(MapWidget):
             self.pingRenderer.setClassificationMethod(myClassificationMethod)
             self.pingRenderer.setClassAttribute('Amp')
             vpr = self.pingLayer.dataProvider()
-            vpr.addAttributes([QgsField(name='Amp', type=QVariant.Double, len=30)])
+            vpr.addAttributes([QgsField(name='Amp', type=PyQt5.QtCore.QVariant.Double, len=30)])
             self.pingLayer.updateFields()
 
             # set the renderer and allow the layerayer to auto refresh
