@@ -71,7 +71,7 @@ import rctCore
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
-from PyQt5 import QtNetwork
+import queue as q
 from qgis.core import *    
 from qgis.gui import *  
 from qgis.utils import *
@@ -91,6 +91,8 @@ class GCS(QMainWindow):
     SBWidth = 500
 
     defaultTimeout = 5
+    
+    sig = pyqtSignal()
 
     def __init__(self):
         '''
@@ -117,6 +119,14 @@ class GCS(QMainWindow):
         self.__createWidgets()
         for button in self._buttons:
             button.config(state='disabled')
+                    
+        self.queue = q.Queue()
+        self.sig.connect(self.execute_inmain, Qt.QueuedConnection)
+        
+    def execute_inmain(self):
+        while not self.queue.empty():
+            (fn, coord, frequency, numPings) = self.queue.get()
+            fn(coord, frequency, numPings)
 
     def __registerModelCallbacks(self):
         self._mavModel.registerCallback(
@@ -179,7 +189,9 @@ class GCS(QMainWindow):
             
             if self.mapDisplay is not None:
                 self.mapDisplay.plotEstimate(coord, frequency)
-                self.mapDisplay.plotPrecision(coord, frequency, numPings)
+                self.queue.put( (self.mapDisplay.plotPrecision, coord, frequency, numPings) )
+                self.sig.emit()
+                #self.mapDisplay.plotPrecision(coord, frequency, numPings)
                 
             if self.mapOptions is not None:
                 self.mapOptions.estDistance(coord, stale, res)
@@ -1846,11 +1858,12 @@ class MapWidget(QWidget):
             
             self.heatMap.setCrs(rasterCrs)
             self.canvas.setDestinationCrs(destCrs)
+            self.heatMap.renderer().setOpacity(0.7)
             
 
-            #self.canvas.setLayers([self.heatMap, self.estimate, self.groundTruth,
-            #                   self.vehicle, self.pingLayer, 
-            #                   self.vehiclePath, self.mapLayer]) 
+            self.canvas.setLayers([self.heatMap, self.estimate, self.groundTruth,
+                               self.vehicle, self.pingLayer, 
+                               self.vehiclePath, self.mapLayer]) 
 
         
     def adjustCanvas(self):
@@ -2486,14 +2499,14 @@ class WebMap(MapWidget):
         else:
             urlWithParams = 'type=xyz&url=http://a.tile.openstreetmap.org/%7Bz%7D/%7Bx%7D/%7By%7D.png&zmax=19&zmin=0&crs=EPSG3857'    
         self.mapLayer = QgsRasterLayer(urlWithParams, 'OpenStreetMap', 'wms') 
-        
+        '''
         if self.precision is None:
             self.precision = self.setupPrecisionLayer()
             destCrs = self.mapLayer.crs()
             rasterCrs = self.precision.crs()
             self.precision.setCrs(rasterCrs)
             self.canvas.setDestinationCrs(destCrs)
-        
+        ''' 
         if self.mapLayer.isValid():   
             crs = self.mapLayer.crs()
             crs.createFromString("EPSG:3857")  
@@ -2506,7 +2519,7 @@ class WebMap(MapWidget):
             QgsProject.instance().addMapLayer(self.vehicle)
             QgsProject.instance().addMapLayer(self.vehiclePath)
             QgsProject.instance().addMapLayer(self.pingLayer)
-            QgsProject.instance().addMapLayer(self.precision)
+            #QgsProject.instance().addMapLayer(self.precision)
             print('valid mapLayer')
         else:
             print('invalid mapLayer')

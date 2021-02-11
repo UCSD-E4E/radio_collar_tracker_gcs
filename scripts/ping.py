@@ -446,6 +446,7 @@ class LocationEstimator:
         for y in range(tiffYSize):
             for x in range(tiffXSize):
                 iDist = np.linalg.norm(pings[:,0:3] - np.array([self.refX+x, self.minY+y, 0]), axis=1)
+        
                 zscores = abs((iDist-calculatedDistances)/stdDistances)
                 inds = np.round(zscores, decimals=1)
                 inds2 = np.round(zscores, decimals=2)
@@ -457,11 +458,12 @@ class LocationEstimator:
                     else:
                         ind2 = int(inds2[i])
                         heatMapArea[y, x] *= self.lookup[inds[i]][ind2] 
-            '''
+                '''
                 for i in range(len(pings)):
-                    heatMapArea2[y, x] *=  norm.pdf(iDist[i], loc=calculatedDistances[i], scale=stdDistances)
-            '''     
-                csv_dict.append({"easting": self.refX+x, "northing": self.minY+y, "value": (heatMapArea[y, x]), "new": (heatMapArea2[y,x])})
+                    heatMapArea[y, x] *=  norm.pdf(iDist[i], loc=calculatedDistances[i], scale=stdDistances)
+                '''
+                #csv_dict.append({"easting": self.refX+x, "northing": self.minY+y, "value": (heatMapArea[y, x]), "new": (heatMapArea2[y,x])})
+                csv_dict.append({"easting": self.refX+x, "northing": self.minY+y, "value": (heatMapArea[y, x])})
             
 
         with open('./holder/query.csv', 'w', newline='') as csvfile:
