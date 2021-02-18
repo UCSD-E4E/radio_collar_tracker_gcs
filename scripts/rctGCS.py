@@ -1692,7 +1692,7 @@ class PolygonMapTool(QgsMapToolEmitPoint):
         QgsMapToolEmitPoint.__init__(self, self.canvas)
         #Creating a list for all vertex coordinates
         self.vertices = []
-        self.rubberBand = QgsRubberBand(self.canvas, True)
+        self.rubberBand = QgsRubberBand(self.canvas, QgsWkbTypes.PolygonGeometry)
         self.rubberBand.setColor(Qt.red)
         self.rubberBand.setWidth(1)
         self.reset()
@@ -1925,7 +1925,6 @@ class MapWidget(QWidget):
                                self.vehiclePath, self.polygonLayer,
                                self.mapLayer])
 
-        #self.canvas.setLayers([self.mapLayer])
         self.canvas.zoomToFullExtent()
         self.canvas.freeze(True)  
         self.canvas.show()     
@@ -2123,22 +2122,6 @@ class MapWidget(QWidget):
             self.estimate.updateExtents()
             self.indEst = self.indEst + 1
 
-    def addPolygonPoint(self):
-        vpr = self.polygonLayer.dateProvider()
-        if self.toolPolygon is None:
-            return
-        elif self.toolPolygon.vertices.len() == 0:
-            return
-        else:
-            for point in self.toolPolygon.vertices:
-                feature = QgsFeature()
-                feature.setFields(self.polygonLayer.fields())
-                feature.setGeometry(QgsGeometry.fromPointXY(point))
-                vpr.addFeatures([feature])
-                self.polygonLayer.updateExtents()
-
-
-
         
 class MapOptions(QWidget):
     '''
@@ -2289,13 +2272,41 @@ class MapOptions(QWidget):
         '''
         Method to export MapWidget's Polygon shape to a shapefile
         '''
-        folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
-        file = folder + 'polygon.shp'
-        options = QgsVectorFileWriter.SaveVectorOptions()
-        options.driverName = "ESRI Shapefile"
+        vpr = self.mapWidget.polygonLayer.dataProvider()
+        if self.mapWidget.toolPolygon is None:
+            return
+        elif len(self.mapWidget.toolPolygon.vertices) == 0:
+            return
+        else:
+            #polyGeom = self.mapWidget.toolPolygon.rubberBand.asGeometry()
+            pts = self.mapWidget.toolPolygon.vertices
+            print(type(pts[0]))
+            polyGeom = QgsGeometry.fromPolygonXY(pts)
+
+
+            #feature = QgsFeature()
+            #feature.setFields(self.mapWidget.polygonLayer.fields())
+            #feature.setGeometry(QgsGeometry.fromMultiPolygonXY(polyGeom))
+            #self.mapWidget.polygonlayer.addFeature(feature)
+            #self.mapWidget.polygonLayer.updateExtents()
+            
+            '''
+            for point in self.mapWidget.toolPolygon.vertices:
+                feature = QgsFeature()
+                feature.setFields(self.mapWidget.polygonLayer.fields())
+                feature.setGeometry(QgsGeometry.fromPointXY(point))
+                self.mapWidget.polygonLayer.addFeature(feature)
+                features = self.mapWidget.polygonLayer.getFeautre()
+                self.mapWidget.polygonLayer.updateExtents()
+            '''
+
+        #folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
+        #file = folder + '/polygon.shp'
+        #options = QgsVectorFileWriter.SaveVectorOptions()
+        #options.driverName = "ESRI Shapefile"
         
-        QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.polygonLayer, file, 
-                                                QgsCoordinateTransformContext(), options)
+        #QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.polygonLayer, file, 
+        #                                        QgsCoordinateTransformContext(), options)
         
            
 
@@ -2471,6 +2482,11 @@ class WebMap(MapWidget):
         
         return layer, pingRenderer
 
+    def setUpPolygonLayer(self):
+        uri = "Point?crs=epsg:3857"
+        polygonPointLayer = QgsVectorLayer(uri, 'Polygon', "memory")
+        return polygonPointLayer
+
     def addLayers(self):
         '''
         Helper method to add map layers to map canvas
@@ -2488,6 +2504,9 @@ class WebMap(MapWidget):
         if self.groundTruth is None:
             self.groundTruth = self.setupGroundTruth()
         
+        if self.polygonLayer is None:
+            self.polygonLayer = self.setUpPolygonLayer()
+            
         #load from cached tiles if true, otherwise loads from web    
         if self.loadCached:
             dirs = AppDirs("GCS", "E4E")
@@ -2748,6 +2767,7 @@ class StaticMap(MapWidget):
 
         self.mapLayer = QgsRasterLayer(self.fileName[0], "SRTM layer name")
         print(self.mapLayer.crs())
+
 
 
         
