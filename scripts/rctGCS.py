@@ -82,7 +82,6 @@ from qgis.utils import *
 import configparser
 import json
 import numpy as np
-<<<<<<< HEAD
 import csv
 
 from threading import Thread
@@ -2278,35 +2277,23 @@ class MapOptions(QWidget):
         elif len(self.mapWidget.toolPolygon.vertices) == 0:
             return
         else:
-            #polyGeom = self.mapWidget.toolPolygon.rubberBand.asGeometry()
             pts = self.mapWidget.toolPolygon.vertices
             print(type(pts[0]))
-            polyGeom = QgsGeometry.fromPolygonXY(pts)
-
-
-            #feature = QgsFeature()
-            #feature.setFields(self.mapWidget.polygonLayer.fields())
-            #feature.setGeometry(QgsGeometry.fromMultiPolygonXY(polyGeom))
-            #self.mapWidget.polygonlayer.addFeature(feature)
-            #self.mapWidget.polygonLayer.updateExtents()
+            polyGeom = QgsGeometry.fromPolygonXY([pts])
             
-            '''
-            for point in self.mapWidget.toolPolygon.vertices:
-                feature = QgsFeature()
-                feature.setFields(self.mapWidget.polygonLayer.fields())
-                feature.setGeometry(QgsGeometry.fromPointXY(point))
-                self.mapWidget.polygonLayer.addFeature(feature)
-                features = self.mapWidget.polygonLayer.getFeautre()
-                self.mapWidget.polygonLayer.updateExtents()
-            '''
+            feature = QgsFeature()
+            feature.setGeometry(polyGeom)
+            vpr.addFeatures([feature])
+            self.mapWidget.polygonLayer.updateExtents()
 
-        #folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
-        #file = folder + '/polygon.shp'
-        #options = QgsVectorFileWriter.SaveVectorOptions()
-        #options.driverName = "ESRI Shapefile"
-        
-        #QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.polygonLayer, file, 
-        #                                        QgsCoordinateTransformContext(), options)
+
+            folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
+            file = folder + '/polygon.shp'
+            options = QgsVectorFileWriter.SaveVectorOptions()
+            options.driverName = "ESRI Shapefile"
+            
+            QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.polygonLayer, file, 
+                                                    QgsCoordinateTransformContext(), options)
         
            
 
@@ -2483,7 +2470,7 @@ class WebMap(MapWidget):
         return layer, pingRenderer
 
     def setUpPolygonLayer(self):
-        uri = "Point?crs=epsg:3857"
+        uri = "Polygon?crs=epsg:3857"
         polygonPointLayer = QgsVectorLayer(uri, 'Polygon', "memory")
         return polygonPointLayer
 
