@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 02/18/21  ML  Refactored layer functions in map classes
 # 02/11/21  ML  pruned imports
 # 10/21/20  ML  Removed testing components
 # 08/19/20  ML  Added config object to gcs, added appDirs for tiles output
@@ -1807,7 +1808,7 @@ class MapWidget(QWidget):
     '''
     Custom Widget that is used to display a map
     '''
-    def __init__(self, root):
+    def __init__(self, root, isWeb):
         '''
         Creates a MapWidget
         Args:
@@ -1832,8 +1833,9 @@ class MapWidget(QWidget):
         self.toolbar = QToolBar()
         self.canvas = qgis.gui.QgsMapCanvas()
         self.canvas.setCanvasColor(PyQt5.QtCore.Qt.white)
+        self.isWeb = isWeb
 
-        self.transformToWeb = QgsCoordinateTransform(
+        self.transformToMap = QgsCoordinateTransform(
                 QgsCoordinateReferenceSystem("EPSG:4326"),
                 QgsCoordinateReferenceSystem("EPSG:3857"), 
                 QgsProject.instance())
@@ -1931,7 +1933,8 @@ class MapWidget(QWidget):
         '''
         lat = coord[0]
         lon = coord[1]
-        point = self.transformToWeb.transform(QgsPointXY(lon, lat))
+        point = self.transformToMap.transform(QgsPointXY(lon, lat))
+
         if self.vehicle is None:
             return
         else:
@@ -1968,7 +1971,7 @@ class MapWidget(QWidget):
         
         
         change = False
-        point = self.transformToWeb.transform(QgsPointXY(lon, lat))
+        point = self.transformToMap.transform(QgsPointXY(lon, lat))
         if self.pingLayer is None:
             return
 
@@ -2036,7 +2039,7 @@ class MapWidget(QWidget):
         lon = coord[1]
         
         
-        point = self.transformToWeb.transform(QgsPointXY(lon, lat))
+        point = self.transformToMap.transform(QgsPointXY(lon, lat))
         if self.estimate is None:
             return
         else:
@@ -2052,6 +2055,115 @@ class MapWidget(QWidget):
             vpr.addFeatures([f])
             self.estimate.updateExtents()
             self.indEst = self.indEst + 1
+            
+    def setupVehicleLayers(self, uri, uriLine):
+        '''
+        Sets up the vehicle and vehicle path layers
+        Args:
+        '''
+        vehicleLayer = QgsVectorLayer(uri, 'Vehicle', "memory")
+        vehiclePathlayer = QgsVectorLayer(uriLine, 'VehiclePath', "memory")
+        
+        # Set drone image for marker symbol
+        path = PyQt5.QtCore.QDir().filePath('../resources/vehicleSymbol.svg')
+        symbolSVG = QgsSvgMarkerSymbolLayer(path)
+        symbolSVG.setSize(4)
+        symbolSVG.setFillColor(PyQt5.QtGui.QColor('#0000ff'))
+        symbolSVG.setStrokeColor(PyQt5.QtGui.QColor('#ff0000'))
+        symbolSVG.setStrokeWidth(1)
+        vehicleLayer.renderer().symbol().changeSymbolLayer(0, symbolSVG)
+        
+        #set autorefresh
+        vehicleLayer.setAutoRefreshInterval(500)
+        vehicleLayer.setAutoRefreshEnabled(True)
+        vehiclePathlayer.setAutoRefreshInterval(500)
+        vehiclePathlayer.setAutoRefreshEnabled(True)
+        return vehicleLayer, vehiclePathlayer
+
+
+    def setupPingLayer(self, uri):
+        '''
+        Sets up the ping layer and renderer.
+        Args:
+        '''
+        ranges = []
+        
+        layer = QgsVectorLayer(uri, 'Pings', 'memory')
+        
+        
+        # make symbols
+        symbolBlue = QgsSymbol.defaultSymbol(layer.geometryType())
+        symbolBlue.setColor(PyQt5.QtGui.QColor('#0000FF'))
+        symbolCyan = QgsSymbol.defaultSymbol(
+            layer.geometryType())
+        symbolCyan.setColor(PyQt5.QtGui.QColor('#00FFFF'))
+        symbolGreen = QgsSymbol.defaultSymbol(
+            layer.geometryType())
+        symbolGreen.setColor(PyQt5.QtGui.QColor('#00FF00'))
+        symbolYellow = QgsSymbol.defaultSymbol(
+            layer.geometryType())
+        symbolYellow.setColor(PyQt5.QtGui.QColor('#FFFF00'))
+        symbolOrange = QgsSymbol.defaultSymbol(
+            layer.geometryType())
+        symbolOrange.setColor(PyQt5.QtGui.QColor('#FFC400'))
+        symbolORed = QgsSymbol.defaultSymbol(
+            layer.geometryType())
+        symbolORed.setColor(PyQt5.QtGui.QColor('#FFA000'))
+        symbolRed = QgsSymbol.defaultSymbol(
+            layer.geometryType())
+        symbolRed.setColor(PyQt5.QtGui.QColor('#FF0000'))
+    
+        # make ranges
+        rBlue = QgsRendererRange(0, 10, symbolBlue, 'Blue')
+        rCyan = QgsRendererRange(10, 20, symbolCyan, 'Cyan')
+        rGreen = QgsRendererRange(20, 40, symbolGreen, 'Green')
+        rYellow = QgsRendererRange(40, 60, symbolYellow, 'Yellow')
+        rOrange = QgsRendererRange(60, 80, symbolOrange, 'Orange')
+        rORed = QgsRendererRange(80, 90, symbolORed, 'ORed')
+        rRed = QgsRendererRange(90, 100, symbolRed, 'Red')
+        ranges.append(rBlue)
+        ranges.append(rCyan)
+        ranges.append(rGreen)
+        ranges.append(rYellow)
+        ranges.append(rOrange)
+        ranges.append(rORed)
+        ranges.append(rRed)
+
+        # set renderer to set symbol based on amplitude
+        pingRenderer = QgsGraduatedSymbolRenderer('Amp', ranges)
+
+        style = QgsStyle().defaultStyle()
+        defaultColorRampNames = style.colorRampNames()
+        ramp = style.colorRamp(defaultColorRampNames[22])
+        pingRenderer.setSourceColorRamp(ramp)
+        pingRenderer.setSourceSymbol( QgsSymbol.defaultSymbol(layer.geometryType()))
+        pingRenderer.sortByValue()
+        
+        
+        vpr = layer.dataProvider()
+        vpr.addAttributes([QgsField(name='Amp', type=PyQt5.QtCore.QVariant.Double, len=30)])
+        layer.updateFields()
+    
+        # set the renderer and allow the mapLayer to auto refresh
+        layer.setRenderer(pingRenderer)
+        layer.setAutoRefreshInterval(500)
+        layer.setAutoRefreshEnabled(True)
+        
+        return layer, pingRenderer
+    
+    def setupEstimate(self, uri):
+        '''
+        Sets up the Estimate mapLayer
+        Args:
+        '''
+        layer = QgsVectorLayer(uri, 'Estimate', "memory")
+        symbol = QgsMarkerSymbol.createSimple({'name':'diamond', 
+                'color':'blue'})
+        layer.renderer().setSymbol(symbol)
+        layer.setAutoRefreshInterval(500)
+        layer.setAutoRefreshEnabled(True)
+        
+        return layer
 
         
 class MapOptions(QWidget):
@@ -2198,7 +2310,7 @@ class WebMap(MapWidget):
             loadCached: boolean value to indicate tile source
         '''
         # Initialize WebMapFrame
-        MapWidget.__init__(self, root)
+        MapWidget.__init__(self, root, True)
 
         self.loadCached = loadCached
 
@@ -2207,7 +2319,7 @@ class WebMap(MapWidget):
            
         self.adjustCanvas()
         r = QgsRectangle(p1lon, p2lat, p2lon, p1lat)
-        rect = self.transformToWeb.transformBoundingBox(r)
+        rect = self.transformToMap.transformBoundingBox(r)
         self.canvas.zoomToFeatureExtent(rect)
 
         self.addToolBar()
@@ -2222,136 +2334,23 @@ class WebMap(MapWidget):
         self.root = root
 
 
-    def setupEstimate(self):
-        '''
-        Sets up the Estimate mapLayer
-        Args:
-        '''
-        uri = "Point?crs=epsg:3857"
-        layer = QgsVectorLayer(uri, 'Estimate', "memory")
-        symbol = QgsMarkerSymbol.createSimple({'name':'diamond', 
-                'color':'blue'})
-        layer.renderer().setSymbol(symbol)
-        layer.setAutoRefreshInterval(500)
-        layer.setAutoRefreshEnabled(True)
-        
-        return layer
 
-
-    def setupVehicleLayers(self):
-        '''
-        Sets up the vehicle and vehicle path layers
-        Args:
-        '''
-        uri = "Point?crs=epsg:3857"
-        uriLine = "Linestring?crs=epsg:3857"
-        vehicleLayer = QgsVectorLayer(uri, 'Vehicle', "memory")
-        vehiclePathlayer = QgsVectorLayer(uriLine, 'VehiclePath', "memory")
-        
-        # Set drone image for marker symbol
-        path = PyQt5.QtCore.QDir().filePath('../resources/vehicleSymbol.svg')
-        symbolSVG = QgsSvgMarkerSymbolLayer(path)
-        symbolSVG.setSize(4)
-        symbolSVG.setFillColor(PyQt5.QtGui.QColor('#0000ff'))
-        symbolSVG.setStrokeColor(PyQt5.QtGui.QColor('#ff0000'))
-        symbolSVG.setStrokeWidth(1)
-        vehicleLayer.renderer().symbol().changeSymbolLayer(0, symbolSVG)
-        
-        #set autorefresh
-        vehicleLayer.setAutoRefreshInterval(500)
-        vehicleLayer.setAutoRefreshEnabled(True)
-        vehiclePathlayer.setAutoRefreshInterval(500)
-        vehiclePathlayer.setAutoRefreshEnabled(True)
-        return vehicleLayer, vehiclePathlayer
-
-
-    def setupPingLayer(self):
-        '''
-        Sets up the ping layer and renderer.
-        Args:
-        '''
-        ranges = []
-        uri = "Point?crs=epsg:3857"
-        layer = QgsVectorLayer(uri, 'Pings', 'memory')
-        
-        
-        # make symbols
-        symbolBlue = QgsSymbol.defaultSymbol(layer.geometryType())
-        symbolBlue.setColor(PyQt5.QtGui.QColor('#0000FF'))
-        symbolCyan = QgsSymbol.defaultSymbol(
-            layer.geometryType())
-        symbolCyan.setColor(PyQt5.QtGui.QColor('#00FFFF'))
-        symbolGreen = QgsSymbol.defaultSymbol(
-            layer.geometryType())
-        symbolGreen.setColor(PyQt5.QtGui.QColor('#00FF00'))
-        symbolYellow = QgsSymbol.defaultSymbol(
-            layer.geometryType())
-        symbolYellow.setColor(PyQt5.QtGui.QColor('#FFFF00'))
-        symbolOrange = QgsSymbol.defaultSymbol(
-            layer.geometryType())
-        symbolOrange.setColor(PyQt5.QtGui.QColor('#FFC400'))
-        symbolORed = QgsSymbol.defaultSymbol(
-            layer.geometryType())
-        symbolORed.setColor(PyQt5.QtGui.QColor('#FFA000'))
-        symbolRed = QgsSymbol.defaultSymbol(
-            layer.geometryType())
-        symbolRed.setColor(PyQt5.QtGui.QColor('#FF0000'))
-    
-        # make ranges
-        rBlue = QgsRendererRange(0, 10, symbolBlue, 'Blue')
-        rCyan = QgsRendererRange(10, 20, symbolCyan, 'Cyan')
-        rGreen = QgsRendererRange(20, 40, symbolGreen, 'Green')
-        rYellow = QgsRendererRange(40, 60, symbolYellow, 'Yellow')
-        rOrange = QgsRendererRange(60, 80, symbolOrange, 'Orange')
-        rORed = QgsRendererRange(80, 90, symbolORed, 'ORed')
-        rRed = QgsRendererRange(90, 100, symbolRed, 'Red')
-        ranges.append(rBlue)
-        ranges.append(rCyan)
-        ranges.append(rGreen)
-        ranges.append(rYellow)
-        ranges.append(rOrange)
-        ranges.append(rORed)
-        ranges.append(rRed)
-
-        # set renderer to set symbol based on amplitude
-        pingRenderer = QgsGraduatedSymbolRenderer('Amp', ranges)
-        
-        
-        #myClassificationMethod = QgsApplication.classificationMethodRegistry().method("EqualInterval")
-        #pingRenderer.setClassificationMethod(myClassificationMethod)
-        #pingRenderer.setClassAttribute('Amp')
-        style = QgsStyle().defaultStyle()
-        defaultColorRampNames = style.colorRampNames()
-        ramp = style.colorRamp(defaultColorRampNames[22])
-        pingRenderer.setSourceColorRamp(ramp)
-        pingRenderer.setSourceSymbol( QgsSymbol.defaultSymbol(layer.geometryType()))
-        pingRenderer.sortByValue()
-        
-        
-        vpr = layer.dataProvider()
-        vpr.addAttributes([QgsField(name='Amp', type=PyQt5.QtCore.QVariant.Double, len=30)])
-        layer.updateFields()
-    
-        # set the renderer and allow the mapLayer to auto refresh
-        layer.setRenderer(pingRenderer)
-        layer.setAutoRefreshInterval(500)
-        layer.setAutoRefreshEnabled(True)
-        
-        return layer, pingRenderer
 
     def addLayers(self):
         '''
         Helper method to add map layers to map canvas
         '''
+        uri = "Point?crs=epsg:3857"
         if self.estimate is None:
-            self.estimate = self.setupEstimate()
+            self.estimate = self.setupEstimate(uri)
             
             
         if self.vehicle is None:
-            self.vehicle, self.vehiclePath = self.setupVehicleLayers()
+            vPathURI = "Linestring?crs=epsg:3857"
+            self.vehicle, self.vehiclePath = self.setupVehicleLayers(uri, vPathURI)
             
         if self.pingLayer is None:
-            self.pingLayer, self.pingRenderer = self.setupPingLayer()
+            self.pingLayer, self.pingRenderer = self.setupPingLayer(uri)
         
         #load from cached tiles if true, otherwise loads from web    
         if self.loadCached:
@@ -2491,7 +2490,7 @@ class StaticMap(MapWidget):
         Args:
             root: the root widget of the application
         '''
-        MapWidget.__init__(self, root)
+        MapWidget.__init__(self, root, False)
 
         self.fileName = None
 
@@ -2520,97 +2519,33 @@ class StaticMap(MapWidget):
         '''
         Helper funciton to add layers to the map canvas
         '''
+        uri = "Point?crs=epsg:4326"
+        uriLine = "Linestring?crs=epsg:4326"
+        
         if(self.fileName == None):
             return
         
         if self.estimate is None:
-            uri = "Point?crs=epsg:4326"
-            
-            self.estimate = QgsVectorLayer(uri, 'Estimate', "memory")
-            
-            symbol = QgsMarkerSymbol.createSimple({'name': 'diamond', 'color': 'blue'})
-            self.estimate.renderer().setSymbol(symbol)
-            
-            
-            self.estimate.setAutoRefreshInterval(500)
-            self.estimate.setAutoRefreshEnabled(True)
-            
+            self.estimate = self.setupEstimate(uri)
             
         if self.vehicle is None:
-            uri = "Point?crs=epsg:4326"
-            uriLine = "Linestring?crs=epsg:4326"
-            
-            self.vehicle = QgsVectorLayer(uri, 'Vehicle', "memory")
-            self.vehiclePath = QgsVectorLayer(uriLine, 'VehiclePath', "memory")
-
-            # Set drone image for marker symbol
-            path = PyQt5.QtCore.QDir().currentPath()
-            full = path +'/camera.svg'
-            symbolSVG = QgsSvgMarkerSymbolLayer(full)
-            symbolSVG.setSize(4)
-            symbolSVG.setFillColor(PyQt5.QtGui.QColor('#0000ff'))
-            symbolSVG.setStrokeColor(PyQt5.QtGui.QColor('#ff0000'))
-            symbolSVG.setStrokeWidth(1)
-            
-            self.vehicle.renderer().symbol().changeSymbolLayer(0, symbolSVG )
-            
-            #set autorefresh
-            self.vehicle.setAutoRefreshInterval(500)
-            self.vehicle.setAutoRefreshEnabled(True)
-            self.vehiclePath.setAutoRefreshInterval(500)
-            self.vehiclePath.setAutoRefreshEnabled(True)
+            self.vehicle, self.vehiclePath = self.setupVehicleLayers(uri, uriLine)
             
         if self.pingLayer is None:
-            ranges = []
-            uri = "Point?crs=epsg:4326"
-            self.pingLayer = QgsVectorLayer(uri, 'Pings', 'memory')
-
-            # make symbols
-            symbolBlue = QgsSymbol.defaultSymbol(
-                    self.pingLayer.geometryType())
-            symbolBlue.setColor(PyQt5.QtGui.QColor('#0000FF'))
-            symbolGreen = QgsSymbol.defaultSymbol(
-                    self.pingLayer.geometryType())
-            symbolGreen.setColor(PyQt5.QtGui.QColor('#00FF00'))
-            symbolYellow = QgsSymbol.defaultSymbol(
-                    self.pingLayer.geometryType())
-            symbolYellow.setColor(PyQt5.QtGui.QColor('#FFFF00'))
-            symbolOrange = QgsSymbol.defaultSymbol(
-                    self.pingLayer.geometryType())
-            symbolOrange.setColor(PyQt5.QtGui.QColor('#FFA500'))
-            symbolRed = QgsSymbol.defaultSymbol(
-                    self.pingLayer.geometryType())
-            symbolRed.setColor(PyQt5.QtGui.QColor('#FF0000'))
-
-            # make ranges
-            rBlue = QgsRendererRange(0, 20, symbolBlue, 'Blue')
-            rGreen = QgsRendererRange(20, 40, symbolGreen, 'Green')
-            rYellow = QgsRendererRange(40, 60, symbolYellow, 'Yellow')
-            rOrange = QgsRendererRange(60, 80, symbolOrange, 'Orange')
-            rRed = QgsRendererRange(80, 100, symbolRed, 'Red')
-
-            ranges.append(rBlue)
-            ranges.append(rGreen)
-            ranges.append(rYellow)
-            ranges.append(rOrange)
-            ranges.append(rRed)
-
-            # set renderer to set symbol based on amplitude
-            self.pingRenderer = QgsGraduatedSymbolRenderer('Amp', ranges)
-            myClassificationMethod = QgsApplication.classificationMethodRegistry().method("EqualInterval")
-            self.pingRenderer.setClassificationMethod(myClassificationMethod)
-            self.pingRenderer.setClassAttribute('Amp')
-            vpr = self.pingLayer.dataProvider()
-            vpr.addAttributes([QgsField(name='Amp', type=PyQt5.QtCore.QVariant.Double, len=30)])
-            self.pingLayer.updateFields()
-
-            # set the renderer and allow the layerayer to auto refresh
-            self.pingLayer.setRenderer(self.pingRenderer)
-            self.pingLayer.setAutoRefreshInterval(500)
-            self.pingLayer.setAutoRefreshEnabled(True)
+            self.pingLayer, self.pingRenderer = self.setupPingLayer(uri)
 
         self.mapLayer = QgsRasterLayer(self.fileName[0], "SRTM layer name")
         print(self.mapLayer.crs())
+        crs = self.mapLayer.crs()
+        
+        self.transformToMap = QgsCoordinateTransform(
+                QgsCoordinateReferenceSystem("EPSG:4326"),
+                crs, 
+                QgsProject.instance())
+        self.transform = QgsCoordinateTransform(
+                crs, 
+                QgsCoordinateReferenceSystem("EPSG:4326"),
+                QgsProject.instance())
 
 
         
@@ -2623,6 +2558,8 @@ class StaticMap(MapWidget):
             print('valid layer')
         else:
             print('invalid layer')
+            
+    
 
 def configSetup():
     '''
