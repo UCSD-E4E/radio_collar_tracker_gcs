@@ -452,15 +452,17 @@ class LocationEstimator:
                 inds2 = np.round(zscores, decimals=2)
                 inds2 = (inds2*100)%10
                 
+                #for i in range(len(pings)):
+                heatMapArea[y, x] +=  norm.pdf(iDist[0], loc=calculatedDistances[0], scale=stdDistances)
+                
+                '''
+                
                 for i in range(len(inds)):
                     if(inds[i] > 4):
-                        heatMapArea[y, x] *= 0
+                        heatMapArea[y, x] *= 0.01
                     else:
                         ind2 = int(inds2[i])
                         heatMapArea[y, x] *= self.lookup[inds[i]][ind2] 
-                '''
-                for i in range(len(pings)):
-                    heatMapArea[y, x] *=  norm.pdf(iDist[i], loc=calculatedDistances[i], scale=stdDistances)
                 '''
                 #csv_dict.append({"easting": self.refX+x, "northing": self.minY+y, "value": (heatMapArea[y, x]), "new": (heatMapArea2[y,x])})
                 csv_dict.append({"easting": self.refX+x, "northing": self.minY+y, "value": (heatMapArea[y, x])})

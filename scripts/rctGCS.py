@@ -1827,6 +1827,20 @@ class MapWidget(QWidget):
             QgsProject.instance().removeMapLayer(self.heatMap)
         if fileName is not None:
             self.heatMap = QgsRasterLayer(fileName[0], "heatMap")   
+            
+            stats = self.heatMap.dataProvider().bandStatistics(1)
+            maxVal = stats.maximumValue
+            print(maxVal)
+            fcn = QgsColorRampShader()
+            fcn.setColorRampType(QgsColorRampShader.Interpolated)
+            lst = [ QgsColorRampShader.ColorRampItem(0, QColor(0,0,0)), QgsColorRampShader.ColorRampItem(maxVal, QColor(255,255,255)) ]
+            fcn.setColorRampItemList(lst)
+            shader = QgsRasterShader()
+            shader.setRasterShaderFunction(fcn)
+            
+            renderer = QgsSingleBandPseudoColorRenderer(self.heatMap.dataProvider(), 1, shader)
+            self.heatMap.setRenderer(renderer)
+            
             QgsProject.instance().addMapLayer(self.heatMap)
             destCrs = self.mapLayer.crs()
             rasterCrs = self.heatMap.crs()
@@ -1852,6 +1866,22 @@ class MapWidget(QWidget):
             QgsProject.instance().removeMapLayer(self.heatMap)
         if fileName is not None:
             self.heatMap = QgsRasterLayer(fileName, "heatMap")   
+            
+            
+            stats = self.heatMap.dataProvider().bandStatistics(1)
+            maxVal = stats.maximumValue
+            print(maxVal)
+            fcn = QgsColorRampShader()
+            fcn.setColorRampType(QgsColorRampShader.Interpolated)
+            lst = [ QgsColorRampShader.ColorRampItem(0, QColor(0,0,0)), QgsColorRampShader.ColorRampItem(maxVal, QColor(255,255,255)) ]
+            fcn.setColorRampItemList(lst)
+            shader = QgsRasterShader()
+            shader.setRasterShaderFunction(fcn)
+            
+            renderer = QgsSingleBandPseudoColorRenderer(self.heatMap.dataProvider(), 1, shader)
+            self.heatMap.setRenderer(renderer)
+            
+            
             QgsProject.instance().addMapLayer(self.heatMap)
             destCrs = self.mapLayer.crs()
             rasterCrs = self.heatMap.crs()
