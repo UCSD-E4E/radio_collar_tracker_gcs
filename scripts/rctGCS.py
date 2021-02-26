@@ -86,6 +86,7 @@ import csv
 
 from threading import Thread
 from appdirs import AppDirs
+from _cffi_backend import newp
 
 class GCS(QMainWindow):
     '''
@@ -2272,11 +2273,13 @@ class MapOptions(QWidget):
         Method to export MapWidget's Polygon shape to a shapefile
         '''
         vpr = self.mapWidget.polygonLayer.dataProvider()
+        self.generateWaypoints()
         if self.mapWidget.toolPolygon is None:
             return
         elif len(self.mapWidget.toolPolygon.vertices) == 0:
             return
-        else:
+        #else:
+            '''
             pts = self.mapWidget.toolPolygon.vertices
             print(type(pts[0]))
             polyGeom = QgsGeometry.fromPolygonXY([pts])
@@ -2294,7 +2297,72 @@ class MapOptions(QWidget):
             
             QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.polygonLayer, file, 
                                                     QgsCoordinateTransformContext(), options)
+            '''
+            
+            
+    def generateWaypoints(self):
+        '''
+        Method to retrieve waypoints based on polygon vertices
+        '''
+        width = 30
+        path = []
+        points = self.mapWidget.toolPolygon.vertices
+        newPoints = []
+        for point in points:
+            toAdd = self.mapWidget.transform.transform(point)
+            easting, northing, num, zone = utm.from_latlon(toAdd[1], toAdd[0])
+            newPoint = [easting, northing]
+            newPoints.append(newPoint)
         
+        points = np.array(newPoints)
+        maxX = points[:,0].max()
+        minX = points[:,0].min()
+        maxY = points[:,1].max()
+        minY = points[:,1].min()
+        
+        yRange = maxY-minY
+        
+        numRows = math.ceil(yRange/width)
+        
+        topPoint = []
+        coord = -1
+        for i in range(len(points)):
+            if(points.item(i,1) == maxY):
+                topPoint = points[i]
+                coord = i
+                
+        path.append(topPoint)
+        
+        curTopL = topPoint
+        curTopR = topPoint
+        for i in range(numRows):
+            #left side
+            previousL = points[coord-1]
+            slope = (curTopL[1]-previousL[1])/(curTopL[0]-previousL[0])
+            print(slope)
+            b = curTopL[1]-(slope*curTopL[0])
+            newY = topPoint[1]-(width*i)
+            newX = (newY-b)/slope
+            
+            if(newY < previousL[1] and newY > minY):
+                curTopL = previousL
+                coord = coord-1
+            
+            #right side
+            previousR = points[coord+1]
+            slope = (curTopR[1]-previousR[1])/(curTopR[0]-previousR[0])
+            print(slope)
+            b = curTopR[1]-(slope*curTopR[0])
+            newY = topPoint[1]-(width*i)
+            newX = (newY-b)/slope
+            
+            if(newY < previousR[1] and newX > minY):
+                curTopR = previousR
+                coord = coord-1
+            
+            print(newX, newY)
+        
+        print(maxX, minX, maxY, minY)
            
 
 
