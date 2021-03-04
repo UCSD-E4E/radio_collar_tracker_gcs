@@ -2278,8 +2278,8 @@ class MapOptions(QWidget):
             return
         elif len(self.mapWidget.toolPolygon.vertices) == 0:
             return
-        #else:
-            '''
+        else:
+            
             pts = self.mapWidget.toolPolygon.vertices
             print(type(pts[0]))
             polyGeom = QgsGeometry.fromPolygonXY([pts])
@@ -2297,7 +2297,7 @@ class MapOptions(QWidget):
             
             QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.polygonLayer, file, 
                                                     QgsCoordinateTransformContext(), options)
-            '''
+            
             
             
     def generateWaypoints(self):
@@ -2311,8 +2311,10 @@ class MapOptions(QWidget):
         for point in points:
             toAdd = self.mapWidget.transform.transform(point)
             easting, northing, num, zone = utm.from_latlon(toAdd[1], toAdd[0])
-            newPoint = [easting, northing]
+            newPoint = QgsPointXY(easting, northing)
             newPoints.append(newPoint)
+        
+        polyGeom = QgsGeometry.fromPolygonXY([newPoints])
         
         points = np.array(newPoints)
         maxX = points[:,0].max()
@@ -2322,47 +2324,53 @@ class MapOptions(QWidget):
         
         yRange = maxY-minY
         
-        numRows = math.ceil(yRange/width)
+        numRows = math.floor(yRange/width)
         
-        topPoint = []
-        coord = -1
-        for i in range(len(points)):
-            if(points.item(i,1) == maxY):
-                topPoint = points[i]
-                coord = i
-                
-        path.append(topPoint)
+        topTwoInd = np.argsort(points[:,1], axis=0)[-2:][::-1]
+        topTwo = points[topTwoInd]
+        topTwo = topTwo[np.argsort(topTwo[:,0], axis=0)]
+        path.append(topTwo[0])
+        path.append(topTwo[1])
         
-        curTopL = topPoint
-        curTopR = topPoint
+        splitLines = []
+        
         for i in range(numRows):
-            #left side
-            previousL = points[coord-1]
-            slope = (curTopL[1]-previousL[1])/(curTopL[0]-previousL[0])
-            print(slope)
-            b = curTopL[1]-(slope*curTopL[0])
-            newY = topPoint[1]-(width*i)
-            newX = (newY-b)/slope
-            
-            if(newY < previousL[1] and newY > minY):
-                curTopL = previousL
-                coord = coord-1
-            
-            #right side
-            previousR = points[coord+1]
-            slope = (curTopR[1]-previousR[1])/(curTopR[0]-previousR[0])
-            print(slope)
-            b = curTopR[1]-(slope*curTopR[0])
-            newY = topPoint[1]-(width*i)
-            newX = (newY-b)/slope
-            
-            if(newY < previousR[1] and newX > minY):
-                curTopR = previousR
-                coord = coord-1
-            
-            print(newX, newY)
+            newY = minY + (i*width)
+            if(i > 0):
+                if((i%2)==0):
+                    splitLines.append(QgsPointXY(minX-1, newY))
+                    splitLines.append(QgsPointXY(maxX+1, newY))
+                else:
+                    splitLines.append(QgsPointXY(maxX+1, newY))
+                    splitLines.append(QgsPointXY(minX-1, newY))
         
-        print(maxX, minX, maxY, minY)
+        
+        x = 0
+        added = 0
+        while(x < len(splitLines)):
+            ind = x
+            split = QgsGeometry.fromPolylineXY([splitLines[ind], splitLines[ind+1]]).intersection(polyGeom).asPolyline()
+            if(len(path) > 1):
+                added = added + 1
+                path.append(split[0])
+                path.append(split[1])
+            x = x + 2
+                
+                
+        botTwoInd = np.argsort(points[:,1], axis=0)[2:]
+        botTwo = points[botTwoInd]
+        botTwo = botTwo[np.argsort(topTwo[:,0], axis=0)]
+        
+        if((added%2)==0):
+            path.append(botTwo[0])
+            path.append(botTwo[1])
+        else:
+            path.append(botTwo[1])
+            path.append(botTwo[0])
+            
+                
+        print(path)
+            
            
 
 
