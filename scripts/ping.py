@@ -452,8 +452,10 @@ class LocationEstimator:
                 inds2 = np.round(zscores, decimals=2)
                 inds2 = (inds2*100)%10
                 
-                #for i in range(len(pings)):
-                heatMapArea[y, x] +=  norm.pdf(iDist[0], loc=calculatedDistances[0], scale=stdDistances)
+                for i in range(len(pings)):
+                    heatMapArea[y, x] *=  norm.pdf(iDist[i], loc=calculatedDistances[i], scale=stdDistances)
+                    if(i==0):
+                        heatMapArea2[y, x] *=  norm.pdf(iDist[i], loc=calculatedDistances[i], scale=stdDistances)
                 
                 '''
                 
@@ -467,7 +469,8 @@ class LocationEstimator:
                 #csv_dict.append({"easting": self.refX+x, "northing": self.minY+y, "value": (heatMapArea[y, x]), "new": (heatMapArea2[y,x])})
                 csv_dict.append({"easting": self.refX+x, "northing": self.minY+y, "value": (heatMapArea[y, x])})
             
-
+        print(np.sum(heatMapArea))
+        print(np.sum(heatMapArea2))
         with open('./holder/query.csv', 'w', newline='') as csvfile:
             fieldnames = ['easting', 'northing', 'value', 'new']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
@@ -502,7 +505,6 @@ class LocationEstimator:
         band.SetStatistics(np.amin(heatMapArea), np.amax(heatMapArea), np.mean(heatMapArea), np.std(heatMapArea))
         dataset.FlushCache()
         dataset = None
-        print((time.time()-ts))
         
 
 
