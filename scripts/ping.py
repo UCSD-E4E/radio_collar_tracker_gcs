@@ -20,6 +20,8 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 03/11/21  ML  Added normalization to heatMapArea in precision visualization 
+#               function
 # 10/05/20  ML  Added estimate precision visualization function
 # 05/25/20  NH  Added getter for pings for LocationEstimator and DataManager
 # 05/18/20  NH  Added logic to convert rctPing to/from rctPingPacket
@@ -421,8 +423,6 @@ class LocationEstimator:
         
         distanceErrors = calculatedDistances - distances
         stdDistances = np.std(distanceErrors)
-        print(stdDistances)
-        print(calculatedDistances)
         P_rx = pings[:,3]
         
         size = 25
@@ -471,6 +471,9 @@ class LocationEstimator:
             
         print(np.sum(heatMapArea))
         print(np.sum(heatMapArea2))
+        sumH = heatMapArea.sum()
+        heatMapArea = heatMapArea / sumH
+        print( heatMapArea.sum())
         with open('./holder/query.csv', 'w', newline='') as csvfile:
             fieldnames = ['easting', 'northing', 'value', 'new']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
