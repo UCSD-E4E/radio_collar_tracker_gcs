@@ -39,10 +39,8 @@ import rctComms
 import time
 import gdal
 import osr
-from multiprocessing import Process, Queue
-import time
 import csv
-
+import math
 
 
 class rctPing:
@@ -353,7 +351,7 @@ class LocationEstimator:
 
         self.result = res_x
         
-        self.doPrecision()
+        #self.doPrecision()
 
         return self.__params, self.__staleEstimate
 
@@ -383,11 +381,11 @@ class LocationEstimator:
 
         return result
     
-    def p_d(self, dist, modeledDistance, D_std):
-
-            return norm.pdf(dist, loc=modeledDistance, scale=D_std)
-        
-    
+    def p_d(self, tx, dx, n, P_rx, P_tx, D_std):
+            modeledDistance = self.RSSItoDistance(P_rx, P_tx, n)
+            adjustedDistance = (np.linalg.norm(dx-tx)-modeledDistance)/D_std
+            return math.exp((-(adjustedDistance**2)/2)) / (math.sqrt(2*math.pi) * D_std)
+            
     def RSSItoDistance(self, P_rx, P_tx, n, alt=0):
         dist = 10 ** ((P_tx - P_rx) / (10 * n))
         if alt != 0:
@@ -430,7 +428,6 @@ class LocationEstimator:
         tiffYSize = size
         pixelSize = 1
         heatMapArea = np.ones((tiffYSize, tiffXSize)) / (tiffXSize * tiffYSize) # [y, x]
-        heatMapArea2 = np.ones((tiffYSize, tiffXSize)) / (tiffXSize * tiffYSize)
             
         self.last_l_tx0 = l_tx[0]
         self.last_l_tx1 = l_tx[1]
@@ -444,36 +441,15 @@ class LocationEstimator:
         csv_dict = []
             
         for y in range(tiffYSize):
-            for x in range(tiffXSize):
-                iDist = np.linalg.norm(pings[:,0:3] - np.array([self.refX+x, self.minY+y, 0]), axis=1)
-        
-                zscores = abs((iDist-calculatedDistances)/stdDistances)
-                inds = np.round(zscores, decimals=1)
-                inds2 = np.round(zscores, decimals=2)
-                inds2 = (inds2*100)%10
-                
+            for x in range(tiffXSize):             
                 for i in range(len(pings)):
-                    heatMapArea[y, x] *=  norm.pdf(iDist[i], loc=calculatedDistances[i], scale=stdDistances)
-                    if(i==0):
-                        heatMapArea2[y, x] *=  norm.pdf(iDist[i], loc=calculatedDistances[i], scale=stdDistances)
-                
-                '''
-                
-                for i in range(len(inds)):
-                    if(inds[i] > 4):
-                        heatMapArea[y, x] *= 0.01
-                    else:
-                        ind2 = int(inds2[i])
-                        heatMapArea[y, x] *= self.lookup[inds[i]][ind2] 
-                '''
+                    heatMapArea[y, x] *= self.p_d(np.array([x + self.refX, y + self.minY, 0]), pings[i,0:3], n, P_rx[i], P, stdDistances)
+  
                 #csv_dict.append({"easting": self.refX+x, "northing": self.minY+y, "value": (heatMapArea[y, x]), "new": (heatMapArea2[y,x])})
                 csv_dict.append({"easting": self.refX+x, "northing": self.minY+y, "value": (heatMapArea[y, x])})
-            
-        print(np.sum(heatMapArea))
-        print(np.sum(heatMapArea2))
+
         sumH = heatMapArea.sum()
         heatMapArea = heatMapArea / sumH
-        print( heatMapArea.sum())
         with open('./holder/query.csv', 'w', newline='') as csvfile:
             fieldnames = ['easting', 'northing', 'value', 'new']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)

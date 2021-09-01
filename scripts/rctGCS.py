@@ -190,8 +190,8 @@ class GCS(QMainWindow):
             
             if self.mapDisplay is not None:
                 self.mapDisplay.plotEstimate(coord, frequency)
-                self.queue.put( (self.mapDisplay.plotPrecision, coord, frequency, numPings) )
-                self.sig.emit()
+                #self.queue.put( (self.mapDisplay.plotPrecision, coord, frequency, numPings) )
+                #self.sig.emit()
                 #self.mapDisplay.plotPrecision(coord, frequency, numPings)
                 
             if self.mapOptions is not None:
