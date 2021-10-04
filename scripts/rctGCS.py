@@ -140,6 +140,8 @@ class GCS(QMainWindow):
             rctCore.Events.NewPing, self.__handleNewPing)
         self._mavModel.registerCallback(
             rctCore.Events.NewEstimate, self.__handleNewEstimate)
+        self._mavModel.registerCallback(
+            rctCore.Events.ConeInfo, self.__handleNewCone)
 
     def mainloop(self, n=0):
         '''
@@ -229,6 +231,18 @@ class GCS(QMainWindow):
         if self.mapDisplay is not None:
             self.mapDisplay.plotVehicle(coord)
 
+    def __handleNewCone(self):
+        '''
+        Internal callback to handle new cone info
+        '''
+        if self._mavModel == None:
+            return
+
+        recentCone = list(self._mavModel.state['CONE_track'])[-1]
+        cone = self._mavModel.state['CONE_track'][recentCone]
+
+        if self.mapDisplay is not None:
+            self.mapDisplay.plotCone(cone)
 
     def __handleRemoteException(self):
         '''
@@ -1793,6 +1807,7 @@ class MapWidget(QWidget):
         self.vehicle = None
         self.vehiclePath = None
         self.precision = None
+        self.cones = None
         self.lastLoc = None
         self.pingLayer = None
         self.pingRenderer = None
@@ -1803,6 +1818,7 @@ class MapWidget(QWidget):
         self.indPing = 0
         self.ind = 0
         self.indEst = 0
+        self.indCone = 0
         self.toolbar = QToolBar()
         self.canvas = QgsMapCanvas()
         self.canvas.setCanvasColor(Qt.white)
@@ -1994,6 +2010,27 @@ class MapWidget(QWidget):
             vpr.addFeatures([f])
             self.vehicle.updateExtents()
             self.ind = self.ind + 1
+    
+    def plotCone(self, coord):
+        lat = coord[0]
+        lon = coord[1]
+        point = self.transformToWeb.transform(QgsPointXY(lon, lat))
+
+        if self.cones is None:
+            return
+        else:
+            if self.indCone > 5:
+                #TODO DECREASE OPACITY
+                self.vehicle.startEditing()
+                
+            #Add new cone
+            cpr = self.cones.dataProvider()
+            pnt = QgsGeometry.fromPointXY(point)
+            f = QgsFeature()
+            f.setGeometry(pnt)
+            cpr.addFeatures([f])
+            self.cones.updateExtents()
+            
 
     def plotPing(self, coord, power):
         '''
@@ -2413,6 +2450,20 @@ class WebMap(MapWidget):
         vehiclePathlayer.setAutoRefreshEnabled(True)
         return vehicleLayer, vehiclePathlayer
 
+    def setupConeLayer(self):
+        uri = "Point?crs=epsg:3857"
+        coneLayer = QgsVectorLayer(uri, 'Cone', "memory")
+        path = QDir().filePath('../resources/searchingTriangle.svg')
+        symbolSVG = QgsSvgMarkerSymbolLayer(path)
+        symbolSVG.setSize(4)
+        symbolSVG.setFillColor(QColor('#ff0000'))
+        symbolSVG.setStrokeColor(QColor('#ff0000'))
+        symbolSVG.setStrokeWidth(1)
+        coneLayer.renderer().symbol().changeSymbolLayer(0, symbolSVG)
+        coneLayer.setAutoRefreshInterval(500)
+        coneLayer.setAutoRefreshEnabled(True)
+        return coneLayer
+
 
     def setupPingLayer(self):
         '''
@@ -2521,6 +2572,8 @@ class WebMap(MapWidget):
         if self.groundTruth is None:
             self.groundTruth = self.setupGroundTruth()
             
+        if self.cones is None:
+            self.cones = self.setupConeLayer()
         
         
         #load from cached tiles if true, otherwise loads from web    
@@ -2550,6 +2603,7 @@ class WebMap(MapWidget):
             QgsProject.instance().addMapLayer(self.vehicle)
             QgsProject.instance().addMapLayer(self.vehiclePath)
             QgsProject.instance().addMapLayer(self.pingLayer)
+            QgsProject.instance().addMapLayer(self.cones)
             #QgsProject.instance().addMapLayer(self.precision)
             print('valid mapLayer')
         else:

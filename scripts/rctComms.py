@@ -89,6 +89,7 @@ class DATA_ID(enum.Enum):
     '''
     PING = 0x01
     VEHICLE = 0x02
+    CONE = 0x03
 
 
 class COMMAND_ID(enum.Enum):
@@ -525,6 +526,43 @@ class rctVehiclePacket(rctBinaryPacket):
         return rctVehiclePacket(lat, lon, alt, hdg, timestamp)
 
 
+class rctConePacket(rctBinaryPacket):
+    def __init__(self, lat: float, lon: float, alt: float, hdg: int, power: float, angle: float, timestamp: dt.datetime = None):
+        self.lat = lat
+        self.lon = lon
+        self.alt = alt
+        self.hdg = hdg
+        self.power = power
+        self.angle = angle
+        if timestamp is None:
+            timestamp = dt.datetime.now()
+        self.timestamp = timestamp
+
+        self._pclass = 0x04
+        self._pid = 0x02
+        self._payload = struct.pack("<BQllHHll", 0x01, int(timestamp.timestamp(
+        ) * 1e3), int(lat * 1e7), int(lon * 1e7), int(alt * 10), hdg, power, angle)
+
+    @classmethod
+    def matches(cls, packetClass: int, packetID: int):
+        return packetClass == 0x04 and packetID == 0x03
+
+    @classmethod
+    def from_bytes(cls, packet: bytes):
+        header = packet[0:6]
+        payload = packet[6:-2]
+        _, _, pcls, pid, _ = struct.unpack("<BBBBH", header)
+        if not cls.matches(pcls, pid):
+            raise RuntimeError("Incorrect packet type")
+        _, timeMS, lat7, lon7, alt1, hdg, power, angle = struct.unpack(
+            '<BQllHHll', payload)
+        timestamp = dt.datetime.fromtimestamp(timeMS / 1e3)
+        lat = lat7 / 1e7
+        lon = lon7 / 1e7
+        alt = alt1 / 10
+        return rctConePacket(lat, lon, alt, hdg, power, angle, timestamp)
+
+
 class rctACKCommand(rctBinaryPacket):
     def __init__(self, commandID: int, ack: bool, timestamp: dt.datetime = None):
         self.commandID = commandID
@@ -815,6 +853,7 @@ class EVENTS(enum.Enum):
     UPGRADE_STATUS = 0x0301
     DATA_PING = 0x0401
     DATA_VEHICLE = 0x0402
+    DATA_CONE = 0x0403
     COMMAND_ACK = 0x0501
     COMMAND_GETF = 0x0502
     COMMAND_SETF = 0x0503
@@ -1066,6 +1105,9 @@ class mavComms:
 
     def sendVehicle(self, vehicle: rctVehiclePacket):
         self.sendPacket(vehicle, None)
+
+    def sendCone(self, cone: rctConePacket):
+        self.sendPacket(cone, None)
 
     def sendException(self, exception: str, traceback: str):
         packet = rctExceptionPacket(exception, traceback)

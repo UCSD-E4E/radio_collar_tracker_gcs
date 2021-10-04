@@ -156,8 +156,9 @@ class Events(Enum):
     NoHeartbeat = auto(),
     NewPing = auto(),
     NewEstimate = auto(),
-    UpgradeStatus = auto()
-    VehicleInfo = auto()
+    UpgradeStatus = auto(),
+    VehicleInfo = auto(),
+    ConeInfo = auto()
 
 
 class MAVModel:
@@ -204,6 +205,7 @@ class MAVModel:
             "UPG_state": -1,
             "UPG_msg": "",
             "VCL_track": {},
+            "CONE_track": {}
         }
 
         self.PP_options = {
@@ -250,6 +252,8 @@ class MAVModel:
             rctComms.EVENTS.DATA_PING, self.__processPing)
         self.__rx.registerCallback(
             rctComms.EVENTS.DATA_VEHICLE, self.__processVehicle)
+        self.__rx.registerCallback(
+            rctComms.EVENTS.DATA_CONE, self.__processCone)
 
     def start(self, guiTickCallback=None):
         '''
@@ -598,6 +602,12 @@ class MAVModel:
         coordinate = [packet.lat, packet.lon, packet.alt, packet.hdg]
         self.state['VCL_track'][packet.timestamp] = coordinate
         for callback in self.__callbacks[Events.VehicleInfo]:
+            callback()
+
+    def __processCone(self, packet: rctComms.rctConePacket, addr: str):
+        coordinate = [packet.lat, packet.lon, packet.alt, packet.angle]
+        self.state['CONE_track'][packet.timestamp] = coordinate
+        for callback in self.__callbacks[Events.ConeInfo]:
             callback()
 
     def __processAck(self, packet: rctComms.rctACKCommand, addr: str):
