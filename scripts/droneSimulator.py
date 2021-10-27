@@ -452,8 +452,9 @@ class droneSim:
             raise RuntimeError
         print("Ping on %d at %3.7f, %3.7f, %3.0f m, measuring %3.3f" %
               (dronePing.freq, dronePing.lat, dronePing.lon, dronePing.alt, dronePing.amplitude))
-        packet = dronePing.toPacket()
-        self.port.sendPing(packet)
+        #packet = dronePing.toPacket()
+        #conepacket = rctComms.rctConePacket(dronePing.lat, dronePing.lon, dronePing.alt, dronePing.amplitude, 30)
+        #self.port.sendCone(packet)
 
     def setSystemState(self, system: str, state):
         '''
@@ -720,8 +721,8 @@ class droneSim:
                     if self.SS_payloadRunning:
                         self.gotPing(newPing)
                     '''
-                    if newPing is not None:
-                        self.gotPing(newPing)
+                    #if newPing is not None:
+                    #    self.gotPing(newPing)
                 prevPingTime = curTime
 
             ###################

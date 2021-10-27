@@ -37,8 +37,8 @@ from scipy.stats import norm, zscore
 import utm
 import rctComms
 import time
-import gdal
-import osr
+from osgeo import gdal
+from osgeo import osr
 import csv
 import math
 

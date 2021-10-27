@@ -237,12 +237,13 @@ class GCS(QMainWindow):
         '''
         if self._mavModel == None:
             return
+        print("cone")
 
-        recentCone = list(self._mavModel.state['CONE_track'])[-1]
-        cone = self._mavModel.state['CONE_track'][recentCone]
+        #recentCone = list(self._mavModel.state['CONE_track'])[-1]
+        #cone = self._mavModel.state['CONE_track'][recentCone]
 
-        if self.mapDisplay is not None:
-            self.mapDisplay.plotCone(cone)
+        #if self.mapDisplay is not None:
+        #    self.mapDisplay.plotCone(cone)
 
     def __handleRemoteException(self):
         '''
