@@ -82,6 +82,7 @@ import configparser
 import json
 import numpy as np
 import csv
+import random #REMOVE
 
 
 class GCS(QMainWindow):
@@ -237,13 +238,12 @@ class GCS(QMainWindow):
         '''
         if self._mavModel == None:
             return
-        print("cone")
 
-        #recentCone = list(self._mavModel.state['CONE_track'])[-1]
-        #cone = self._mavModel.state['CONE_track'][recentCone]
+        recentCone = list(self._mavModel.state['CONE_track'])[-1]
+        cone = self._mavModel.state['CONE_track'][recentCone]
 
-        #if self.mapDisplay is not None:
-        #    self.mapDisplay.plotCone(cone)
+        if self.mapDisplay is not None:
+            self.mapDisplay.plotCone(cone)
 
     def __handleRemoteException(self):
         '''
@@ -1920,7 +1920,7 @@ class MapWidget(QWidget):
         '''
         self.canvas.setExtent(self.mapLayer.extent())  
         self.canvas.setLayers([self.precision, self.estimate, self.groundTruth, 
-                               self.vehicle, self.pingLayer, 
+                               self.vehicle, self.pingLayer, self.cones,
                                self.vehiclePath, self.mapLayer]) 
         #self.canvas.setLayers([self.mapLayer])
         self.canvas.zoomToFullExtent()   
@@ -2015,22 +2015,32 @@ class MapWidget(QWidget):
     def plotCone(self, coord):
         lat = coord[0]
         lon = coord[1]
+        headingArr = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330]
+        hind = self.indCone % 12
+        heading = headingArr[hind]
         point = self.transformToWeb.transform(QgsPointXY(lon, lat))
 
         if self.cones is None:
             return
         else:
-            if self.indCone > 5:
+            if self.indCone > 4:
                 #TODO DECREASE OPACITY
-                self.vehicle.startEditing()
+                self.cones.startEditing()
+                self.cones.deleteFeature(self.indCone-5)
+                self.cones.commitChanges()
+                
+
                 
             #Add new cone
             cpr = self.cones.dataProvider()
             pnt = QgsGeometry.fromPointXY(point)
             f = QgsFeature()
+            f.setFields(self.cones.fields())
             f.setGeometry(pnt)
+            f.setAttribute(0, heading)
             cpr.addFeatures([f])
             self.cones.updateExtents()
+            self.indCone = self.indCone + 1
             
 
     def plotPing(self, coord, power):
@@ -2461,6 +2471,12 @@ class WebMap(MapWidget):
         symbolSVG.setStrokeColor(QColor('#ff0000'))
         symbolSVG.setStrokeWidth(1)
         coneLayer.renderer().symbol().changeSymbolLayer(0, symbolSVG)
+        coneLayer.renderer().symbol().setDataDefinedAngle(QgsProperty().fromField("Heading"))
+        #coneLayer.renderer().symbol().setDataDefinedProperty(QgsProperty().fromField("Opacity"))
+
+        cpr = coneLayer.dataProvider()
+        cpr.addAttributes([QgsField(name='Heading', type=QVariant.Double, len=30)])
+        coneLayer.updateFields()
         coneLayer.setAutoRefreshInterval(500)
         coneLayer.setAutoRefreshEnabled(True)
         return coneLayer
