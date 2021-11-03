@@ -20,15 +20,6 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
-# 02/18/21  ML  Refactored layer functions in map classes
-# 02/11/21  ML  pruned imports
-# 02/11/21  ML  Added heatmap display for live precision visualization
-# 10/21/20  ML  Removed testing components
-# 08/19/20  ML  Added config object to gcs, added appDirs for tiles output
-# 08/14/20  ML  Removed excel sheet outputs
-# 08/11/20  ML  Added export settings, pings, and vehicle path as json file
-# 08/06/20  NH  Refactored map loading code for ease of debugging
-# 07/31/20  ML  Added ability to export pings and vehicle paths as Shapefile
 # 07/17/20  ML  Translated component status and upgrade displays into PyQt and
 #               fixed CollapseFrame nesting issue
 # 07/14/20  ML  Added ability to cache and load offline maps
@@ -67,27 +58,24 @@ import math
 import time
 import logging
 import sys
+from sys import argv
 import os
 import os.path
 import requests
 import rctTransport
 import rctComms
 import rctCore
-import PyQt5.QtCore
+from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
-import PyQt5.QtGui
-from qgis.core import *
-import qgis.gui  
-import qgis.utils
-import configparser
-import json
-from threading import Thread
-from appdirs import AppDirs
-import queue as q
+from PyQt5.QtGui import *
+from PyQt5 import QtNetwork
+import qgis
+from qgis.core import *    
+from qgis.gui import *  
+from qgis.utils import *
 from qgis.core import QgsProject
-import numpy as np
-import csv
-
+from threading import Thread
+import configparser
 
 class GCS(QMainWindow):
     '''
@@ -97,14 +85,10 @@ class GCS(QMainWindow):
     SBWidth = 500
 
     defaultTimeout = 5
-    
-    sig = pyqtSignal()
 
-    def __init__(self, configObj):
+    def __init__(self):
         '''
         Creates the GCS Application Object
-        Args:
-            configObj: a configparser object
         '''
         super().__init__()
         self.__log = logging.getLogger('rctGCS.GCS')
@@ -114,6 +98,8 @@ class GCS(QMainWindow):
         self._buttons = []
         self._systemConnectionTab = None
         self.systemSettingWidget = None
+        #self.__missionStatusText = StringVar()
+        #self.__missionStatusText.set("Start Recording")
         self.__missionStatusText = "Start Recording"
         self.innerFreqFrame = None
         self.freqElements = []
@@ -123,31 +109,19 @@ class GCS(QMainWindow):
         self.mapDisplay = None
         self.mainThread = None
         self.testFrame = None
-        self.config = configObj
-        self.pingSheetCreated = False
         self.__createWidgets()
         for button in self._buttons:
             button.config(state='disabled')
-                    
-        self.queue = q.Queue()
-        self.sig.connect(self.execute_inmain, Qt.QueuedConnection)
-        
-    def execute_inmain(self):
-        while not self.queue.empty():
-            (fn, coord, frequency, numPings) = self.queue.get()
-            fn(coord, frequency, numPings)
 
     def __registerModelCallbacks(self):
         self._mavModel.registerCallback(
-            rctCore.Events.Heartbeat, self.__heartbeatCallback)
+        rctCore.Events.Heartbeat, self.__heartbeatCallback)
         self._mavModel.registerCallback(
             rctCore.Events.Exception, self.__handleRemoteException)
         self._mavModel.registerCallback(
             rctCore.Events.VehicleInfo, self.__handleVehicleInfo)
         self._mavModel.registerCallback(
             rctCore.Events.NewPing, self.__handleNewPing)
-        self._mavModel.registerCallback(
-            rctCore.Events.NewEstimate, self.__handleNewEstimate)
 
     def mainloop(self, n=0):
         '''
@@ -182,44 +156,14 @@ class GCS(QMainWindow):
         dialog.setText("No Heartbeats Received")
         dialog.addButton(QMessageBox.Ok)
         dialog.exec()
-        
-    def __handleNewEstimate(self):
-        '''
-        Internal callback to handle when a new estimate is received
-        '''
-        freqList = self._mavModel.EST_mgr.getFrequencies()
-        for frequency in freqList:
-            params, stale, res = self._mavModel.EST_mgr.getEstimate(frequency)
-            
-            zone, let = self._mavModel.EST_mgr.getUTMZone()
-            coord = utm.to_latlon(params[0], params[1], zone, let)
-            
-            numPings = self._mavModel.EST_mgr.getNumPings(frequency)
-            
-            if self.mapDisplay is not None:
-                self.mapDisplay.plotEstimate(coord, frequency)
-                #self.queue.put( (self.mapDisplay.plotPrecision, coord, frequency, numPings) )
-                #self.sig.emit()
-                #self.mapDisplay.plotPrecision(coord, frequency, numPings)
-                
-            if self.mapOptions is not None:
-                self.mapOptions.estDistance(coord, stale, res)
-
 
     def __handleNewPing(self):
-        '''
-        Internal callback to handle when a new ping is received
-        '''
-        freqList = self._mavModel.EST_mgr.getFrequencies()
-        for frequency in freqList:
-            last = self._mavModel.EST_mgr.getPings(frequency)[-1].tolist()
-            zone, let = self._mavModel.EST_mgr.getUTMZone()
-            u = (last[0], last[1], zone, let)
-            coord = utm.to_latlon(*u)
-            power = last[3]
-
-            if self.mapDisplay is not None:
-                self.mapDisplay.plotPing(coord, power)
+        print("in ping")
+        last = self._mavModel.EST_mgr.getPings(173500000)[-1]
+        coord = utm.to_latlon(*last[0])
+        amp = last[1]
+        if self.mapDisplay is not None:
+            self.mapDisplay.plotPing(coord, amp)
 
 
 
@@ -231,11 +175,10 @@ class GCS(QMainWindow):
             return
         last = list(self._mavModel.state['VCL_track'])[-1]
         coord = self._mavModel.state['VCL_track'][last]
-        
-        self._mavModel.EST_mgr.addVehicleLocation(coord)
 
         if self.mapDisplay is not None:
             self.mapDisplay.plotVehicle(coord)
+
 
 
     def __handleRemoteException(self):
@@ -251,7 +194,14 @@ class GCS(QMainWindow):
 
     def __startStopMission(self):
         # State machine for start recording -> stop recording
-
+        '''
+        if self.__missionStatusText.get() == 'Start Recording':
+            self.__missionStatusText.set('Stop Recording')
+            self._mavModel.startMission(timeout=self.defaultTimeout)
+        else:
+            self.__missionStatusText.set('Start Recording')
+            self._mavModel.stopMission(timeout=self.defaultTimeout)
+        '''
         if self._mavModel == None:
             return
 
@@ -340,105 +290,12 @@ class GCS(QMainWindow):
             self.swStatusLabel.config(text='SW: ON', bg='green')
         else:
             self.swStatusLabel.config(text='SW: NULL', bg='red')
-            
-    def exportAll(self):
-        '''
-        Exports pings, vehcle path, and settings as json file
-        '''
-        final = {}
-        
-        if self.mapDisplay is not None:
-            vPath = self._mavModel.EST_mgr.getVehiclePath()
-            pingDict = {}
-            vDict = {}
-            indPing = 0
-            indPath = 0
-            freqList = self._mavModel.EST_mgr.getFrequencies()
-            for frequency in freqList:
-                pings = self._mavModel.EST_mgr.getPings(frequency)
-                for pingArray in pings:
-                    pingArr = pingArray.tolist()
-                    zone, let = self._mavModel.EST_mgr.getUTMZone()
-                    u = (pingArr[0], pingArr[1], zone, let)
-                    coord = utm.to_latlon(*u)
-                    amp = pingArr[3]
-                    newPing = {}
-                    newPing['Frequency'] = frequency
-                    newPing['Coordinate'] = coord
-                    newPing['Amplitude'] = amp
-                    pingDict[indPing] = newPing
-                    indPing = indPing + 1
-            for coord in vPath:
-                newCoord = {}
-                newCoord['Coordinate'] = (coord[0], coord[1])
-                vDict[indPath] = newCoord
-                indPath = indPath + 1
-                
-            final['Pings'] = pingDict
-            final['Vehicle Path'] = vDict
-            
-        if self.systemSettingsWidget is not None:
-            optionVars = self.systemSettingsWidget.optionVars
-            optionDict = {}
-            for key in optionVars.keys():
-                if key == "TGT_frequencies":
-                    optionDict[key] = optionVars[key]
-                elif optionVars[key] is not None:
-                    optionDict[key] = optionVars[key].text()
-                    
-            final['System Settings'] = optionDict
-          
-        if self._mavModel is not None:      
-            varDict = self._mavModel.state
-            newVarDict = {}
-            
-            for key in varDict.keys():
-                if ((key == 'STS_sdrStatus') or (key == 'STS_dirStatus') or 
-                    (key == 'STS_gpsStatus') or (key == 'STS_sysStatus')):
-                    temp = {}
-                    temp['name'] = varDict[key].name
-                    temp['value'] = varDict[key].value
-                    newVarDict[key] = temp
-                elif(key == 'VCL_track'):
-                    pass
-                else:
-                    newVarDict[key] = varDict[key]
-    
-                
-            final['States'] = newVarDict
-            
-        with open('data.json', 'w') as outfile:
-            json.dump(final, outfile)
-            
 
 
     def closeEvent(self, event):
         '''
         Internal callback for window close
         '''
-        trans = QgsCoordinateTransform(
-            QgsCoordinateReferenceSystem("EPSG:3857"), 
-            QgsCoordinateReferenceSystem("EPSG:4326"),
-            QgsProject.instance())
-        if self.mapDisplay is not None:
-            ext = trans.transformBoundingBox(self.mapDisplay.canvas.extent())
-            lat1 = ext.yMaximum()
-            lon1 = ext.xMinimum()
-            lat2 = ext.yMinimum()
-            lon2 = ext.xMaximum()
-            
-
-            
-            config_path = 'gcsConfig.ini'   
-
-            self.config['LastCoords'] = {}
-            self.config['LastCoords']['Lat1'] = str(lat1)
-            self.config['LastCoords']['Lon1'] = str(lon1)
-            self.config['LastCoords']['Lat2'] = str(lat2)
-            self.config['LastCoords']['Lon2'] = str(lon2)
-            with open(config_path, 'w') as configFile:
-                self.config.write(configFile)
-            
         if self._mavModel is not None:
             self._mavModel.stop()
         super().closeEvent(event)
@@ -464,18 +321,13 @@ class GCS(QMainWindow):
         self.statusWidget.updateGUIOptionVars()
 
     def setMap(self, mapWidget):
-        '''
-        Function to set the mapDisplay widget
-        Args:
-            mapWidget: A MapWidget object
-        '''
         self.mapDisplay = mapWidget
 
     def __createWidgets(self):
         '''
         Internal helper to make GUI widgets
         '''
-        self.mainThread = PyQt5.QtCore.QThread.currentThread()
+        self.mainThread = QThread.currentThread()
 
         holder = QGridLayout()
         centr_widget = QFrame()
@@ -507,7 +359,7 @@ class GCS(QMainWindow):
 
 
         # DATA DISPLAY TOOLS
-        self.mapOptions = MapOptions()
+        self.mapOptions = MapOptions(holder)
         self.mapOptions.resize(300, 100)
         self.mapControl = MapControl(frm_sideControl, holder, 
                 self.mapOptions, self)
@@ -521,7 +373,6 @@ class GCS(QMainWindow):
         
         self.upgradeDisplay = UpgradeDisplay(content, self)
         self.upgradeDisplay.resize(self.SBWidth, 400)
-        
 
 
 
@@ -529,15 +380,6 @@ class GCS(QMainWindow):
         btn_startRecord = QPushButton(self.__missionStatusText)
         #                            textvariable=self.__missionStatusText, 
         btn_startRecord.clicked.connect(lambda:self.__startStopMission())
-        
-        btn_exportAll = QPushButton('Export Info')
-        btn_exportAll.clicked.connect(lambda:self.exportAll())
-        
-        btn_precision = QPushButton('Do Precision')
-        btn_precision.clicked.connect(lambda:self._mavModel.EST_mgr.doPrecisions(173500000))
-        
-        btn_heatMap = QPushButton('Display Heatmap')
-        btn_heatMap.clicked.connect(lambda:self.mapDisplay.setupHeatMap())
 
         wlay.addWidget(self._systemConnectionTab)
         wlay.addWidget(self.statusWidget)
@@ -545,32 +387,17 @@ class GCS(QMainWindow):
         wlay.addWidget(self.systemSettingsWidget)
         wlay.addWidget(self.upgradeDisplay)
         wlay.addWidget(btn_startRecord)
-        wlay.addWidget(btn_exportAll)
-        wlay.addWidget(btn_precision)
-        wlay.addWidget(btn_heatMap)
-        
         wlay.addStretch()
         content.resize(self.SBWidth, 400)
         frm_sideControl.setMinimumWidth(self.SBWidth)
-        holder.addWidget(frm_sideControl, 0, 0, alignment=PyQt5.QtCore.Qt.AlignLeft)
-        holder.addWidget(self.mapOptions, 0, 4, alignment=PyQt5.QtCore.Qt.AlignTop)
+        holder.addWidget(frm_sideControl, 0, 0, alignment=Qt.AlignLeft)
+        holder.addWidget(self.mapOptions, 0, 4, alignment=Qt.AlignTop)
         centr_widget.setLayout(holder)
         self.resize(1800, 1100)
         self.show()
 
 class CollapseFrame(QWidget):
-    '''
-    Custom Collapsible Widget - used to aid in 
-    creating a collapsible field attached to a button
-    '''
     def __init__(self, title="", parent=None):
-        '''
-        Creates a new CollapseFrame Object
-        Args:
-            title: String that will be the displayed label of the 
-                   toggle button
-            parent: The parent Widget of the CollapseFrame
-        '''
         super(CollapseFrame, self).__init__(parent)
 
         self.content_height = 0
@@ -579,9 +406,9 @@ class CollapseFrame(QWidget):
         )
         self.toggle_button.setStyleSheet("QToolButton { border: none; }")
         self.toggle_button.setToolButtonStyle(
-            PyQt5.QtCore.Qt.ToolButtonTextBesideIcon
+            Qt.ToolButtonTextBesideIcon
         )
-        self.toggle_button.setArrowType(PyQt5.QtCore.Qt.RightArrow)
+        self.toggle_button.setArrowType(Qt.RightArrow)
         self.toggle_button.pressed.connect(self.on_pressed)
 
         self.content_area = QWidget()
@@ -595,52 +422,23 @@ class CollapseFrame(QWidget):
 
 
     def updateText(self, text):
-        '''
-        Public function to allow the label of the toggle button to bt
-        changed.
-        Args:
-            text: A string that will be the new label text for the
-                  toggle button
-        '''
         self.toggle_button.setText(text)
 
-    @PyQt5.QtCore.pyqtSlot()
+    @pyqtSlot()
     def on_pressed(self):
-        '''
-        Internal Callback to be called when the toggle button is 
-        pressed. Facilitates the collapsing and displaying of the
-        content_area contents
-        '''
         checked = self.toggle_button.isChecked()
         self.toggle_button.setArrowType(
-            PyQt5.QtCore.Qt.DownArrow if not checked else PyQt5.QtCore.Qt.RightArrow
+            Qt.DownArrow if not checked else Qt.RightArrow
         )
         self.content_area.setVisible(not checked)
 
     def setContentLayout(self, layout):
-        '''
-        Public function to allow the content_area widget's layout to be
-        set. This layout will contain the contents to be collapsed or 
-        displayed
-        Args:
-            layout: A QLayout type object(QVBoxLayout, QGridLayout, etc.)
-        '''
         lay = self.content_area.layout()
         del lay
         self.content_area.setLayout(layout)
         
 class UpgradeDisplay(CollapseFrame):
-    '''
-    Custom CollapsFrame widget that is used to facilitate software 
-    upgrades
-    '''
     def __init__(self, parent, root: GCS):
-        '''
-        Creates a new UpgradeDisplay widget
-        Args:
-            parent: the parent QWidget
-            root: the GCS application root
-        '''
         CollapseFrame.__init__(self, title='Upgrade Software')
         
         self.__parent = parent
@@ -656,9 +454,6 @@ class UpgradeDisplay(CollapseFrame):
         self.updateGUIOptionVars()
         
     def __createWidget(self):
-        '''
-        Inner function to create internal widgets
-        '''
         self.__innerFrame = QGridLayout()
         
         file_lbl = QLabel('Selected File:')
@@ -679,18 +474,12 @@ class UpgradeDisplay(CollapseFrame):
         self.setContentLayout(self.__innerFrame)
         
     def fileDialogue(self):
-        '''
-        Opens a dialog to allow the user to indicate a file
-        '''
         filename = QFileDialog.getOpenFileName()
         if filename is None:
             return
         self.filename.setText(filename[0])
         
     def sendUpgradeFile(self):
-        '''
-        Inner function to send a user specified upgrade file to the mavModel
-        '''
         file = open(self.filename.text(), "rb")
         byteStream = file.read()
         self.__root._mavModel.sendUpgradePacket(byteStream)
@@ -701,9 +490,6 @@ class UpgradeDisplay(CollapseFrame):
 
 
 class StatusDisplay(CollapseFrame):
-    '''
-    Custom widget to display system status
-    '''
     def __init__(self, parent, root: GCS):
         CollapseFrame.__init__(self, 'Components')
         
@@ -722,9 +508,7 @@ class StatusDisplay(CollapseFrame):
         self.updateGUIOptionVars()
 
     def __createWidget(self):
-        '''
-        Inner funciton to create internal widgets
-        '''
+        
         self.__innerFrame = QGridLayout()
 
         lbl_overall_status = QLabel('Status:')
@@ -773,16 +557,7 @@ class StatusDisplay(CollapseFrame):
         self.componentStatusWidget.update()
 
 class ComponentStatusDisplay(CollapseFrame):
-    '''
-    Custom widget class to display the current statuses of system
-    components
-    '''
     def __init__(self, root: GCS):
-        '''
-        Creates a ComponentStatusDisplay object
-        Args:
-            root: The application root
-        '''
         CollapseFrame.__init__(self, 'Component Statuses')
         self.sdrMap = {
             "SDR_INIT_STATES.find_devices": {'text': 'SDR: Searching for devices', 'bg':'yellow'},
@@ -845,9 +620,6 @@ class ComponentStatusDisplay(CollapseFrame):
         self.updateGUIOptionVars()
 
     def __createWidget(self):
-        '''
-        Inner Function to create internal widgets
-        '''
         self.innerFrame = QGridLayout()
 
         lbl_sdr_status = QLabel('SDR Status')
@@ -901,16 +673,7 @@ class ComponentStatusDisplay(CollapseFrame):
                 continue
 
 class SystemSettingsControl(CollapseFrame):
-    '''
-    This class provides for a custom widget that facilitates 
-    configuring system settings for the drone
-    '''
     def __init__(self, root):
-        '''
-        Creates a SystemSettingsControl Widget
-        Args:
-            root: rctGCS instance
-        '''
         CollapseFrame.__init__(self, title='System Settings')
         #self.__parent = parent
         self.__root = root
@@ -939,10 +702,6 @@ class SystemSettingsControl(CollapseFrame):
         self.__createWidget()
 
     def update(self):
-        '''
-        Function to facilitate the updating of internal widget 
-        displays
-        '''
         self.__updateWidget() #add updated values
 
         # Repaint widgets and layouts
@@ -954,9 +713,6 @@ class SystemSettingsControl(CollapseFrame):
         
 
     def __updateWidget(self):
-        '''
-        Function to update displayed values of target widgets
-        '''
         if self.frm_targHolder:
             while (self.frm_targHolder.count() > 0):
                 child = self.frm_targHolder.takeAt(0)
@@ -1078,19 +834,10 @@ class SystemSettingsControl(CollapseFrame):
         self.update()
 
     def __advancedSettings(self):
-        '''
-        Helper function to open an ExpertSettingsDialog widget
-        '''
         openSettings = ExpertSettingsDialog(self, self.optionVars)
         openSettings.exec_()
 
     def validateFrequency(self, var: int):
-        '''
-        Helper function to ensure frequencies are within an appropriate
-        range
-        Args:
-            var: An integer value that is the frequency to be validated
-        '''
         cntrFreq = self.__root._mavModel.getOption('SDR_centerFreq')
         sampFreq = self.__root._mavModel.getOption('SDR_samplingFreq')
         if abs(var - cntrFreq) > sampFreq:
@@ -1098,10 +845,6 @@ class SystemSettingsControl(CollapseFrame):
         return True
 
     def _updateButtonCallback(self):
-        '''
-        Internal callback to be called when the update button is
-        pressed
-        '''
         cntrFreq = int(self.optionVars['SDR_centerFreq'].text())
         sampFreq = int(self.optionVars['SDR_samplingFreq'].text())
 
@@ -1175,9 +918,6 @@ class SystemSettingsControl(CollapseFrame):
             timeout=self.__root.defaultTimeout, **options)
 
     def addTarget(self):
-        '''
-        Internal function to facilitate users adding target frequencies
-        '''
         cntrFreq = int(self.optionVars['SDR_centerFreq'].text())
         sampFreq = int(self.optionVars['SDR_samplingFreq'].text())
         addTargetWindow = AddTargetDialog(self.frm_targHolder, cntrFreq, sampFreq)
@@ -1197,17 +937,7 @@ class SystemSettingsControl(CollapseFrame):
 
 
 class ExpertSettingsDialog(QWizard):
-    '''
-    A Custom Dialog Widget to facilitate user input for expert 
-    settings
-    '''
     def __init__(self, parent, optionVars):
-        '''
-        Creates a new ExpertSettingsDialog
-        Args:
-            parent: the parent widget of the dialog
-            optionVars: Dictionary object of option variables
-        '''
         super(ExpertSettingsDialog, self).__init__(parent)
         self.parent = parent
         self.addPage(ExpertSettingsDialogPage(self, optionVars))
@@ -1215,17 +945,7 @@ class ExpertSettingsDialog(QWizard):
         self.resize(640,480)
 
 class ExpertSettingsDialogPage(QWizardPage):
-    '''
-    Custom DialogPage widget to facilitate user configured
-    expert settings
-    '''
     def __init__(self, parent=None, optionVars=None):
-        '''
-        Creates a new ExpertSettingsDialogPage object
-        Args:
-            parent: An ExpertSettingsDialog object
-            optionVars: Dictionary object of option variables
-        '''
         super(ExpertSettingsDialogPage, self).__init__(parent)
         self.__parent = parent
         self.optionVars = optionVars
@@ -1235,9 +955,6 @@ class ExpertSettingsDialogPage(QWizardPage):
         self.__parent.parent.updateGUIOptionVars(0xFF, self.optionVars)
 
     def __createWidget(self):
-        '''
-        Internal function to create widgets
-        '''
         expSettingsFrame = QGridLayout()
 
         lbl_pingWidth = QLabel('Expected Ping Width(ms)')
@@ -1295,15 +1012,9 @@ class ExpertSettingsDialogPage(QWizardPage):
         self.setLayout(expSettingsFrame)
 
     def validateParameters(self):
-        '''
-        Inner function to validate parameters set
-        '''
         return True
 
     def submit(self):
-        '''
-        Inner function to submit enterred information
-        '''
         if not self.validateParameters():
             return
         self.__parent.parent.submitGUIOptionVars(0xFF)
@@ -1311,18 +1022,7 @@ class ExpertSettingsDialogPage(QWizardPage):
 
 
 class AddTargetDialog(QWizard):
-    '''
-    A Custom Dialog Widget to facilitate user-added target frequencies
-    '''
     def __init__(self, parent, centerFrequency: int, samplingFrequency: int):
-        '''
-        Creates a new AddTargetDialog
-        Args:
-            parent: the parent widget of the AddTargetDialog
-            centerFrequency: an integer frequency value
-            samplingFrequency: an integer value to indicate sampling
-                               range
-        '''
         QWizardPage.__init__(self)
         self.__parent = parent
         self.name = "filler"
@@ -1336,16 +1036,10 @@ class AddTargetDialog(QWizard):
         self.button(QWizard.FinishButton).clicked.connect(self.submit)
 
     def validate(self):
-        '''
-        Helper Method ot validate input frequency
-        '''
         return abs(int(self.page.targFreqEntry.text()) - self.centerFrequency) <= self.samplingFrequency
 
 
     def submit(self):
-        '''
-        Internal function to submit newly added target frequency 
-        '''
         if not self.validate():
             dialog = QMessageBox()
             dialog.setIcon(QMessageBox.Critical)
@@ -1358,19 +1052,7 @@ class AddTargetDialog(QWizard):
 
 
 class AddTargetDialogPage(QWizardPage):
-    '''
-    Custom DialogPage widget to facilitate user-added target
-    frequencies
-    '''
     def __init__(self, parent, centerFrequency: int, samplingFrequency: int):
-        '''
-        Creates a new AddTargetDialog
-        Args:
-            parent: the parent widget of the AddTargetDialog
-            centerFrequency: an integer frequency value
-            samplingFrequency: an integer value to indicate sampling
-                               range
-        '''
         QWizardPage.__init__(self, parent)
         self.__parent = parent
         self.targNameEntry = None
@@ -1386,9 +1068,6 @@ class AddTargetDialogPage(QWizardPage):
 
 
     def __createWidget(self):
-        '''
-        Internal function to create widgets
-        '''
         rx  = QRegExp("[0-9]{30}")                           
         val = QRegExpValidator(rx)                            
         frm_targetSettings = QGridLayout()
@@ -1418,15 +1097,7 @@ class AddTargetDialogPage(QWizardPage):
 
 
 class ConnectionDialog(QWizard):
-    '''
-    Custom Dialog widget to facilitate connecting to the drone
-    '''
     def __init__(self, parent):
-        '''
-        Creates new ConnectionDialog widget
-        Args:
-            parent: the parent widget of this object
-        '''
         super(ConnectionDialog, self).__init__()
         self.__parent = parent
         self.setWindowTitle('Connect Settings')
@@ -1439,9 +1110,6 @@ class ConnectionDialog(QWizard):
         self.button(QWizard.FinishButton).clicked.connect(lambda:self.submit())
 
     def submit(self):
-        '''
-        Internal Function to submit user inputted connection settings
-        '''
         try:
             print(self.page.portEntry.text())
             self.port = rctTransport.RCTTCPClient(
@@ -1453,16 +1121,7 @@ class ConnectionDialog(QWizard):
             return
 
 class ConnectionDialogPage(QWizardPage):
-    '''
-    Custom DialogPage widget - Allows the user to configure 
-    settings to connect to the drone
-    '''
     def __init__(self, parent):
-        '''
-        Creates a new AddTargetDialog
-        Args:
-            parent: The parent ConnectionDialog widget
-        '''
         super(ConnectionDialogPage, self).__init__(parent)
         self.__parent = parent
         #self.__portEntry = tk.IntVar()
@@ -1478,9 +1137,7 @@ class ConnectionDialogPage(QWizardPage):
 
 
     def __createWidget(self):
-        '''
-        Internal function to create widgets
-        '''
+
         frm_holder = QHBoxLayout()
         frm_holder.addStretch(1)
         frm_conType = QVBoxLayout()
@@ -1512,10 +1169,7 @@ class ConnectionDialogPage(QWizardPage):
 
 
 
-class MapControl(CollapseFrame): 
-    '''
-    Custom Widget Class to facilitate Map Loading
-    '''   
+class MapControl(CollapseFrame):    
     def __init__(self, parent, holder, mapOptions, root: GCS):
         CollapseFrame.__init__(self, title='Map Display Tools')
         self.__parent = parent
@@ -1532,9 +1186,6 @@ class MapControl(CollapseFrame):
 
 
     def __createWidgets(self):
-        '''
-        Internal function to create widgets
-        '''
         controlPanelHolder = QScrollArea()
         content = QWidget()
 
@@ -1551,6 +1202,8 @@ class MapControl(CollapseFrame):
         btn_loadMap = QPushButton('Load Map')
         btn_loadMap.clicked.connect(lambda:self.__loadMapFile())
         controlPanel.addWidget(btn_loadMap)
+        btn_export = QPushButton(" Export")
+        controlPanel.addWidget(btn_export)
 
 
         
@@ -1592,97 +1245,23 @@ class MapControl(CollapseFrame):
 
         self.setContentLayout(controlPanel)
         
-    def __coordsFromConf(self):
-        '''
-        Internal function to pull past coordinates from the config
-        file if they exist
-        '''
-
-        try:
-            lat1 = self.__root.config['LastCoords']['lat1']
-            lon1 = self.__root.config['LastCoords']['lon1']
-            lat2 = self.__root.config['LastCoords']['lat2']
-            lon2 = self.__root.config['LastCoords']['lon2']
-            return lat1, lon1, lat2, lon2
-        except KeyError:
-            return None, None, None, None
-            
-        
     def __loadWebMap(self):
-        '''
-        Internal function to load map from web 
-        '''
-        lat1 = self.__p1latEntry.text()
-        lon1 = self.__p1lonEntry.text()
-        lat2 = self.__p2latEntry.text()
-        lon2 = self.__p2lonEntry.text()
-        
-        
-        
-        if (lat1 == '') or (lon1 == '') or (lat2 == '') or (lon2 == ''):
-            lat1, lon1, lat2, lon2 = self.__coordsFromConf()
-            
-            self.__p1latEntry.setText(lat1)
-            self.__p1lonEntry.setText(lon1)
-            self.__p2latEntry.setText(lat2)
-            self.__p2lonEntry.setText(lon2)
-        
-        if lat1 is None or lat2 is None or lon1 is None or lon2 is None:
-            lat1 = 90
-            lat2 = -90
-            lon1 = -180
-            lon2 = 180
-            self.__p1latEntry.setText(lat1)
-            self.__p1lonEntry.setText(lon1)
-            self.__p2latEntry.setText(lat2)
-            self.__p2lonEntry.setText(lon2)
-        p1lat = float(lat1)
-        p1lon = float(lon1)
-        p2lat = float(lat2)
-        p2lon = float(lon2)
-        
-        try:
-            temp = WebMap(self.__holder, p1lat, p1lon, 
-                    p2lat, p2lon, False)
-        except RuntimeError:
-            return
+        p1lat = float(self.__p1latEntry.text())
+        p1lon = float(self.__p1lonEntry.text())
+        p2lat = float(self.__p2latEntry.text())
+        p2lon = float(self.__p2lonEntry.text())
         self.__mapFrame.setParent(None)
-        self.__mapFrame = temp
+        self.__mapFrame = WebMap(self.__holder, p1lat, p1lon, 
+                p2lat, p2lon, False)
         self.__mapFrame.resize(800, 500)
         self.__mapOptions.setMap(self.__mapFrame, True)
         self.__root.setMap(self.__mapFrame)
 
     def __loadCachedMap(self):
-        '''
-        Internal function to load map from cached tiles
-        '''
-        lat1 = self.__p1latEntry.text()
-        lon1 = self.__p1lonEntry.text()
-        lat2 = self.__p2latEntry.text()
-        lon2 = self.__p2lonEntry.text()
-        
-        if (lat1 == '') or (lon1 == '') or (lat2 == '') or (lon2 == ''):
-            lat1, lon1, lat2, lon2 = self.__coordsFromConf()
-            
-            self.__p1latEntry.setText(lat1)
-            self.__p1lonEntry.setText(lon1)
-            self.__p2latEntry.setText(lat2)
-            self.__p2lonEntry.setText(lon2)
-        
-        if lat1 is None or lat2 is None or lon1 is None or lon2 is None:
-            lat1 = 90
-            lat2 = -90
-            lon1 = -180
-            lon2 = 180
-            self.__p1latEntry.setText(lat1)
-            self.__p1lonEntry.setText(lon1)
-            self.__p2latEntry.setText(lat2)
-            self.__p2lonEntry.setText(lon2)
-        p1lat = float(lat1)
-        p1lon = float(lon1)
-        p2lat = float(lat2)
-        p2lon = float(lon2)
-        
+        p1lat = float(self.__p1latEntry.text())
+        p1lon = float(self.__p1lonEntry.text())
+        p2lat = float(self.__p2latEntry.text())
+        p2lon = float(self.__p2lonEntry.text())
         self.__mapFrame.setParent(None)
         self.__mapFrame = WebMap(self.__holder, p1lat, p1lon, 
                 p2lat, p2lon, True)
@@ -1691,9 +1270,6 @@ class MapControl(CollapseFrame):
         self.__root.setMap(self.__mapFrame)
 
     def __loadMapFile(self):
-        '''
-        Internal function to load user-specified raster file
-        '''
         self.__mapFrame.setParent(None)
         self.__mapFrame = StaticMap(self.__holder)
         self.__mapFrame.resize(800, 500)
@@ -1702,177 +1278,86 @@ class MapControl(CollapseFrame):
 
 
 
-class PolygonMapTool(qgis.gui.QgsMapToolEmitPoint):
-    def __init__(self, canvas):
-        self.canvas = canvas
-        qgis.gui.QgsMapToolEmitPoint.__init__(self, self.canvas)
-        self.rubberBand = qgis.gui.QgsRubberBand(self.canvas, True)
-        self.rubberBand.setColor(PyQt5.QtCore.Qt.red)
-        self.rubberBand.setWidth(1)
-        self.reset()
-
-    def reset(self):
-        self.startPoint = self.endPoint = None
-        self.isEmittingPoint = False
-        self.rubberBand.reset(True)
-
-    def canvasPressEvent(self, e):
-        self.startPoint = self.toMapCoordinates(e.pos())
-        self.endPoint = self.startPoint
-        self.isEmittingPoint = True
-        self.showLine(self.startPoint, self.endPoint)
-
-    def canvasReleaseEvent(self, e):
-        self.isEmittingPoint = False
-
-    def canvasMoveEvent(self, e):
-        if not self.isEmittingPoint:
-            return
-
-        self.endPoint = self.toMapCoordinates(e.pos())
-
-    def showLine(self, startPoint, endPoint):
-        return
-
-    def deactivate(self):
-        qgis.gui.QgsMapTool.deactivate(self)
-        self.deactivated.emit()
 
 
-class RectangleMapTool(qgis.gui.QgsMapToolEmitPoint):
-    '''
-    Custom QgsMapTool to select a rectangular area of a QgsMapCanvas
-    '''
-    def __init__(self, canvas):
-        '''
-        Creates a RectangleMapTool object
-        Args:
-            canvas: the QgsMapCanvas that the RectangleMapTool will be 
-                    attached to
-        '''
-        self.canvas = canvas
-        qgis.gui.QgsMapToolEmitPoint.__init__(self, self.canvas)
-        self.rubberBand = qgis.gui.QgsRubberBand(self.canvas, True)
-        self.rubberBand.setColor(PyQt5.QtGui.QColor(0,255,255,125))
-        self.rubberBand.setWidth(1)
-        self.reset()
 
-    def reset(self):
-        '''
-        '''
-        self.startPoint = self.endPoint = None
-        self.isEmittingPoint = False
-        self.rubberBand.reset(True)
+class RectangleMapTool(QgsMapToolEmitPoint):
+  def __init__(self, canvas):
+    self.canvas = canvas
+    QgsMapToolEmitPoint.__init__(self, self.canvas)
+    self.rubberBand = QgsRubberBand(self.canvas, True)
+    self.rubberBand.setColor(QColor(0,255,255,125))
+    self.rubberBand.setWidth(1)
+    self.reset()
 
-    def canvasPressEvent(self, e):
-        '''
-        Internal callback to be called when the user's mouse 
-        presses the canvas
-        Args:
-            e: The press event
-        '''
-        self.startPoint = self.toMapCoordinates(e.pos())
-        self.endPoint = self.startPoint
-        self.isEmittingPoint = True
-        self.showRect(self.startPoint, self.endPoint)
+  def reset(self):
+    self.startPoint = self.endPoint = None
+    self.isEmittingPoint = False
+    self.rubberBand.reset(True)
 
-    def canvasReleaseEvent(self, e):
-        '''
-        Internal callback called when the user's mouse releases 
-        over the canvas
-        Args:
-            e: The release event
-        '''
-        self.isEmittingPoint = False
+  def canvasPressEvent(self, e):
+    self.startPoint = self.toMapCoordinates(e.pos())
+    self.endPoint = self.startPoint
+    self.isEmittingPoint = True
+    self.showRect(self.startPoint, self.endPoint)
 
-    def canvasMoveEvent(self, e):
-        '''
-        Internal callback called when the user's mouse moves 
-        over the canvas
-        Args:
-            e: The move event
-        '''
-        if not self.isEmittingPoint:
-            return
+  def canvasReleaseEvent(self, e):
+    self.isEmittingPoint = False
 
-        self.endPoint = self.toMapCoordinates(e.pos())
-        self.showRect(self.startPoint, self.endPoint)
+  def canvasMoveEvent(self, e):
+    if not self.isEmittingPoint:
+      return
 
-    def showRect(self, startPoint, endPoint):
-        '''
-        Internal function to display the rectangle being 
-        specified by the user
-        '''
-        self.rubberBand.reset(QgsWkbTypes.PolygonGeometry)
-        if startPoint.x() == endPoint.x() or startPoint.y() == endPoint.y():
-            return
-    
-        point1 = QgsPointXY(startPoint.x(), startPoint.y())
-        point2 = QgsPointXY(startPoint.x(), endPoint.y())
-        point3 = QgsPointXY(endPoint.x(), endPoint.y())
-        point4 = QgsPointXY(endPoint.x(), startPoint.y())
-    
-        self.rubberBand.addPoint(point1, False)
-        self.rubberBand.addPoint(point2, False)
-        self.rubberBand.addPoint(point3, False)
-        self.rubberBand.addPoint(point4, True)    # true to update canvas
-        self.rubberBand.show()
+    self.endPoint = self.toMapCoordinates(e.pos())
+    self.showRect(self.startPoint, self.endPoint)
 
-    def rectangle(self):
-        '''
-        function to return the rectangle that has been selected
-        '''
-        if self.startPoint is None or self.endPoint is None:
-            return None
-        elif (self.startPoint.x() == self.endPoint.x() or \
-              self.startPoint.y() == self.endPoint.y()):
-            return None
-    
-        return QgsRectangle(self.startPoint, self.endPoint)
+  def showRect(self, startPoint, endPoint):
+    self.rubberBand.reset(QgsWkbTypes.PolygonGeometry)
+    if startPoint.x() == endPoint.x() or startPoint.y() == endPoint.y():
+      return
 
-    def deactivate(self):
-        '''
-        Function to deactivate the map tool
-        '''
-        qgis.gui.QgsMapTool.deactivate(self)
-        self.deactivated.emit()
+    point1 = QgsPointXY(startPoint.x(), startPoint.y())
+    point2 = QgsPointXY(startPoint.x(), endPoint.y())
+    point3 = QgsPointXY(endPoint.x(), endPoint.y())
+    point4 = QgsPointXY(endPoint.x(), startPoint.y())
+
+    self.rubberBand.addPoint(point1, False)
+    self.rubberBand.addPoint(point2, False)
+    self.rubberBand.addPoint(point3, False)
+    self.rubberBand.addPoint(point4, True)    # true to update canvas
+    self.rubberBand.show()
+
+  def rectangle(self):
+    if self.startPoint is None or self.endPoint is None:
+      return None
+    elif (self.startPoint.x() == self.endPoint.x() or \
+          self.startPoint.y() == self.endPoint.y()):
+      return None
+
+    return QgsRectangle(self.startPoint, self.endPoint)
+
+  def deactivate(self):
+    QgsMapTool.deactivate(self)
+    self.deactivated.emit()
 
 
 class MapWidget(QWidget):
-    '''
-    Custom Widget that is used to display a map
-    '''
-    def __init__(self, root, isWeb):
-        '''
-        Creates a MapWidget
-        Args:
-            root: The root widget of the application
-        '''
+
+    def __init__(self, root):
         QWidget.__init__(self)
         self.holder = QVBoxLayout()
-        self.groundTruth = None
-        self.mapLayer = None
+        self.layer = None
         self.vehicle = None
-        self.vehiclePath = None
-        self.precision = None
-        self.lastLoc = None
         self.pingLayer = None
         self.pingRenderer = None
-        self.estimate = None
-        self.toolPolygon = None
-        self.polygonAction = None
-        self.heatMap = None
         self.pingMin = 800
         self.pingMax = 0
-        self.indPing = 0
-        self.ind = 0
-        self.indEst = 0
+        self.ind = 1
         self.toolbar = QToolBar()
-        self.canvas = qgis.gui.QgsMapCanvas()
-        self.canvas.setCanvasColor(PyQt5.QtCore.Qt.white)
-        self.isWeb = isWeb
+        self.canvas = QgsMapCanvas()
+        self.canvas.setCanvasColor(Qt.white)
 
-        self.transformToMap = QgsCoordinateTransform(
+        self.transformToWeb = QgsCoordinateTransform(
                 QgsCoordinateReferenceSystem("EPSG:4326"),
                 QgsCoordinateReferenceSystem("EPSG:3857"), 
                 QgsProject.instance())
@@ -1880,97 +1365,10 @@ class MapWidget(QWidget):
                 QgsCoordinateReferenceSystem("EPSG:3857"), 
                 QgsCoordinateReferenceSystem("EPSG:4326"),
                 QgsProject.instance())
-        
-    
-    def setupHeatMap(self):
-        '''
-        Sets up the heatMap maplayer
-        Args:
-        '''
-        fileName = QFileDialog.getOpenFileName()
-        print(fileName[0])
-        if self.heatMap is not None:
-            QgsProject.instance().removeMapLayer(self.heatMap)
-        if fileName is not None:
-            self.heatMap = QgsRasterLayer(fileName[0], "heatMap")   
-            
-            stats = self.heatMap.dataProvider().bandStatistics(1)
-            maxVal = stats.maximumValue
-            print(maxVal)
-            fcn = QgsColorRampShader()
-            fcn.setColorRampType(QgsColorRampShader.Interpolated)
-            lst = [ QgsColorRampShader.ColorRampItem(0, QColor(0,0,0)), QgsColorRampShader.ColorRampItem(maxVal, QColor(255,255,255)) ]
-            fcn.setColorRampItemList(lst)
-            shader = QgsRasterShader()
-            shader.setRasterShaderFunction(fcn)
-            
-            renderer = QgsSingleBandPseudoColorRenderer(self.heatMap.dataProvider(), 1, shader)
-            self.heatMap.setRenderer(renderer)
-            
-            QgsProject.instance().addMapLayer(self.heatMap)
-            destCrs = self.mapLayer.crs()
-            rasterCrs = self.heatMap.crs()
-            
-            self.heatMap.setCrs(rasterCrs)
-            self.canvas.setDestinationCrs(destCrs)
-            
 
-            self.canvas.setLayers([self.heatMap, self.estimate, self.groundTruth,
-                               self.vehicle, self.pingLayer, 
-                               self.vehiclePath, self.mapLayer]) 
-            
-            
-    def plotPrecision(self, coord, freq, numPings):
-        data_dir = 'holder'
-        outputFileName = '/%s/PRECISION_%03.3f_%d_heatmap.tiff' % (data_dir, freq / 1e7, numPings)
-        fileName = QDir().currentPath() + outputFileName
-        print(fileName)
-        print(outputFileName)
-
-        
-        if self.heatMap is not None:
-            QgsProject.instance().removeMapLayer(self.heatMap)
-        if fileName is not None:
-            self.heatMap = QgsRasterLayer(fileName, "heatMap")   
-            
-            
-            stats = self.heatMap.dataProvider().bandStatistics(1)
-            maxVal = stats.maximumValue
-            print(maxVal)
-            fcn = QgsColorRampShader()
-            fcn.setColorRampType(QgsColorRampShader.Interpolated)
-            lst = [ QgsColorRampShader.ColorRampItem(0, QColor(0,0,0)), QgsColorRampShader.ColorRampItem(maxVal, QColor(255,255,255)) ]
-            fcn.setColorRampItemList(lst)
-            shader = QgsRasterShader()
-            shader.setRasterShaderFunction(fcn)
-            
-            renderer = QgsSingleBandPseudoColorRenderer(self.heatMap.dataProvider(), 1, shader)
-            self.heatMap.setRenderer(renderer)
-            
-            
-            QgsProject.instance().addMapLayer(self.heatMap)
-            destCrs = self.mapLayer.crs()
-            rasterCrs = self.heatMap.crs()
-            
-            self.heatMap.setCrs(rasterCrs)
-            self.canvas.setDestinationCrs(destCrs)
-            self.heatMap.renderer().setOpacity(0.7)
-            
-
-            self.canvas.setLayers([self.heatMap, self.estimate, self.groundTruth,
-                               self.vehicle, self.pingLayer, 
-                               self.vehiclePath, self.mapLayer]) 
-
-        
     def adjustCanvas(self):
-        '''
-        Helper function to set and adjust the camvas' layers
-        '''
-        self.canvas.setExtent(self.mapLayer.extent())  
-        self.canvas.setLayers([self.precision, self.estimate, self.groundTruth, 
-                               self.vehicle, self.pingLayer, 
-                               self.vehiclePath, self.mapLayer]) 
-        #self.canvas.setLayers([self.mapLayer])
+        self.canvas.setExtent(self.layer.extent())  
+        self.canvas.setLayers([self.pingLayer, self.vehicle, self.layer]) 
         self.canvas.zoomToFullExtent()   
         self.canvas.freeze(True)  
         self.canvas.show()     
@@ -1979,9 +1377,6 @@ class MapWidget(QWidget):
         self.canvas.repaint()
 
     def addToolBar(self):
-        '''
-        Internal function to add tools to the map toolbar
-        '''
         self.actionZoomIn = QAction("Zoom in", self)
         self.actionZoomOut = QAction("Zoom out", self)
         self.actionPan = QAction("Pan", self)
@@ -1999,75 +1394,34 @@ class MapWidget(QWidget):
         self.toolbar.addAction(self.actionPan)
 
         # create the map tools
-        self.toolPan = qgis.gui.QgsMapToolPan(self.canvas)
+        self.toolPan = QgsMapToolPan(self.canvas)
         self.toolPan.setAction(self.actionPan)
-        self.toolZoomIn = qgis.gui.QgsMapToolZoom(self.canvas, False) # false = in
+        self.toolZoomIn = QgsMapToolZoom(self.canvas, False) # false = in
         self.toolZoomIn.setAction(self.actionZoomIn)
-        self.toolZoomOut = qgis.gui.QgsMapToolZoom(self.canvas, True) # true = out
+        self.toolZoomOut = QgsMapToolZoom(self.canvas, True) # true = out
         self.toolZoomOut.setAction(self.actionZoomOut)
-        
-        self.polygonAction = QAction("Polygon", self)
-        self.polygonAction.setCheckable(True)
-        self.polygonAction.triggered.connect(self.polygon)
-        self.toolbar.addAction(self.polygonAction)
-        
-        self.toolPolygon = PolygonMapTool(self.canvas)
-        self.toolPolygon.setAction(self.polygonAction)
-        
-    def polygon(self):
-        '''
-        Helper function to set polygon tool when it is selected from 
-        the toolbar
-        '''
-        self.canvas.setMapTool(self.toolPolygon)
-        
+
 
 
     def zoomIn(self):
-        '''
-        Helper function to set the zoomIn map tool when it is selected
-        '''
         self.canvas.setMapTool(self.toolZoomIn)
 
     def zoomOut(self):
-        '''
-        Helper function to set the zoomOut map tool when it is selected
-        '''
         self.canvas.setMapTool(self.toolZoomOut)
 
     def pan(self):
-        '''
-        Helper function to set the pan map tool when it is selected
-        '''
         self.canvas.setMapTool(self.toolPan)
 
     def plotVehicle(self, coord):
-        '''
-        Function to plot the vehicle's current location on the vehicle 
-        map layer
-        Args:
-            coord: A tuple of float values indicating an EPSG:4326 lat/Long 
-                   coordinate pair
-        '''
         lat = coord[0]
         lon = coord[1]
-        point = self.transformToMap.transform(QgsPointXY(lon, lat))
-
+        point = self.transformToWeb.transform(QgsPointXY(lon, lat))
         if self.vehicle is None:
             return
         else:
-            if self.ind > 0:
-                lpr = self.vehiclePath.dataProvider()
-                lin = QgsGeometry.fromPolylineXY([self.lastLoc, point])
-                lineFeat = QgsFeature()
-                lineFeat.setGeometry(lin)
-                lpr.addFeatures([lineFeat])
-                vpr = self.vehicle.dataProvider()
-                self.vehicle.startEditing()
-                self.vehicle.deleteFeature(self.ind)
-                self.vehicle.commitChanges()
-            
-            self.lastLoc = point
+            self.vehicle.startEditing()
+            self.vehicle.deleteFeature(self.ind)
+            self.vehicle.commitChanges()
             vpr = self.vehicle.dataProvider()
             pnt = QgsGeometry.fromPointXY(point)
             f = QgsFeature()
@@ -2076,238 +1430,60 @@ class MapWidget(QWidget):
             self.vehicle.updateExtents()
             self.ind = self.ind + 1
 
-    def plotPing(self, coord, power):
-        '''
-        Function to plot a new ping on the ping map layer
-        Args:
-            coord: A tuple of float values indicating an EPSG:4326 lat/Long 
-                   coordinate pair
-            amp: The amplitude of the ping
-        '''
+    def plotPing(self, coord, amp):
         lat = coord[0]
         lon = coord[1]
-        
-        
         change = False
-        point = self.transformToMap.transform(QgsPointXY(lon, lat))
+        point = self.transformToWeb.transform(QgsPointXY(lon, lat))
         if self.pingLayer is None:
             return
-
         else:
-            if power < self.pingMin:
+            if amp < self.pingMin:
                 change = True
-                self.pingMin = power
-            if power > self.pingMax:
+                self.pingMin = amp
+            if amp > self.pingMax:
                 change = True
-                self.pingMax = power
+                self.pingMax = amp
             if (self.pingMax == self.pingMin):
                 self.pingMax = self.pingMax + 1
             if change:
                 r = self.pingMax - self.pingMin
-                first = r * 0.14
-                second = r * 0.28
-                third = r * 0.42
-                fourth = r * 0.56
-                fifth = r * 0.7
-                sixth = r * 0.84
-                
+                first = r * 0.33
+                second = r * 0.66
                 for i, rangeObj in enumerate(self.pingRenderer.ranges()):
-                    if rangeObj.label() == 'Blue':
+                    if rangeObj.label() == 'Lower':
                         self.pingRenderer.updateRangeLowerValue(i, self.pingMin)
                         self.pingRenderer.updateRangeUpperValue(i, self.pingMin + first)
-                    if rangeObj.label() == 'Cyan':
+                    if rangeObj.label() == 'Mid':
                         self.pingRenderer.updateRangeLowerValue(i, self.pingMin + first)
                         self.pingRenderer.updateRangeUpperValue(i, self.pingMin + second)
-                    if rangeObj.label() == 'Green':
+                    if rangeObj.label() == 'Upper':
                         self.pingRenderer.updateRangeLowerValue(i, self.pingMin + second)
-                        self.pingRenderer.updateRangeUpperValue(i, self.pingMin + third)
-                    if rangeObj.label() == 'Yellow':
-                        self.pingRenderer.updateRangeLowerValue(i, self.pingMin + third)
-                        self.pingRenderer.updateRangeUpperValue(i, self.pingMin + fourth)
-                    if rangeObj.label() == 'Orange':
-                        self.pingRenderer.updateRangeLowerValue(i, self.pingMin +fourth)
-                        self.pingRenderer.updateRangeUpperValue(i, self.pingMin + fifth)
-                    if rangeObj.label() == 'ORed':
-                        self.pingRenderer.updateRangeLowerValue(i, self.pingMin +fifth)
-                        self.pingRenderer.updateRangeUpperValue(i, self.pingMin + sixth)
-                    if rangeObj.label() == 'Red':
-                        self.pingRenderer.updateRangeLowerValue(i, self.pingMin + sixth)
                         self.pingRenderer.updateRangeUpperValue(i, self.pingMax)
 
             vpr = self.pingLayer.dataProvider()
-            
-            #Create new ping point
             pnt = QgsGeometry.fromPointXY(point)
             f = QgsFeature()
-            f.setFields(self.pingLayer.fields())
             f.setGeometry(pnt)
-            f.setAttribute(0, power)
+            b = f.setAttribute('Amp', amp)
+            print (b)
             vpr.addFeatures([f])
             self.pingLayer.updateExtents()
-            
-    def plotEstimate(self, coord, frequency):
-        '''
-        Function to plot the current estimate point on the estimate map layer
-        Args:
-            coord: A tuple of float values indicating an EPSG:4326 lat/Long 
-                   coordinate pair
-            frequency: the frequency that this estimate corresponds to
-        '''
-        lat = coord[0]
-        lon = coord[1]
-        
-        
-        point = self.transformToMap.transform(QgsPointXY(lon, lat))
-        if self.estimate is None:
-            return
-        else:
-            if self.indEst > 0:
-                self.estimate.startEditing()
-                self.estimate.deleteFeature(self.indEst)
-                self.estimate.commitChanges()
-            
-            vpr = self.estimate.dataProvider()
-            pnt = QgsGeometry.fromPointXY(point)
-            f = QgsFeature()
-            f.setGeometry(pnt)
-            vpr.addFeatures([f])
-            self.estimate.updateExtents()
-            self.indEst = self.indEst + 1
-            
-    def setupVehicleLayers(self, uri, uriLine):
-        '''
-        Sets up the vehicle and vehicle path layers
-        Args:
-        '''
-        vehicleLayer = QgsVectorLayer(uri, 'Vehicle', "memory")
-        vehiclePathlayer = QgsVectorLayer(uriLine, 'VehiclePath', "memory")
-        
-        # Set drone image for marker symbol
-        path = PyQt5.QtCore.QDir().filePath('../resources/vehicleSymbol.svg')
-        symbolSVG = QgsSvgMarkerSymbolLayer(path)
-        symbolSVG.setSize(4)
-        symbolSVG.setFillColor(PyQt5.QtGui.QColor('#0000ff'))
-        symbolSVG.setStrokeColor(PyQt5.QtGui.QColor('#ff0000'))
-        symbolSVG.setStrokeWidth(1)
-        vehicleLayer.renderer().symbol().changeSymbolLayer(0, symbolSVG)
-        
-        #set autorefresh
-        vehicleLayer.setAutoRefreshInterval(500)
-        vehicleLayer.setAutoRefreshEnabled(True)
-        vehiclePathlayer.setAutoRefreshInterval(500)
-        vehiclePathlayer.setAutoRefreshEnabled(True)
-        return vehicleLayer, vehiclePathlayer
-
-
-    def setupPingLayer(self, uri):
-        '''
-        Sets up the ping layer and renderer.
-        Args:
-        '''
-        ranges = []
-        
-        layer = QgsVectorLayer(uri, 'Pings', 'memory')
-        
-        
-        # make symbols
-        symbolBlue = QgsSymbol.defaultSymbol(layer.geometryType())
-        symbolBlue.setColor(PyQt5.QtGui.QColor('#0000FF'))
-        symbolCyan = QgsSymbol.defaultSymbol(
-            layer.geometryType())
-        symbolCyan.setColor(PyQt5.QtGui.QColor('#00FFFF'))
-        symbolGreen = QgsSymbol.defaultSymbol(
-            layer.geometryType())
-        symbolGreen.setColor(PyQt5.QtGui.QColor('#00FF00'))
-        symbolYellow = QgsSymbol.defaultSymbol(
-            layer.geometryType())
-        symbolYellow.setColor(PyQt5.QtGui.QColor('#FFFF00'))
-        symbolOrange = QgsSymbol.defaultSymbol(
-            layer.geometryType())
-        symbolOrange.setColor(PyQt5.QtGui.QColor('#FFC400'))
-        symbolORed = QgsSymbol.defaultSymbol(
-            layer.geometryType())
-        symbolORed.setColor(PyQt5.QtGui.QColor('#FFA000'))
-        symbolRed = QgsSymbol.defaultSymbol(
-            layer.geometryType())
-        symbolRed.setColor(PyQt5.QtGui.QColor('#FF0000'))
-    
-        # make ranges
-        rBlue = QgsRendererRange(0, 10, symbolBlue, 'Blue')
-        rCyan = QgsRendererRange(10, 20, symbolCyan, 'Cyan')
-        rGreen = QgsRendererRange(20, 40, symbolGreen, 'Green')
-        rYellow = QgsRendererRange(40, 60, symbolYellow, 'Yellow')
-        rOrange = QgsRendererRange(60, 80, symbolOrange, 'Orange')
-        rORed = QgsRendererRange(80, 90, symbolORed, 'ORed')
-        rRed = QgsRendererRange(90, 100, symbolRed, 'Red')
-        ranges.append(rBlue)
-        ranges.append(rCyan)
-        ranges.append(rGreen)
-        ranges.append(rYellow)
-        ranges.append(rOrange)
-        ranges.append(rORed)
-        ranges.append(rRed)
-
-        # set renderer to set symbol based on amplitude
-        pingRenderer = QgsGraduatedSymbolRenderer('Amp', ranges)
-
-        style = QgsStyle().defaultStyle()
-        defaultColorRampNames = style.colorRampNames()
-        ramp = style.colorRamp(defaultColorRampNames[22])
-        pingRenderer.setSourceColorRamp(ramp)
-        pingRenderer.setSourceSymbol( QgsSymbol.defaultSymbol(layer.geometryType()))
-        pingRenderer.sortByValue()
-        
-        
-        vpr = layer.dataProvider()
-        vpr.addAttributes([QgsField(name='Amp', type=PyQt5.QtCore.QVariant.Double, len=30)])
-        layer.updateFields()
-    
-        # set the renderer and allow the mapLayer to auto refresh
-        layer.setRenderer(pingRenderer)
-        layer.setAutoRefreshInterval(500)
-        layer.setAutoRefreshEnabled(True)
-        
-        return layer, pingRenderer
-    
-    def setupEstimate(self, uri):
-        '''
-        Sets up the Estimate mapLayer
-        Args:
-        '''
-        layer = QgsVectorLayer(uri, 'Estimate', "memory")
-        symbol = QgsMarkerSymbol.createSimple({'name':'diamond', 
-                'color':'blue'})
-        layer.renderer().setSymbol(symbol)
-        layer.setAutoRefreshInterval(500)
-        layer.setAutoRefreshEnabled(True)
-        
-        return layer
 
         
 class MapOptions(QWidget):
-    '''
-    Custom Widget facilitate map caching and exporting map layers
-    '''
-    def __init__(self):
-        '''
-        Creates a MapOptions widget
-        '''
+
+    def __init__(self, holder):
         QWidget.__init__(self)
 
         self.mapWidget = None
         self.btn_cacheMap = None
         self.isWebMap = False
         self.__createWidgets()
-        self.created = False
-        self.writer = None
-        self.hasPoint = False
         
 
 
     def __createWidgets(self):
-        '''
-        Inner function to create internal widgets
-        '''
         # MAP OPTIONS
         lay_mapOptions = QVBoxLayout()
 
@@ -2322,30 +1498,28 @@ class MapOptions(QWidget):
         self.btn_cacheMap.clicked.connect(lambda:self.__cacheMap())
         self.btn_cacheMap.setEnabled(False)
         lay_mapOptions.addWidget(self.btn_cacheMap)
-        
-        exportTab = CollapseFrame('Export')
-        btn_pingExport = QPushButton('Pings')
-        btn_pingExport.clicked.connect(lambda:self.exportPing())
-        btn_vehiclePathExport = QPushButton('Vehicle Path')
-        btn_vehiclePathExport.clicked.connect(lambda:self.exportVehiclePath())
-        
-        lay_export = QVBoxLayout()
-        lay_export.addWidget(btn_pingExport)
-        lay_export.addWidget(btn_vehiclePathExport)
-        exportTab.setContentLayout(lay_export)
-        
-        lay_mapOptions.addWidget(exportTab)    
-        
-        
-        
 
         self.setLayout(lay_mapOptions)
 
 
+        '''
+        # MAP LEGEND
+        frm_mapLegend = tk.Frame(master=frm_mapGrid, width=self.SBWidth)
+        frm_mapLegend.pack(side=tk.BOTTOM)
+
+        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
+                              bg='gray', text='Map Legend')
+        lbl_legend.grid(column=0, row=0, sticky='ew')
+
+        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
+                              bg='light gray', text='Vehicle')
+        lbl_legend.grid(column=0, row=1, sticky='ew')
+
+        lbl_legend = tk.Label(frm_mapLegend, width=self.SBWidth,
+                              bg='light gray', text='Target')
+        lbl_legend.grid(column=0, row=2, sticky='ew')
+        '''
     def __cacheMap(self):
-        '''
-        Inner function to facilitate map caching
-        '''
         if self.isWebMap:
             if (self.mapWidget.toolRect.rectangle() == None):
                 msg = QMessageBox()
@@ -2363,148 +1537,27 @@ class MapOptions(QWidget):
             print("alert")
 
     def setMap(self, mapWidg: MapWidget, isWebMap):
-        '''
-        Function to set the MapWidget that this object will use
-        Args:
-            mapWidg: A MapWidget object
-            isWebMap: A boolean indicating whether or not the mapWidget 
-                      is a WebMap
-        '''
         self.isWebMap = isWebMap
         self.mapWidget = mapWidg
-        self.addLegend()
         
         self.btn_cacheMap.setEnabled(isWebMap)
-        
-    def addLegend(self):
-        '''
-        Function to add Map Legend widget when map is loaded
-        '''
-        #TODO add labels and symbols for vehicle, pings, and vehicle path
-        curLayout = self.layout()
-        #curLayout.addWidget(legendWidget)
 
-    def estDistance(self, coord, stale, res):
-
-        lat1 = coord[0]
-        lon1 = coord[1]
-        lat2 = 32.885889
-        lon2 = -117.234028
-        
-        if not self.hasPoint:
-            point = self.mapWidget.transformToWeb.transform(QgsPointXY(lon2, lat2))
-            vpr = self.mapWidget.groundTruth.dataProvider()
-            pnt = QgsGeometry.fromPointXY(point)
-            f = QgsFeature()
-            f.setGeometry(pnt)
-            vpr.addFeatures([f])
-            self.mapWidget.groundTruth.updateExtents()
-            self.hasPoint = True
-
-        
-        dist = self.distance(lat1, lat2, lon1, lon2)
-        
-        if not self.created:
-            with open('results.csv', 'w', newline='') as csvfile:
-                fieldnames = ['Distance', 'res.x', 'residuals']
-                self.writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                self.writer.writeheader()
-                self.created = True
-                self.writer.writerow({'Distance': str(dist), 'res.x': str(res.x), 'residuals': str(res.fun)})
-        else:
-            with open('results.csv', 'a+', newline='') as csvfile:
-                fieldnames = ['Distance', 'res.x', 'residuals']
-                self.writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                self.writer.writerow({'Distance': str(dist), 'res.x': str(res.x), 'residuals': str(res.fun)})
-                
-       
-        
-        d = '%.3f'%(dist)
-
-        self.lbl_dist.setText(d + '(m.)')
-        
-    def distance(self, lat1, lat2, lon1, lon2): 
-        '''
-        Helper function to calculate distance. For testing only
-        Args:
-            lat1: float value indicating the lat value of a point
-            lat2: float value indicating the lat value of a second point
-            lon1: float value indicating the long value of a point
-            lon2: float value indicating the long value of a second point
-        '''
-        lon1 = math.radians(lon1) 
-        lon2 = math.radians(lon2) 
-        lat1 = math.radians(lat1) 
-        lat2 = math.radians(lat2) 
-           
-        # Haversine formula  
-        dlon = lon2 - lon1  
-        dlat = lat2 - lat1 
-        a = math.sin(dlat / 2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2
-      
-        c = 2 * math.asin(math.sqrt(a))  
-         
-        # Radius of earth in kilometers. Use 3956 for miles 
-        r = 6371
-           
-        return(c * r * 1000)
-    
-    def exportPing(self):
-        '''
-        Method to export a MapWidget's pingLayer to a shapefile
-        '''
-        folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
-        file = folder + '/pings.shp'
-        options = QgsVectorFileWriter.SaveVectorOptions()
-        options.driverName = "ESRI Shapefile"
-
-        QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.pingLayer, 
-                                        file, 
-                                        QgsCoordinateTransformContext(), options)
-        
-    def exportVehiclePath(self):
-        '''
-        Method to export a MapWidget's vehiclePath to a shapefile
-        '''
-        folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
-        file = folder + '/vehiclePath.shp'
-        options = QgsVectorFileWriter.SaveVectorOptions()
-        options.driverName = "ESRI Shapefile"
-
-        QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.vehiclePath, 
-                                        file, 
-                                        QgsCoordinateTransformContext(), options)
-           
-
-
-
+'''
+    Helper Class to facilititate displaying online web maps
+'''
 class WebMap(MapWidget):
-    '''
-    Custom MapWidget to facilititate displaying online or offline 
-    web maps
-    '''
+
     def __init__(self, root, p1lat, p1lon, p2lat, p2lon, loadCached):
-        '''
-        Creates a WebMap widget
-        Args:
-            root: the root widget of the Application
-            p1lat: float lat value
-            p1lon: float lon value
-            p2lat: float lat value
-            p2lon: float lon value
-            loadCached: boolean value to indicate tile source
-        '''
         # Initialize WebMapFrame
-        MapWidget.__init__(self, root, True)
+        MapWidget.__init__(self, root)
 
         self.loadCached = loadCached
 
         
         self.addLayers()
-           
         self.adjustCanvas()
         r = QgsRectangle(p1lon, p2lat, p2lon, p1lat)
-        rect = self.transformToMap.transformBoundingBox(r)
+        rect = self.transformToWeb.transformBoundingBox(r)
         self.canvas.zoomToFeatureExtent(rect)
 
         self.addToolBar()
@@ -2518,216 +1571,81 @@ class WebMap(MapWidget):
         root.addWidget(self, 0, 1, 1, 2)
         self.root = root
 
-
-    def setupEstimate(self):
-        '''
-        Sets up the Estimate mapLayer
-        Args:
-        '''
-        uri = "Point?crs=epsg:3857"
-        layer = QgsVectorLayer(uri, 'Estimate', "memory")
-        symbol = QgsMarkerSymbol.createSimple({'name':'diamond', 
-                'color':'blue'})
-        layer.renderer().setSymbol(symbol)
-        layer.setAutoRefreshInterval(500)
-        layer.setAutoRefreshEnabled(True)
-        
-        return layer
-    
-    def setupGroundTruth(self):
-        '''
-        Sets up the groundTruth maplayer
-        Args:
-        '''
-        uri = "Point?crs=epsg:3857"
-        layer = QgsVectorLayer(uri, 'Estimate', "memory")
-        symbol = QgsMarkerSymbol.createSimple({'name':'square', 
-                'color':'cyan'})
-        layer.renderer().setSymbol(symbol)
-        
-        return layer
-
-   
-        
-
-    def setupVehicleLayers(self):
-        '''
-        Sets up the vehicle and vehicle path layers
-        Args:
-        '''
-        uri = "Point?crs=epsg:3857"
-        uriLine = "Linestring?crs=epsg:3857"
-        vehicleLayer = QgsVectorLayer(uri, 'Vehicle', "memory")
-        vehiclePathlayer = QgsVectorLayer(uriLine, 'VehiclePath', "memory")
-        
-        # Set drone image for marker symbol
-        path = QDir().filePath('../resources/vehicleSymbol.svg')
-        symbolSVG = QgsSvgMarkerSymbolLayer(path)
-        symbolSVG.setSize(4)
-        symbolSVG.setFillColor(QColor('#0000ff'))
-        symbolSVG.setStrokeColor(QColor('#ff0000'))
-        symbolSVG.setStrokeWidth(1)
-        vehicleLayer.renderer().symbol().changeSymbolLayer(0, symbolSVG)
-        
-        #set autorefresh
-        vehicleLayer.setAutoRefreshInterval(500)
-        vehicleLayer.setAutoRefreshEnabled(True)
-        vehiclePathlayer.setAutoRefreshInterval(500)
-        vehiclePathlayer.setAutoRefreshEnabled(True)
-        return vehicleLayer, vehiclePathlayer
-
-
-    def setupPingLayer(self):
-        '''
-        Sets up the ping layer and renderer.
-        Args:
-        '''
-        ranges = []
-        uri = "Point?crs=epsg:3857"
-        layer = QgsVectorLayer(uri, 'Pings', 'memory')
-        
-        
-        # make symbols
-        symbolBlue = QgsSymbol.defaultSymbol(layer.geometryType())
-        symbolBlue.setColor(QColor('#0000FF'))
-        symbolCyan = QgsSymbol.defaultSymbol(
-            layer.geometryType())
-        symbolCyan.setColor(QColor('#00FFFF'))
-        symbolGreen = QgsSymbol.defaultSymbol(
-            layer.geometryType())
-        symbolGreen.setColor(QColor('#00FF00'))
-        symbolYellow = QgsSymbol.defaultSymbol(
-            layer.geometryType())
-        symbolYellow.setColor(QColor('#FFFF00'))
-        symbolOrange = QgsSymbol.defaultSymbol(
-            layer.geometryType())
-        symbolOrange.setColor(QColor('#FFC400'))
-        symbolORed = QgsSymbol.defaultSymbol(
-            layer.geometryType())
-        symbolORed.setColor(QColor('#FFA000'))
-        symbolRed = QgsSymbol.defaultSymbol(
-            layer.geometryType())
-        symbolRed.setColor(QColor('#FF0000'))
-    
-        # make ranges
-        rBlue = QgsRendererRange(0, 10, symbolBlue, 'Blue')
-        rCyan = QgsRendererRange(10, 20, symbolCyan, 'Cyan')
-        rGreen = QgsRendererRange(20, 40, symbolGreen, 'Green')
-        rYellow = QgsRendererRange(40, 60, symbolYellow, 'Yellow')
-        rOrange = QgsRendererRange(60, 80, symbolOrange, 'Orange')
-        rORed = QgsRendererRange(80, 90, symbolORed, 'ORed')
-        rRed = QgsRendererRange(90, 100, symbolRed, 'Red')
-        ranges.append(rBlue)
-        ranges.append(rCyan)
-        ranges.append(rGreen)
-        ranges.append(rYellow)
-        ranges.append(rOrange)
-        ranges.append(rORed)
-        ranges.append(rRed)
-
-        # set renderer to set symbol based on amplitude
-        pingRenderer = QgsGraduatedSymbolRenderer('Amp', ranges)
-        
-        
-        style = QgsStyle().defaultStyle()
-        defaultColorRampNames = style.colorRampNames()
-        ramp = style.colorRamp(defaultColorRampNames[22])
-        pingRenderer.setSourceColorRamp(ramp)
-        pingRenderer.setSourceSymbol( QgsSymbol.defaultSymbol(layer.geometryType()))
-        pingRenderer.sortByValue()
-        
-        
-        vpr = layer.dataProvider()
-        vpr.addAttributes([QgsField(name='Amp', type=QVariant.Double, len=30)])
-        layer.updateFields()
-    
-        # set the renderer and allow the mapLayer to auto refresh
-        layer.setRenderer(pingRenderer)
-        layer.setAutoRefreshInterval(500)
-        layer.setAutoRefreshEnabled(True)
-        
-        return layer, pingRenderer
-    
-    def setupPrecisionLayer(self):
-        path = QDir().currentPath()
-        uri = 'file:///' + path + '/holder/query.csv?encoding=%s&delimiter=%s&xField=%s&yField=%s&crs=%s&value=%s' % ("UTF-8",",", "easting", "northing","epsg:32611", "value")
-        
-        csv_layer= QgsVectorLayer(uri, "query", "delimitedtext")
-        
-        csv_layer.setOpacity(0.5)
-        
-        heatmap = QgsHeatmapRenderer()
-        heatmap.setWeightExpression('value')
-        heatmap.setRadiusUnit(QgsUnitTypes.RenderUnit.RenderMetersInMapUnits)
-        heatmap.setRadius(3)
-        csv_layer.setRenderer(heatmap)
-        
-        csv_layer.setAutoRefreshInterval(500)
-        csv_layer.setAutoRefreshEnabled(True)
-        
-        return csv_layer
-
     def addLayers(self):
-        '''
-        Helper method to add map layers to map canvas
-        '''
-        uri = "Point?crs=epsg:3857"
-        if self.estimate is None:
-            self.estimate = self.setupEstimate(uri)
-            
-            
         if self.vehicle is None:
-            vPathURI = "Linestring?crs=epsg:3857"
-            self.vehicle, self.vehiclePath = self.setupVehicleLayers(uri, vPathURI)
-            
+            uri = "Point?crs=epsg:3857"
+            point = self.transformToWeb.transform(QgsPointXY(float(-117.5), float(32.5)))
+            self.vehicle = QgsVectorLayer(uri, 'Vehicle', "memory")
+            vpr = self.vehicle.dataProvider()
+            pnt = QgsGeometry.fromPointXY(point)
+            f = QgsFeature()
+            f.setGeometry(pnt)
+            vpr.addFeatures([f])
+            self.vehicle.updateExtents()
+            path = QDir().currentPath()
+            full = path +'/camera.svg'
+            symbol = QgsSvgMarkerSymbolLayer(full)
+            symbol.setSize(4)
+            symbol.setFillColor(QColor('#0000ff'))
+            symbol.setStrokeColor(QColor('#ff0000'))
+            symbol.setStrokeWidth(1)
+            self.vehicle.renderer().symbol().changeSymbolLayer(0, symbol )
+            self.vehicle.setAutoRefreshInterval(500)
+            self.vehicle.setAutoRefreshEnabled(True)
         if self.pingLayer is None:
-            self.pingLayer, self.pingRenderer = self.setupPingLayer()
-            
-        if self.groundTruth is None:
-            self.groundTruth = self.setupGroundTruth()
-            
-        
-        
-        #load from cached tiles if true, otherwise loads from web    
+            ranges = []
+            uri = "Point?crs=epsg:3857"
+            self.pingLayer = QgsVectorLayer(uri, 'Pings', "memory")
+
+            # make symbols
+            symbolLower = QgsSymbol.defaultSymbol(
+                    self.pingLayer.geometryType())
+            symbolLower.setColor(QColor('#0000FF'))
+            symbolMid = QgsSymbol.defaultSymbol(
+                    self.pingLayer.geometryType())
+            symbolMid.setColor(QColor('#00FF00'))
+            symbolUpper = QgsSymbol.defaultSymbol(
+                    self.pingLayer.geometryType())
+            symbolUpper.setColor(QColor('#FF0000'))
+
+            # make ranges
+            rLower = QgsRendererRange(0, 20, symbolLower, 'Lower')
+            rMid = QgsRendererRange(20, 40, symbolMid, 'Mid')
+            rUpper = QgsRendererRange(40, 100, symbolUpper, 'Upper')
+
+            ranges.append(rLower)
+            ranges.append(rMid)
+            ranges.append(rUpper)
+
+            self.pingRenderer = QgsGraduatedSymbolRenderer('', ranges)
+            myClassificationMethod = QgsApplication.classificationMethodRegistry().method("EqualInterval")
+            self.pingRenderer.setClassificationMethod(myClassificationMethod)
+            self.pingRenderer.setClassAttribute('Amp')
+            vpr = self.pingLayer.dataProvider()
+            vpr.addAttributes([QgsField('Amp', QVariant.Double)])
+            self.pingLayer.updateFields()
+
+
+            self.pingLayer.setRenderer(self.pingRenderer)
+            self.pingLayer.setAutoRefreshInterval(500)
+            self.pingLayer.setAutoRefreshEnabled(True)
         if self.loadCached:
-            dirs = AppDirs("GCS", "E4E")
-            path = dirs.site_data_dir.replace("\\", "/")
+            path = QDir().currentPath()
             urlWithParams = 'type=xyz&url=file:///'+ path+'/tiles/%7Bz%7D/%7Bx%7D/%7By%7D.png'
         else:
             urlWithParams = 'type=xyz&url=http://a.tile.openstreetmap.org/%7Bz%7D/%7Bx%7D/%7By%7D.png&zmax=19&zmin=0&crs=EPSG3857'    
-        self.mapLayer = QgsRasterLayer(urlWithParams, 'OpenStreetMap', 'wms') 
-        '''
-        if self.precision is None:
-            self.precision = self.setupPrecisionLayer()
-            destCrs = self.mapLayer.crs()
-            rasterCrs = self.precision.crs()
-            self.precision.setCrs(rasterCrs)
-            self.canvas.setDestinationCrs(destCrs)
-        ''' 
-        if self.mapLayer.isValid():   
-            crs = self.mapLayer.crs()
+        self.layer = QgsRasterLayer(urlWithParams, 'OpenStreetMap', 'wms') 
+        if self.layer.isValid():   
+            crs = self.layer.crs()
             crs.createFromString("EPSG:3857")  
-            self.mapLayer.setCrs(crs)
-            
-            #add all layers to map
-            QgsProject.instance().addMapLayer(self.mapLayer)
-            QgsProject.instance().addMapLayer(self.groundTruth)
-            QgsProject.instance().addMapLayer(self.estimate)
+            self.layer.setCrs(crs)
+            QgsProject.instance().addMapLayer(self.layer)
             QgsProject.instance().addMapLayer(self.vehicle)
-            QgsProject.instance().addMapLayer(self.vehiclePath)
             QgsProject.instance().addMapLayer(self.pingLayer)
-            #QgsProject.instance().addMapLayer(self.precision)
-            print('valid mapLayer')
+            print('valid layer')
         else:
-            print('invalid mapLayer')
-            raise RuntimeError
-
-
-
+            print('invalid layer')
     def addRectTool(self):
-        '''
-        Helper function to add the rectangle tool to the toolbar
-        '''
         self.rectAction = QAction("Rect", self)
         self.rectAction.setCheckable(True)
         self.rectAction.triggered.connect(self.rect)
@@ -2736,21 +1654,9 @@ class WebMap(MapWidget):
         self.toolRect.setAction(self.rectAction)
 
     def rect(self):
-        '''
-        Helper function to set rect tool when it is selected from 
-        the toolbar
-        '''
         self.canvas.setMapTool(self.toolRect)
 
     def deg2num(self, lat_deg, lon_deg, zoom):
-        '''
-        Helper function to calculate the map tile number for a given 
-        location
-        Args:
-            lat_deg: float latitude value
-            lon_deg: float longitude value
-            zoom: integer zoom value
-        '''
         lat_rad = math.radians(lat_deg)
         n = 2.0 ** zoom
         x = int((lon_deg + 180.0) / 360.0 * n)
@@ -2759,9 +1665,6 @@ class WebMap(MapWidget):
         
 
     def cacheMap(self):
-        '''
-        Function to facilitate caching map tiles
-        '''
         if (self.toolRect.rectangle() == None):
             return
         else:
@@ -2771,7 +1674,7 @@ class WebMap(MapWidget):
             print("Rectangle:", r.xMinimum(),
                     r.yMinimum(), r.xMaximum(), r.yMaximum()
                  )
-            '''
+            
             if (r != None):
                 zoomStart = 17
                 tilecount = 0
@@ -2792,20 +1695,13 @@ class WebMap(MapWidget):
                                 return
                 print("Download Complete")
             else:
-                print("Download Failed")
-            '''
+                print(":(")
             
     def downloadTile(self, xtile, ytile, zoom):
-        '''
-        Helper Function to facilitate the downloading of web tiles
-        '''
+        
         url = "http://c.tile.openstreetmap.org/%d/%d/%d.png" % (zoom, xtile, ytile)
-        dirs = AppDirs("GCS", "E4E")
-        cachePath = dirs.site_data_dir.replace('\\', '/')
-         
-        tilePath = '/tiles/%d/%d/' % (zoom, xtile)
-        dir_path = cachePath + tilePath
-        download_path = cachePath +"/tiles/%d/%d/%d.png" % (zoom, xtile, ytile)
+        dir_path = "tiles/%d/%d/" % (zoom, xtile)
+        download_path = "tiles/%d/%d/%d.png" % (zoom, xtile, ytile)
         
         if not os.path.exists(dir_path):
             os.makedirs(dir_path)
@@ -2827,16 +1723,8 @@ class WebMap(MapWidget):
 
 
 class StaticMap(MapWidget):
-    '''
-    Custom MapWidget to facilititate displaying a static raster file
-    '''
     def __init__(self, root):
-        '''
-        Creates a StaticMap object
-        Args:
-            root: the root widget of the application
-        '''
-        MapWidget.__init__(self, root, False)
+        MapWidget.__init__(self, root)
 
         self.fileName = None
 
@@ -2856,82 +1744,44 @@ class StaticMap(MapWidget):
 
 
     def __getFileName(self):
-        '''
-        inner function to retrieve a user specified raster file
-        '''
         self.fileName = QFileDialog.getOpenFileName()      
 
     def __addLayers(self):
-        '''
-        Helper funciton to add layers to the map canvas
-        '''
-        uri = "Point?crs=epsg:4326"
-        uriLine = "Linestring?crs=epsg:4326"
-        
         if(self.fileName == None):
             return
+        self.layer = QgsRasterLayer(self.fileName[0], "SRTM layer name")
         
-        if self.estimate is None:
-            self.estimate = self.setupEstimate(uri)
-            
-        if self.vehicle is None:
-            self.vehicle, self.vehiclePath = self.setupVehicleLayers(uri, uriLine)
-            
-        if self.pingLayer is None:
-            self.pingLayer, self.pingRenderer = self.setupPingLayer(uri)
-
-        self.mapLayer = QgsRasterLayer(self.fileName[0], "SRTM layer name")
-        print(self.mapLayer.crs())
-        crs = self.mapLayer.crs()
-        
-        self.transformToMap = QgsCoordinateTransform(
-                QgsCoordinateReferenceSystem("EPSG:4326"),
-                crs, 
-                QgsProject.instance())
-        self.transform = QgsCoordinateTransform(
-                crs, 
-                QgsCoordinateReferenceSystem("EPSG:4326"),
-                QgsProject.instance())
-
-
-        
-        if self.mapLayer.isValid():   
-            QgsProject.instance().addMapLayer(self.mapLayer)
-            QgsProject.instance().addMapLayer(self.estimate)
-            QgsProject.instance().addMapLayer(self.vehicle)
-            QgsProject.instance().addMapLayer(self.vehiclePath)
-            QgsProject.instance().addMapLayer(self.pingLayer)
+        if self.layer.isValid():   
+            QgsProject.instance().addMapLayer(self.layer)
             print('valid layer')
         else:
             print('invalid layer')
-            
-    
 
 def configSetup():
-    '''
-    Helper function to set up paths to QGIS lbrary files, and 
-    config file
-    '''
     config_path = 'gcsConfig.ini'
     if(not os.path.isfile(config_path)):
-        prefix_path = QFileDialog.getExistingDirectory(None, 'Select the Qgis directory')          
-        config = configparser.ConfigParser()
-        config['FilePaths'] = {}
-        config['FilePaths']['PrefixPath'] = prefix_path
-        if ("qgis" not in prefix_path):
+        prefix_path = QFileDialog.getExistingDirectory(None, 
+                'Select the Qgis directory')
+        if ("qgis" in prefix_path):            
+            config = configparser.ConfigParser()
+            config['FilePaths'] = {}
+            config['FilePaths']['PrefixPath'] = prefix_path
+            with open(config_path, 'w') as configFile:
+                config.write(configFile)
+                return prefix_path
+                print("here")
+        else:
             msg = QMessageBox()
-            msg.setText("Warning, incorrect file chosen. Map tools may not function as expected")
+            msg.setText("Wrong file. Choose qgis file")
             msg.setWindowTitle("Alert")
             msg.setIcon(QMessageBox.Critical)
             msg.exec_()
-        with open(config_path, 'w') as configFile:
-            config.write(configFile)
-            return config, prefix_path
+            configSetup()
     else:
         config = configparser.ConfigParser()
         config.read(config_path)
         prefix_path = config['FilePaths']['PrefixPath']
-        return config, prefix_path
+        return prefix_path
    
 
 
@@ -2951,18 +1801,15 @@ if __name__ == '__main__':
     ch.setFormatter(formatter)
     logger.addHandler(ch)
     
-  
     app = QgsApplication([], True)
-    
-    configObj, prefix_path = configSetup()
-    
-    QgsApplication.setPrefixPath(prefix_path)
-
+    prefix_path = configSetup() 
+    #prefix_path = config['FilePaths']['PrefixPath']
+    app.setPrefixPath(prefix_path, True) 
     app.initQgis()
 
-    ex = GCS(configObj)
+    ex = GCS()
     ex.show()
 
     exitcode = app.exec_()
-    app.exitQgis()
+    QgsApplication.exitQgis()
     sys.exit(exitcode)
