@@ -20,10 +20,15 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+<<<<<<< HEAD
 # 03/11/21  ML  Added normalization to heatMapArea in precision visualization 
 #               function
 # 08/14/20  ML  Added ping resampling in estimate calculation
 # 10/05/20  ML  Added estimate precision visualization function
+=======
+# 10/05/20  ML  Added estimate precision visualization function
+# 08/14/20  ML  Added ping resampling in estimate calculation
+>>>>>>> v1.a_YA0
 # 05/25/20  NH  Added getter for pings for LocationEstimator and DataManager
 # 05/18/20  NH  Added logic to convert rctPing to/from rctPingPacket
 # 05/05/20  NH  Added estimator
@@ -36,12 +41,22 @@ import numpy as np
 from scipy.optimize import least_squares
 from scipy.stats import norm, zscore
 import utm
+<<<<<<< HEAD
+=======
+import rctComms
+>>>>>>> v1.a_YA0
 import time
 import rctComms
 import gdal
 import osr
+<<<<<<< HEAD
 import csv
 import math
+=======
+import multiprocessing
+
+
+>>>>>>> v1.a_YA0
 
 
 class rctPing:
