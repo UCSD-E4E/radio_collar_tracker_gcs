@@ -427,8 +427,6 @@ class GCS(QMainWindow):
             lat2 = ext.yMinimum()
             lon2 = ext.xMaximum()
             
-
-            
             config_path = 'gcsConfig.ini'   
 
             self.config['LastCoords'] = {}
