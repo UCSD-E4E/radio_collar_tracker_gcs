@@ -1816,6 +1816,9 @@ class MapWidget(QWidget):
         self.heatMap = None
         self.pingMin = 800
         self.pingMax = 0
+        self.coneMin = sys.float_info.max
+        self.coneMax = sys.float_info.min
+        self.indPing = 0
         self.indPing = 0
         self.ind = 0
         self.indEst = 0
@@ -2019,29 +2022,67 @@ class MapWidget(QWidget):
         hind = self.indCone % 12
         heading = headingArr[hind]
         point = self.transformToWeb.transform(QgsPointXY(lon, lat))
+        # Example amplitudes
+        ampArr = [2.4, 4, 5, 2.1, 3, 8, 5.9, 2, 1, 3, 5, 4]
+        amp = ampArr[hind]
+        if self.coneMin > amp:
+            self.coneMin = amp
+        if self.coneMax < amp:
+            self.coneMax = amp
 
         if self.cones is None:
             return
         else:
+            colorInd = 1
             if self.indCone > 4:
                 #TODO DECREASE OPACITY
                 self.cones.startEditing()
                 self.cones.deleteFeature(self.indCone-5)
                 self.cones.commitChanges()
-                
-
+                colorInd = self.indCone - 4
+            
+            # colors cone based on coneMin-coneMax range
+            colors = {}
+            while colorInd <= self.indCone:
+                feature = self.cones.getFeature(colorInd)
+                featureAmp = feature.attributes()[1]
+                color = self.calcColor(featureAmp, self.coneMin, self.coneMax)
+                print('Color ' + color)
+                colors[colorInd] = {2: color}
+                colorInd = colorInd + 1
+            print(colors)
                 
             #Add new cone
             cpr = self.cones.dataProvider()
+            cpr.changeAttributeValues(colors)
             pnt = QgsGeometry.fromPointXY(point)
             f = QgsFeature()
             f.setFields(self.cones.fields())
             f.setGeometry(pnt)
             f.setAttribute(0, heading)
+            f.setAttribute(1, amp)
+            f.setAttribute(2, self.calcColor(amp, self.coneMin, self.coneMax))
             cpr.addFeatures([f])
             self.cones.updateExtents()
             self.indCone = self.indCone + 1
             
+    def calcColor(self, amp, minAmp, maxAmp):
+        '''
+        Calculates hex color value for a cone based on variable range
+        Colors range between red (strongest) and blue (weakest)
+        Args:
+            amp: Float containing cone signal amplitude
+            minAmp: Flaot representing minimum amplitude in range
+            maxAmp: Float representing maximum amplitude in range
+        '''
+        if (minAmp == maxAmp):
+            colorRatio = 0.5
+        else:
+            colorRatio = (amp - minAmp)/(maxAmp - minAmp)
+        red = int(255 * colorRatio)
+        blue = int(255 * (1-colorRatio))
+        color = "#%02x%02x%02x" % (red, 0, blue)
+        return color
 
     def plotPing(self, coord, power):
         '''
@@ -2469,13 +2510,16 @@ class WebMap(MapWidget):
         symbolSVG.setSize(4)
         symbolSVG.setFillColor(QColor('#ff0000'))
         symbolSVG.setStrokeColor(QColor('#ff0000'))
-        symbolSVG.setStrokeWidth(1)
+        #symbolSVG.setStrokeWidth(1)
+        symbolSVG.setDataDefinedProperty(QgsSymbolLayer.PropertyFillColor, QgsProperty.fromField("Color"))
         coneLayer.renderer().symbol().changeSymbolLayer(0, symbolSVG)
         coneLayer.renderer().symbol().setDataDefinedAngle(QgsProperty().fromField("Heading"))
         #coneLayer.renderer().symbol().setDataDefinedProperty(QgsProperty().fromField("Opacity"))
 
         cpr = coneLayer.dataProvider()
-        cpr.addAttributes([QgsField(name='Heading', type=QVariant.Double, len=30)])
+        cpr.addAttributes([QgsField(name='Heading', type=QVariant.Double, len=30),
+                            QgsField(name="Amp", type=QVariant.Double, len=30),
+                            QgsField(name='Color', type=QVariant.String, len=30)])
         coneLayer.updateFields()
         coneLayer.setAutoRefreshInterval(500)
         coneLayer.setAutoRefreshEnabled(True)
