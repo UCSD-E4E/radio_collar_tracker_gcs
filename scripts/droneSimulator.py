@@ -41,6 +41,7 @@
 #
 ###############################################################################
 import argparse
+import math
 import threading
 import socket
 import datetime as dt
@@ -181,6 +182,7 @@ class droneSim:
         self.SS_vehicleTarget = np.array(self.SM_TakeoffTarget)
         self.SS_waypointIdx = 0
         self.SS_payloadRunning = False
+        self.SS_heading = 0
 
         # HS - Heartbeat State parameters
         self.HS_run = True
@@ -353,6 +355,7 @@ class droneSim:
         self.SS_vehicleTarget = np.array(self.SM_TakeoffTarget)
         self.SS_waypointIdx = 0
         self.SS_payloadRunning = False
+        self.SS_heading = 0
 
         # HS - Heartbeat State parameters
         self.HS_run = True
@@ -733,6 +736,30 @@ class droneSim:
                 prevPosTime = curTime
             prevTime = curTime
 
+    def __antennaModel(self, beam_angle) -> float:
+        return np.cos(beam_angle) ** (2.99999)
+
+    def __computeHeadingMultiplier(self) -> float:
+        self.SS_heading
+        self.SS_vehiclePosition
+        self.SP_Position
+
+        # Get my current heading
+        x = np.cos(np.deg2rad(self.SS_heading))
+        y = np.sin(np.deg2rad(self.SS_heading))
+        heading_vector = np.array([x, y])
+
+        # Get the bearing to the transmitter
+        transmitter_vector = np.array(self.SP_Position) - np.array(self.SS_vehiclePosition)
+        transmitter_vector /= np.linalg.norm(transmitter_vector)
+
+        # Compute the bearing from antenna to transmitter
+        dot = np.dot(heading_vector, transmitter_vector)
+        angle = np.arccos(dot)
+
+        # Plug into directivity model
+        return self.__antennaModel(angle)
+
     def calculatePingMeasurement(self):
         '''
         Calculate the simulated ping measurement from the current state 
@@ -766,9 +793,12 @@ class droneSim:
 
         measurement = (Prx, f_tx)
 
+        measurement[0] *= self.__computeHeadingMultiplier()
+
         # implement noise floor
         if Prx < P_n:
            measurement = None
+
 
         return measurement
 
@@ -854,6 +884,8 @@ class droneSim:
         e['SS_waypointIdx'] = str(self.SS_waypointIdx )
         
         e['SS_payloadRunning'] = str(self.SS_payloadRunning )
+
+        e['SS_heading'] = str(self.SS_heading )
         
 
         e['HS_run'] = str(self.HS_run )
