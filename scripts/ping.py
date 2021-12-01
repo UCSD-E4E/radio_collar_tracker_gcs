@@ -42,6 +42,15 @@ from osgeo import osr
 import csv
 import math
 
+class rctCone:
+    def __init__(self, lat: float, lon: float, amplitude: float, freq: int, alt: float, heading:float, time: float):
+        self.lat = lat
+        self.lon = lon
+        self.amplitude = amplitude
+        self.heading
+        self.freq = freq
+        self.alt = alt
+        self.time = dt.datetime.fromtimestamp(time)
 
 class rctPing:
     def __init__(self, lat: float, lon: float, amplitude: float, freq: int, alt: float, time: float):
