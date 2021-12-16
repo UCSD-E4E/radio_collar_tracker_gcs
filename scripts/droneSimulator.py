@@ -740,18 +740,14 @@ class droneSim:
         return np.cos(beam_angle) ** (2.99999)
 
     def __computeHeadingMultiplier(self) -> float:
-        self.SS_heading
-        self.SS_vehiclePosition
-        self.SP_Position
-
         # Get my current heading
         x = np.cos(np.deg2rad(self.SS_heading))
         y = np.sin(np.deg2rad(self.SS_heading))
-        heading_vector = np.array([x, y])
+        heading_vector = np.array([x, y, 0])
 
         # Get the bearing to the transmitter
         transmitter_vector = np.array(self.SP_Position) - np.array(self.SS_vehiclePosition)
-        transmitter_vector /= np.linalg.norm(transmitter_vector)
+        transmitter_vector = transmitter_vector / np.linalg.norm(transmitter_vector)
 
         # Compute the bearing from antenna to transmitter
         dot = np.dot(heading_vector, transmitter_vector)
