@@ -2018,39 +2018,40 @@ class MapWidget(QWidget):
     def plotCone(self, coord):
         lat = coord[0]
         lon = coord[1]
-        headingArr = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330]
-        hind = self.indCone % 12
-        heading = headingArr[hind]
+        heading = coord[3]
+        #power = coord[4]
+        #dummy power values to test calcColor
+        pArr =  [2.4, 4, 5, 2.1, 3, 8, 5.9, 2, 1, 3, 5, 4]        
+        aind = self.indCone % 12
+        power = pArr[aind]
+
         point = self.transformToWeb.transform(QgsPointXY(lon, lat))
-        # Example amplitudes
-        ampArr = [2.4, 4, 5, 2.1, 3, 8, 5.9, 2, 1, 3, 5, 4]
-        amp = ampArr[hind]
-        if self.coneMin > amp:
-            self.coneMin = amp
-        if self.coneMax < amp:
-            self.coneMax = amp
+        if self.coneMin > power:
+            self.coneMin = power
+        if self.coneMax < power:
+            self.coneMax = power
 
         if self.cones is None:
             return
         else:
-            colorInd = 1
             if self.indCone > 4:
                 #TODO DECREASE OPACITY
                 self.cones.startEditing()
                 self.cones.deleteFeature(self.indCone-5)
                 self.cones.commitChanges()
-                colorInd = self.indCone - 4
+            
             
             # colors cone based on coneMin-coneMax range
+            colorInd = self.indCone
+            opacity = 1
             colors = {}
-            while colorInd <= self.indCone:
+            while colorInd >= self.indCone-4 and colorInd > 0:
                 feature = self.cones.getFeature(colorInd)
-                featureAmp = feature.attributes()[1]
-                color = self.calcColor(featureAmp, self.coneMin, self.coneMax)
-                print('Color ' + color)
+                amp = feature.attributes()[1]
+                color = self.calcColor(amp, self.coneMin, self.coneMax, opacity)
                 colors[colorInd] = {2: color}
-                colorInd = colorInd + 1
-            print(colors)
+                colorInd -= 1
+                opacity -= 0.2
                 
             #Add new cone
             cpr = self.cones.dataProvider()
@@ -2060,13 +2061,13 @@ class MapWidget(QWidget):
             f.setFields(self.cones.fields())
             f.setGeometry(pnt)
             f.setAttribute(0, heading)
-            f.setAttribute(1, amp)
-            f.setAttribute(2, self.calcColor(amp, self.coneMin, self.coneMax))
+            f.setAttribute(1, power)
+            f.setAttribute(2, self.calcColor(power, self.coneMin, self.coneMax, 1))
             cpr.addFeatures([f])
             self.cones.updateExtents()
             self.indCone = self.indCone + 1
             
-    def calcColor(self, amp, minAmp, maxAmp):
+    def calcColor(self, amp, minAmp, maxAmp, opac):
         '''
         Calculates hex color value for a cone based on variable range
         Colors range between red (strongest) and blue (weakest)
@@ -2074,6 +2075,7 @@ class MapWidget(QWidget):
             amp: Float containing cone signal amplitude
             minAmp: Flaot representing minimum amplitude in range
             maxAmp: Float representing maximum amplitude in range
+            opac: Float representing percent opacity
         '''
         if (minAmp == maxAmp):
             colorRatio = 0.5
@@ -2081,8 +2083,16 @@ class MapWidget(QWidget):
             colorRatio = (amp - minAmp)/(maxAmp - minAmp)
         red = int(255 * colorRatio)
         blue = int(255 * (1-colorRatio))
-        color = "#%02x%02x%02x" % (red, 0, blue)
+        opacity = int(255 * opac)
+        color = "#%02x%02x%02x%02x" % (opacity, red, 0, blue)
+        print("color: "+color)
         return color
+
+    def calcLength(self):
+        '''
+        '''
+        #TODO: chnange length of cone based on amplitude
+
 
     def plotPing(self, coord, power):
         '''
