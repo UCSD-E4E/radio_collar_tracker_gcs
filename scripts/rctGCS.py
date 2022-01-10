@@ -2064,6 +2064,7 @@ class MapWidget(QWidget):
             f.setAttribute(1, power)
             f.setAttribute(2, self.calcColor(power, self.coneMin, self.coneMax, 1))
             f.setAttribute(3, self.calcHeight(power, self.coneMin, self.coneMax))
+            f.setAttribute(4, "bottom")
             cpr.addFeatures([f])
             self.cones.updateExtents()
             self.indCone = self.indCone + 1
@@ -2531,6 +2532,7 @@ class WebMap(MapWidget):
         #symbolSVG.setStrokeWidth(1)
         symbolSVG.setDataDefinedProperty(QgsSymbolLayer.PropertyFillColor, QgsProperty.fromField("Color"))
         symbolSVG.setDataDefinedProperty(QgsSymbolLayer.PropertyHeight, QgsProperty.fromField("Height"))
+        symbolSVG.setDataDefinedProperty(QgsSymbolLayer.PropertyVerticalAnchor, QgsProperty.fromField("VAnchor"))
         coneLayer.renderer().symbol().changeSymbolLayer(0, symbolSVG)
         coneLayer.renderer().symbol().setDataDefinedAngle(QgsProperty().fromField("Heading"))
         #coneLayer.renderer().symbol().setDataDefinedProperty(QgsProperty().fromField("Opacity"))
@@ -2539,7 +2541,8 @@ class WebMap(MapWidget):
         cpr.addAttributes([QgsField(name='Heading', type=QVariant.Double, len=30),
                             QgsField(name="Amp", type=QVariant.Double, len=30),
                             QgsField(name='Color', type=QVariant.String, len=30),
-                            QgsField(name="Height", type=QVariant.Double, len=30)])
+                            QgsField(name="Height", type=QVariant.Double, len=30),
+                            QgsField(name="VAnchor", type=QVariant.String, len=30)])
         coneLayer.updateFields()
         coneLayer.setAutoRefreshInterval(500)
         coneLayer.setAutoRefreshEnabled(True)
