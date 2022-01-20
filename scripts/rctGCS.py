@@ -94,6 +94,8 @@ class GCS(QMainWindow):
     Ground Control Station GUI
     '''
 
+    #TODO Make generic warning class
+
     SBWidth = 500
 
     defaultTimeout = 5
@@ -113,6 +115,7 @@ class GCS(QMainWindow):
         self._mavModel = None
         self._buttons = []
         self._systemConnectionTab = None
+        self.btn_startRecord = None
         self.systemSettingWidget = None
         self.__missionStatusText = "Start Recording"
         self.innerFreqFrame = None
@@ -165,11 +168,13 @@ class GCS(QMainWindow):
         '''
         Internal callback to send the start command
         '''
+        self._mavModel.startMission()
 
     def __stopCommand(self):
         '''
         Internal callback to send the stop command
         '''
+        self._mavModel.stopMission()
 
     def __noHeartbeat(self):
         '''
@@ -261,6 +266,7 @@ class GCS(QMainWindow):
         else:
             self.__missionStatusText = 'Start Recording'
             self._mavModel.stopMission(timeout=self.defaultTimeout)
+        self.btn_startRecord.setText(self.__missionStatusText)
 
     def __updateStatus(self):
         '''
@@ -497,6 +503,7 @@ class GCS(QMainWindow):
         btn_connect = QPushButton("Connect")
         btn_connect.resize(self.SBWidth, 100)
         btn_connect.clicked.connect(lambda:self.__handleConnectInput())
+
         lay_sys.addWidget(btn_connect)
         self._systemConnectionTab.setContentLayout(lay_sys)
 
@@ -524,9 +531,9 @@ class GCS(QMainWindow):
 
 
         # START PAYLOAD RECORDING
-        btn_startRecord = QPushButton(self.__missionStatusText)
+        self.btn_startRecord = QPushButton(self.__missionStatusText)
         #                            textvariable=self.__missionStatusText, 
-        btn_startRecord.clicked.connect(lambda:self.__startStopMission())
+        self.btn_startRecord.clicked.connect(lambda:self.__startStopMission())
         
         btn_exportAll = QPushButton('Export Info')
         btn_exportAll.clicked.connect(lambda:self.exportAll())
@@ -542,7 +549,7 @@ class GCS(QMainWindow):
         wlay.addWidget(self.mapControl)
         wlay.addWidget(self.systemSettingsWidget)
         wlay.addWidget(self.upgradeDisplay)
-        wlay.addWidget(btn_startRecord)
+        wlay.addWidget(self.btn_startRecord)
         wlay.addWidget(btn_exportAll)
         wlay.addWidget(btn_precision)
         wlay.addWidget(btn_heatMap)
@@ -975,7 +982,7 @@ class SystemSettingsControl(CollapseFrame):
                 freqLabel = QLabel('Target %d' % (rowIdx + 1))
                 freqVariable = freq
                 freqEntry = QLineEdit()
-                val = QIntValidator(cntrFreq-sampFreq, cntrFreq+sampFreq)                            
+                val = PyQt5.QtGui.QIntValidator(cntrFreq-sampFreq, cntrFreq+sampFreq)                            
                 freqEntry.setValidator(val)
                 freqEntry.setText(str(freqVariable))
 
@@ -1027,7 +1034,7 @@ class SystemSettingsControl(CollapseFrame):
                 freqEntry = QLineEdit()
                 cntrFreq = self.__root._mavModel.getOption('SDR_centerFreq')
                 sampFreq = self.__root._mavModel.getOption('SDR_samplingFreq')
-                val = QIntValidator(cntrFreq-sampFreq, cntrFreq+sampFreq)                            
+                val = PyQt5.QtGui.QIntValidator(cntrFreq-sampFreq, cntrFreq+sampFreq)                            
                 freqEntry.setValidator(val)
                 freqEntry.setText(freqVariable)
                 
@@ -1441,13 +1448,17 @@ class ConnectionDialog(QWizard):
         Internal Function to submit user inputted connection settings
         '''
         try:
+            #TODO add address input
+            print(self.page.addrEntry.text())
             print(self.page.portEntry.text())
             self.port = rctTransport.RCTTCPClient(
-                addr='127.0.0.1', port=int(self.page.portEntry.text()))
+                addr=self.page.addrEntry.text(),
+                port=int(self.page.portEntry.text()))
             self.comms = rctComms.gcsComms(self.port)
             self.model = rctCore.MAVModel(self.comms)
             self.model.start()
         except:
+            #TODO ADD ERROR HANDLING/NOTIFICATION
             return
 
 class ConnectionDialogPage(QWizardPage):
@@ -1463,10 +1474,10 @@ class ConnectionDialogPage(QWizardPage):
         '''
         super(ConnectionDialogPage, self).__init__(parent)
         self.__parent = parent
-        #self.__portEntry = tk.IntVar()
-        #self.__portEntry.set(9000)  # default value
         self.__portEntryVal = 9000 # default value
-        self.portEntry = None # default value
+        self.__addrEntryVal = "127.0.0.1" # default value
+        self.portEntry = None 
+        self.addrEntry = None
         self.port = None
         self.comms = None
         self.model = None
@@ -1479,6 +1490,7 @@ class ConnectionDialogPage(QWizardPage):
         '''
         Internal function to create widgets
         '''
+        #TODO Add error handling if contype is not selected
         frm_holder = QHBoxLayout()
         frm_holder.addStretch(1)
         frm_conType = QVBoxLayout()
@@ -1496,9 +1508,15 @@ class ConnectionDialogPage(QWizardPage):
         lbl_port = QLabel('Port')
         frm_port.addWidget(lbl_port)
 
+        lbl_addr = QLabel('IP Address:')
+        frm_conType.addWidget(lbl_addr)
+
         self.portEntry = QLineEdit() #textvariable=self.__portEntry)
         self.portEntry.setText(str(self.__portEntryVal))
+        self.addrEntry = QLineEdit()
+        self.addrEntry.setText(self.__addrEntryVal)
         frm_port.addWidget(self.portEntry)
+        frm_port.addWidget(self.addrEntry)
 
 
 
