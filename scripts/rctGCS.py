@@ -1394,8 +1394,8 @@ class AddTargetDialogPage(QWizardPage):
         '''
         Internal function to create widgets
         '''
-        rx  = QRegExp("[0-9]{30}")                           
-        val = QRegExpValidator(rx)                            
+        rx  = PyQt5.QtCore.QRegExp("[0-9]{30}")                           
+        val = PyQt5.QtGui.QRegExpValidator(rx)                            
         frm_targetSettings = QGridLayout()
 
         lbl_targetName = QLabel('Target Name:')
