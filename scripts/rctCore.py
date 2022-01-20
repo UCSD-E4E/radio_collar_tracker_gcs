@@ -605,7 +605,7 @@ class MAVModel:
             callback()
 
     def __processCone(self, packet: rctComms.rctConePacket, addr: str):
-        coordinate = [packet.lat, packet.lon, packet.alt, packet.angle]
+        coordinate = [packet.lat, packet.lon, packet.alt, packet.power, packet.angle]
         self.state['CONE_track'][packet.timestamp] = coordinate
         for callback in self.__callbacks[Events.ConeInfo]:
             callback()
