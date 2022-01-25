@@ -2018,12 +2018,12 @@ class MapWidget(QWidget):
     def plotCone(self, coord):
         lat = coord[0]
         lon = coord[1]
-        heading = coord[3]
-        power = coord[4]
+        heading = coord[4]
+        #power = coord[3]
         #dummy power values to test calcColor
-        #pArr =  [2.4, 4, 5, 2.1, 3, 8, 5.9, 2, 1, 3, 5, 4]        
-        #aind = self.indCone % 12
-        #power = pArr[aind]
+        pArr =  [2.4, 4, 5, 2.1, 3, 8, 5.9, 2, 1, 3, 5, 4]        
+        aind = self.indCone % 12
+        power = pArr[aind]
 
         point = self.transformToWeb.transform(QgsPointXY(lon, lat))
         if self.coneMin > power:
