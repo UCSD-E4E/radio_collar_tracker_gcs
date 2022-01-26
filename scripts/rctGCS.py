@@ -58,6 +58,8 @@
 #
 ###############################################################################
 import datetime as dt
+from optparse import TitledHelpFormatter
+from warnings import WarningMessage
 import utm
 import math
 import time
@@ -83,6 +85,32 @@ import json
 import numpy as np
 import csv
 import random #REMOVE
+
+
+class WarningMessager:
+    
+    def showWarning(title, text):
+        '''
+        Creates warning popups
+        Args: 
+            title: message header
+            text: message body
+        '''
+        msg = QMessageBox()
+        msg.setText(title)
+        msg.setWindowTitle("Alert")
+        msg.setInformativeText(text)
+        msg.setIcon(QMessageBox.Critical)
+        msg.addButton(QMessageBox.Ok)
+        msg.exec_()
+
+    def showWarning(text):
+        msg = QMessageBox()
+        msg.setText(text)
+        msg.setWindowTitle("Alert")
+        msg.setIcon(QMessageBox.Critical)
+        msg.addButton(QMessageBox.Ok)
+        msg.exec_()
 
 
 class GCS(QMainWindow):
@@ -172,11 +200,7 @@ class GCS(QMainWindow):
         '''
         for button in self._buttons:
             button.config(state='disabled')
-        dialog = QMessageBox()
-        dialog.setIcon(QMessageBox.Critical)
-        dialog.setText("No Heartbeats Received")
-        dialog.addButton(QMessageBox.Ok)
-        dialog.exec()
+        WarningMessager.showWarning("No Heartbeats Received")
         
     def __handleNewEstimate(self):
         '''
@@ -249,12 +273,8 @@ class GCS(QMainWindow):
         '''
         Internal callback for an exception message
         '''
-        dialog = QMessageBox()
-        dialog.setIcon(QMessageBox.Critical)
-        dialog.setText('An exception has occured!\n%s\n%s' % (
+        WarningMessager.showWarning('An exception has occured!\n%s\n%s' % (
             self._mavModel.lastException[0], self._mavModel.lastException[1]))
-        dialog.addButton(QMessageBox.Ok)
-        dialog.exec()
 
     def __startStopMission(self):
         # State machine for start recording -> stop recording
@@ -906,6 +926,7 @@ class ComponentStatusDisplay(CollapseFrame):
                 style = "background-color: %s" % configOpts['bg']
                 self.statusLabels[varName].setStyleSheet(style)
             except KeyError:
+                WarningMessager.showWarning("Unexpected Error", "Failed to update GUI option vars")
                 continue
 
 class SystemSettingsControl(CollapseFrame):
@@ -1116,13 +1137,7 @@ class SystemSettingsControl(CollapseFrame):
         targetFrequencies = []
         for targetName in self.targEntries:
             if not self.validateFrequency(self.targEntries[targetName][0]):
-                dialog = QMessageBox()
-                dialog.setIcon(QMessageBox.Critical)
-                dialog.setText("Target frequency " + 
-                        str(self.targEntries[targetName][0]) + 
-                        " is invalid. Please enter another value.")
-                dialog.addButton(QMessageBox.Ok)
-                dialog.exec()
+                WarningMessager.showWarning("Target frequency " + str(self.targEntries[targetName][0]) + " is invalid. Please enter another value.")
                 return
             targetFreq = self.targEntries[targetName][0]
             targetFrequencies.append(targetFreq)
@@ -1153,6 +1168,7 @@ class SystemSettingsControl(CollapseFrame):
             try:
                 self.optionVars[optionName].setText(str(optionValue))
             except AttributeError:
+                WarningMessager.showWarning("Unexpected Error", "Failed to update GUI option vars")
                 print(optionName)
         self.update()
 
@@ -1313,6 +1329,7 @@ class ExpertSettingsDialogPage(QWizardPage):
         Inner function to submit enterred information
         '''
         if not self.validateParameters():
+            WarningMessager.showWarning("Entered information could not be validated")
             return
         self.__parent.parent.submitGUIOptionVars(0xFF)
 
@@ -1355,11 +1372,7 @@ class AddTargetDialog(QWizard):
         Internal function to submit newly added target frequency 
         '''
         if not self.validate():
-            dialog = QMessageBox()
-            dialog.setIcon(QMessageBox.Critical)
-            dialog.setText("You have entered an invalid target frequency. Please try again.")
-            dialog.addButton(QMessageBox.Ok)
-            dialog.exec()
+            WarningMessager.showWarning("Invalid frequency", "You have entered an invalid target frequency. Please try again.")
             return
         self.name = self.page.targNameEntry.text()
         self.freq = int(self.page.targFreqEntry.text())
@@ -1458,6 +1471,7 @@ class ConnectionDialog(QWizard):
             self.model = rctCore.MAVModel(self.comms)
             self.model.start()
         except:
+            WarningMessager.showWarning("Unexpected Error", "Imputted connection settings were not submitted")
             return
 
 class ConnectionDialogPage(QWizardPage):
@@ -1615,6 +1629,7 @@ class MapControl(CollapseFrame):
             lon2 = config['LastCoords']['lon2']
             return lat1, lon1, lat2, lon2
         except KeyError:
+            WarningMessager.showWarning(config_path, "Could not read config path")
             return None, None, None, None
             
         
@@ -1655,6 +1670,7 @@ class MapControl(CollapseFrame):
             temp = WebMap(self.__holder, p1lat, p1lon, 
                     p2lat, p2lon, False)
         except RuntimeError:
+            WarningMessager.showWarning("Unexpected Error", "Failed to load web map")
             return
         self.__mapFrame.setParent(None)
         self.__mapFrame = temp
@@ -2100,7 +2116,6 @@ class MapWidget(QWidget):
         height = 4.0
         if (minAmp != maxAmp):
             height = 3.0 * (amp - minAmp)/(maxAmp - minAmp) + 1
-        print("Height: "+str(height))
         return height
 
     def plotPing(self, coord, power):
@@ -2274,12 +2289,7 @@ class MapOptions(QWidget):
         '''
         if self.isWebMap:
             if (self.mapWidget.toolRect.rectangle() == None):
-                msg = QMessageBox()
-                msg.setText("No specified area to cache!")
-                msg.setWindowTitle("Alert")
-                msg.setInformativeText("Use the rect tool to choose an area on the map to cache")
-                msg.setIcon(QMessageBox.Critical)
-                msg.exec_()
+                WarningMessager.showWarning("No specified area to cache!", "Use the rect tool to choose an area on the map to cache")
                 self.mapWidget.rect()
             else:
                 cacheThread = Thread(target=self.mapWidget.cacheMap)
@@ -2954,11 +2964,7 @@ def configSetup():
                 config.write(configFile)
                 return prefix_path
         else:
-            msg = QMessageBox()
-            msg.setText("Wrong file. Choose qgis file")
-            msg.setWindowTitle("Alert")
-            msg.setIcon(QMessageBox.Critical)
-            msg.exec_()
+            WarningMessager.showWarning("Wrong file. Choose qgis file")
             configSetup()
     else:
         config = configparser.ConfigParser()
