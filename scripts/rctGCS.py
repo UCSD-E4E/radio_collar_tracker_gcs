@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 01/26/22  ML  Pruned experimental code/displays, removed all panda UI overlap
 # 02/18/21  ML  Refactored layer functions in map classes
 # 02/11/21  ML  pruned imports
 # 02/11/21  ML  Added heatmap display for live precision visualization
@@ -84,7 +85,6 @@ import json
 from threading import Thread
 from appdirs import AppDirs
 import queue as q
-from qgis.core import QgsProject
 import numpy as np
 import csv
 from PyQt5.Qt import QSvgWidget
@@ -93,8 +93,6 @@ class GCS(QMainWindow):
     '''
     Ground Control Station GUI
     '''
-
-    #TODO Make generic warning class
 
     SBWidth = 500
 
@@ -115,7 +113,6 @@ class GCS(QMainWindow):
         self._mavModel = None
         self._buttons = []
         self._systemConnectionTab = None
-        self.btn_startRecord = None
         self.systemSettingWidget = None
         self.__missionStatusText = "Start Recording"
         self.innerFreqFrame = None
@@ -152,29 +149,13 @@ class GCS(QMainWindow):
         self._mavModel.registerCallback(
             rctCore.Events.NewEstimate, self.__handleNewEstimate)
 
-    def mainloop(self, n=0):
-        '''
-        Main Application Loop
-        :param n:
-        :type n:
-        '''
+
 
     def __heartbeatCallback(self):
         '''
         Internal Heartbeat callback
         '''
 
-    def __startCommand(self):
-        '''
-        Internal callback to send the start command
-        '''
-        self._mavModel.startMission()
-
-    def __stopCommand(self):
-        '''
-        Internal callback to send the stop command
-        '''
-        self._mavModel.stopMission()
 
     def __noHeartbeat(self):
         '''
@@ -203,12 +184,9 @@ class GCS(QMainWindow):
             
             if self.mapDisplay is not None:
                 self.mapDisplay.plotEstimate(coord, frequency)
-                #self.queue.put( (self.mapDisplay.plotPrecision, coord, frequency, numPings) )
-                #self.sig.emit()
-                #self.mapDisplay.plotPrecision(coord, frequency, numPings)
+                self.queue.put( (self.mapDisplay.plotPrecision, coord, frequency, numPings) )
+                self.sig.emit()
                 
-            if self.mapOptions is not None:
-                self.mapOptions.estDistance(coord, stale, res)
 
 
     def __handleNewPing(self):
@@ -266,7 +244,6 @@ class GCS(QMainWindow):
         else:
             self.__missionStatusText = 'Start Recording'
             self._mavModel.stopMission(timeout=self.defaultTimeout)
-        self.btn_startRecord.setText(self.__missionStatusText)
 
     def __updateStatus(self):
         '''
@@ -503,7 +480,6 @@ class GCS(QMainWindow):
         btn_connect = QPushButton("Connect")
         btn_connect.resize(self.SBWidth, 100)
         btn_connect.clicked.connect(lambda:self.__handleConnectInput())
-
         lay_sys.addWidget(btn_connect)
         self._systemConnectionTab.setContentLayout(lay_sys)
 
@@ -531,28 +507,20 @@ class GCS(QMainWindow):
 
 
         # START PAYLOAD RECORDING
-        self.btn_startRecord = QPushButton(self.__missionStatusText)
+        btn_startRecord = QPushButton(self.__missionStatusText)
         #                            textvariable=self.__missionStatusText, 
-        self.btn_startRecord.clicked.connect(lambda:self.__startStopMission())
+        btn_startRecord.clicked.connect(lambda:self.__startStopMission())
         
         btn_exportAll = QPushButton('Export Info')
         btn_exportAll.clicked.connect(lambda:self.exportAll())
-        
-        btn_precision = QPushButton('Do Precision')
-        btn_precision.clicked.connect(lambda:self._mavModel.EST_mgr.doPrecisions(173500000))
-        
-        btn_heatMap = QPushButton('Display Heatmap')
-        btn_heatMap.clicked.connect(lambda:self.mapDisplay.setupHeatMap())
 
         wlay.addWidget(self._systemConnectionTab)
         wlay.addWidget(self.statusWidget)
         wlay.addWidget(self.mapControl)
         wlay.addWidget(self.systemSettingsWidget)
         wlay.addWidget(self.upgradeDisplay)
-        wlay.addWidget(self.btn_startRecord)
+        wlay.addWidget(btn_startRecord)
         wlay.addWidget(btn_exportAll)
-        wlay.addWidget(btn_precision)
-        wlay.addWidget(btn_heatMap)
         
         wlay.addStretch()
         content.resize(self.SBWidth, 400)
@@ -982,7 +950,7 @@ class SystemSettingsControl(CollapseFrame):
                 freqLabel = QLabel('Target %d' % (rowIdx + 1))
                 freqVariable = freq
                 freqEntry = QLineEdit()
-                val = PyQt5.QtGui.QIntValidator(cntrFreq-sampFreq, cntrFreq+sampFreq)                            
+                val = QIntValidator(cntrFreq-sampFreq, cntrFreq+sampFreq)                            
                 freqEntry.setValidator(val)
                 freqEntry.setText(str(freqVariable))
 
@@ -1034,7 +1002,7 @@ class SystemSettingsControl(CollapseFrame):
                 freqEntry = QLineEdit()
                 cntrFreq = self.__root._mavModel.getOption('SDR_centerFreq')
                 sampFreq = self.__root._mavModel.getOption('SDR_samplingFreq')
-                val = PyQt5.QtGui.QIntValidator(cntrFreq-sampFreq, cntrFreq+sampFreq)                            
+                val = QIntValidator(cntrFreq-sampFreq, cntrFreq+sampFreq)                            
                 freqEntry.setValidator(val)
                 freqEntry.setText(freqVariable)
                 
@@ -1394,8 +1362,8 @@ class AddTargetDialogPage(QWizardPage):
         '''
         Internal function to create widgets
         '''
-        rx  = PyQt5.QtCore.QRegExp("[0-9]{30}")                           
-        val = PyQt5.QtGui.QRegExpValidator(rx)                            
+        rx  = QRegExp("[0-9]{30}")                           
+        val = QRegExpValidator(rx)                            
         frm_targetSettings = QGridLayout()
 
         lbl_targetName = QLabel('Target Name:')
@@ -1448,17 +1416,13 @@ class ConnectionDialog(QWizard):
         Internal Function to submit user inputted connection settings
         '''
         try:
-            #TODO add address input
-            print(self.page.addrEntry.text())
             print(self.page.portEntry.text())
             self.port = rctTransport.RCTTCPClient(
-                addr=self.page.addrEntry.text(),
-                port=int(self.page.portEntry.text()))
+                addr='127.0.0.1', port=int(self.page.portEntry.text()))
             self.comms = rctComms.gcsComms(self.port)
             self.model = rctCore.MAVModel(self.comms)
             self.model.start()
         except:
-            #TODO ADD ERROR HANDLING/NOTIFICATION
             return
 
 class ConnectionDialogPage(QWizardPage):
@@ -1475,9 +1439,7 @@ class ConnectionDialogPage(QWizardPage):
         super(ConnectionDialogPage, self).__init__(parent)
         self.__parent = parent
         self.__portEntryVal = 9000 # default value
-        self.__addrEntryVal = "127.0.0.1" # default value
-        self.portEntry = None 
-        self.addrEntry = None
+        self.portEntry = None # default value
         self.port = None
         self.comms = None
         self.model = None
@@ -1490,7 +1452,6 @@ class ConnectionDialogPage(QWizardPage):
         '''
         Internal function to create widgets
         '''
-        #TODO Add error handling if contype is not selected
         frm_holder = QHBoxLayout()
         frm_holder.addStretch(1)
         frm_conType = QVBoxLayout()
@@ -1508,15 +1469,9 @@ class ConnectionDialogPage(QWizardPage):
         lbl_port = QLabel('Port')
         frm_port.addWidget(lbl_port)
 
-        lbl_addr = QLabel('IP Address:')
-        frm_conType.addWidget(lbl_addr)
-
-        self.portEntry = QLineEdit() #textvariable=self.__portEntry)
+        self.portEntry = QLineEdit()
         self.portEntry.setText(str(self.__portEntryVal))
-        self.addrEntry = QLineEdit()
-        self.addrEntry.setText(self.__addrEntryVal)
         frm_port.addWidget(self.portEntry)
-        frm_port.addWidget(self.addrEntry)
 
 
 
@@ -1908,6 +1863,7 @@ class MapWidget(QWidget):
         self.pingMin = 800
         self.pingMax = 0
         self.indPing = 0
+        self.indPing = 0
         self.ind = 0
         self.indEst = 0
         self.toolbar = QToolBar()
@@ -1966,7 +1922,7 @@ class MapWidget(QWidget):
     def plotPrecision(self, coord, freq, numPings):
         data_dir = 'holder'
         outputFileName = '/%s/PRECISION_%03.3f_%d_heatmap.tiff' % (data_dir, freq / 1e7, numPings)
-        fileName = QDir().currentPath() + outputFileName
+        fileName = PyQt5.QtCore.QDir().currentPath() + outputFileName
         print(fileName)
         print(outputFileName)
 
@@ -2114,6 +2070,7 @@ class MapWidget(QWidget):
             vpr.addFeatures([f])
             self.vehicle.updateExtents()
             self.ind = self.ind + 1
+
 
     def plotPing(self, coord, power):
         '''
@@ -2336,10 +2293,12 @@ class MapOptions(QWidget):
         self.mapWidget = None
         self.btn_cacheMap = None
         self.isWebMap = False
+        self.lbl_dist = None
         self.__createWidgets()
         self.created = False
         self.writer = None
         self.hasPoint = False
+        self.mapLegend = None
         
 
 
@@ -2385,8 +2344,6 @@ class MapOptions(QWidget):
         
         lay_mapOptions.addWidget(exportTab)    
         
-        
-        
 
         self.setLayout(lay_mapOptions)
 
@@ -2428,7 +2385,8 @@ class MapOptions(QWidget):
         '''
         self.isWebMap = isWebMap
         self.mapWidget = mapWidg
-        self.addLegend()
+        if self.mapLegend is None:
+            self.addLegend()
         
         self.btn_cacheMap.setEnabled(isWebMap)
         self.btn_clearMap.setEnabled(isWebMap)
@@ -2437,74 +2395,8 @@ class MapOptions(QWidget):
         '''
         Function to add Map Legend widget when map is loaded
         '''
-        mapLegend = MapLegend()
-        self.layout().addWidget(mapLegend)
-
-    def estDistance(self, coord, stale, res):
-
-        lat1 = coord[0]
-        lon1 = coord[1]
-        lat2 = 32.885889
-        lon2 = -117.234028
-        
-        if not self.hasPoint:
-            point = self.mapWidget.transformToWeb.transform(QgsPointXY(lon2, lat2))
-            vpr = self.mapWidget.groundTruth.dataProvider()
-            pnt = QgsGeometry.fromPointXY(point)
-            f = QgsFeature()
-            f.setGeometry(pnt)
-            vpr.addFeatures([f])
-            self.mapWidget.groundTruth.updateExtents()
-            self.hasPoint = True
-
-        
-        dist = self.distance(lat1, lat2, lon1, lon2)
-        
-        if not self.created:
-            with open('results.csv', 'w', newline='') as csvfile:
-                fieldnames = ['Distance', 'res.x', 'residuals']
-                self.writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                self.writer.writeheader()
-                self.created = True
-                self.writer.writerow({'Distance': str(dist), 'res.x': str(res.x), 'residuals': str(res.fun)})
-        else:
-            with open('results.csv', 'a+', newline='') as csvfile:
-                fieldnames = ['Distance', 'res.x', 'residuals']
-                self.writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                self.writer.writerow({'Distance': str(dist), 'res.x': str(res.x), 'residuals': str(res.fun)})
-                
-       
-        
-        d = '%.3f'%(dist)
-
-        self.lbl_dist.setText(d + '(m.)')
-        
-    def distance(self, lat1, lat2, lon1, lon2): 
-        '''
-        Helper function to calculate distance. For testing only
-        Args:
-            lat1: float value indicating the lat value of a point
-            lat2: float value indicating the lat value of a second point
-            lon1: float value indicating the long value of a point
-            lon2: float value indicating the long value of a second point
-        '''
-        lon1 = math.radians(lon1) 
-        lon2 = math.radians(lon2) 
-        lat1 = math.radians(lat1) 
-        lat2 = math.radians(lat2) 
-           
-        # Haversine formula  
-        dlon = lon2 - lon1  
-        dlat = lat2 - lat1 
-        a = math.sin(dlat / 2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2
-      
-        c = 2 * math.asin(math.sqrt(a))  
-         
-        # Radius of earth in kilometers. Use 3956 for miles 
-        r = 6371
-           
-        return(c * r * 1000)
-
+        self.mapLegend = MapLegend()
+        self.layout().addWidget(self.mapLegend)
         
     
     def exportPing(self):
@@ -2695,8 +2587,6 @@ class WebMap(MapWidget):
         return layer
 
    
-
-
     def setupPingLayer(self):
         '''
         Sets up the ping layer and renderer.
@@ -2769,7 +2659,7 @@ class WebMap(MapWidget):
         return layer, pingRenderer
     
     def setupPrecisionLayer(self):
-        path = QDir().currentPath()
+        path = PyQt5.QtCore.QDir().currentPath()
         uri = 'file:///' + path + '/holder/query.csv?encoding=%s&delimiter=%s&xField=%s&yField=%s&crs=%s&value=%s' % ("UTF-8",",", "easting", "northing","epsg:32611", "value")
         
         csv_layer= QgsVectorLayer(uri, "query", "delimitedtext")
@@ -2899,7 +2789,7 @@ class WebMap(MapWidget):
             print("Rectangle:", r.xMinimum(),
                     r.yMinimum(), r.xMaximum(), r.yMaximum()
                  )
-            '''
+            
             if (r != None):
                 zoomStart = 17
                 tilecount = 0
@@ -2921,7 +2811,7 @@ class WebMap(MapWidget):
                 print("Download Complete")
             else:
                 print("Download Failed")
-            '''
+            
             
     def downloadTile(self, xtile, ytile, zoom):
         '''
@@ -2950,8 +2840,6 @@ class WebMap(MapWidget):
         else: 
             print("skipped %r" % url)
             return False
-
-        return True
 
 
 class StaticMap(MapWidget):
