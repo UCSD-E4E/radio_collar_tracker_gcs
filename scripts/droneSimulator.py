@@ -56,6 +56,7 @@ import json
 from rctComms import mavComms, rctBinaryPacket
 import rctComms
 import time
+import math
 
 def getIPs():
     '''
@@ -465,7 +466,7 @@ class droneSim:
         self.stop()
         self.start()
 
-    def gotPing(self, dronePing: rctPing):
+    def gotPing(self, dronePing: rctPing, hdg:float):
         '''
         Helper function to send a ping packet.  This must be called while the
         port is open.
@@ -475,8 +476,8 @@ class droneSim:
             raise RuntimeError
         print("Ping on %d at %3.7f, %3.7f, %3.0f m, measuring %3.3f" %
               (dronePing.freq, dronePing.lat, dronePing.lon, dronePing.alt, dronePing.amplitude))
-        #packet = dronePing.toPacket()
-        conepacket = rctComms.rctConePacket(dronePing.lat, dronePing.lon, dronePing.alt, dronePing.amplitude, 30)
+        
+        conepacket = rctComms.rctConePacket(dronePing.lat, dronePing.lon, dronePing.alt, dronePing.amplitude, hdg)
         self.port.sendCone(conepacket)
 
     def setSystemState(self, system: str, state):
@@ -740,12 +741,15 @@ class droneSim:
                         self.SS_vehiclePosition[0], self.SS_vehiclePosition[1], self.SM_utmZoneNum, self.SM_utmZone)
                     newPing = rctPing(
                         lat, lon, pingMeasurement[0], pingMeasurement[1], self.SS_vehiclePosition[2], curTime.timestamp())
+                    
+                    hdg = self.get_bearing(self.SS_vehiclePosition[0], self.SS_vehiclePosition[1], self.SS_vehicleTarget[0], self.SS_vehicleTarget[1])
+                    print(hdg)
                     '''
                     if self.SS_payloadRunning:
                         self.gotPing(newPing)
                     '''
                     if newPing is not None:
-                        self.gotPing(newPing)
+                        self.gotPing(newPing, hdg)
                 prevPingTime = curTime
 
             ###################
@@ -755,6 +759,15 @@ class droneSim:
                 self.transmitPosition()
                 prevPosTime = curTime
             prevTime = curTime
+
+    def get_bearing(self, lat1, long1, lat2, long2):
+        dLon = (long2 - long1)
+        x = math.cos(math.radians(lat2)) * math.sin(math.radians(dLon))
+        y = math.cos(math.radians(lat1)) * math.sin(math.radians(lat2)) - math.sin(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.cos(math.radians(dLon))
+        brng = np.arctan2(x,y)
+        brng = np.degrees(brng)
+
+        return brng
 
     def calculatePingMeasurement(self):
         '''
