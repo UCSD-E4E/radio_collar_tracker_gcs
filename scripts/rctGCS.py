@@ -62,6 +62,8 @@
 #
 ###############################################################################
 import datetime as dt
+from optparse import TitledHelpFormatter
+from warnings import WarningMessage
 import utm
 import math
 import time
@@ -88,6 +90,26 @@ from qgis.core import QgsProject
 import numpy as np
 import csv
 from PyQt5.Qt import QSvgWidget
+
+class WarningMessager:
+    
+    def showWarning(text: str, title="Warning"):
+        '''
+        Creates warning popups
+        Args: 
+            title: message header
+            text: message body
+        '''
+        msg = QMessageBox()
+        msg.setText(title)
+        msg.setWindowTitle("Alert")
+        msg.setInformativeText(text)
+        msg.setIcon(QMessageBox.Critical)
+        msg.addButton(QMessageBox.Ok)
+        msg.exec_()
+
+    
+
 
 class GCS(QMainWindow):
     '''
@@ -179,11 +201,7 @@ class GCS(QMainWindow):
         '''
         for button in self._buttons:
             button.config(state='disabled')
-        dialog = QMessageBox()
-        dialog.setIcon(QMessageBox.Critical)
-        dialog.setText("No Heartbeats Received")
-        dialog.addButton(QMessageBox.Ok)
-        dialog.exec()
+        WarningMessager.showWarning("No Heartbeats Received")
         
     def __handleNewEstimate(self):
         '''
@@ -203,9 +221,7 @@ class GCS(QMainWindow):
                 #self.queue.put( (self.mapDisplay.plotPrecision, coord, frequency, numPings) )
                 #self.sig.emit()
                 #self.mapDisplay.plotPrecision(coord, frequency, numPings)
-                
-            if self.mapOptions is not None:
-                self.mapOptions.estDistance(coord, stale, res)
+
 
 
     def __handleNewPing(self):
@@ -256,12 +272,8 @@ class GCS(QMainWindow):
         '''
         Internal callback for an exception message
         '''
-        dialog = QMessageBox()
-        dialog.setIcon(QMessageBox.Critical)
-        dialog.setText('An exception has occured!\n%s\n%s' % (
+        WarningMessager.showWarning('An exception has occured!\n%s\n%s' % (
             self._mavModel.lastException[0], self._mavModel.lastException[1]))
-        dialog.addButton(QMessageBox.Ok)
-        dialog.exec()
 
     def __startStopMission(self):
         # State machine for start recording -> stop recording
@@ -910,6 +922,7 @@ class ComponentStatusDisplay(CollapseFrame):
                 style = "background-color: %s" % configOpts['bg']
                 self.statusLabels[varName].setStyleSheet(style)
             except KeyError:
+                WarningMessager.showWarning("Unexpected Error", "Failed to update GUI option vars")
                 continue
 
 class SystemSettingsControl(CollapseFrame):
@@ -1120,13 +1133,7 @@ class SystemSettingsControl(CollapseFrame):
         targetFrequencies = []
         for targetName in self.targEntries:
             if not self.validateFrequency(self.targEntries[targetName][0]):
-                dialog = QMessageBox()
-                dialog.setIcon(QMessageBox.Critical)
-                dialog.setText("Target frequency " + 
-                        str(self.targEntries[targetName][0]) + 
-                        " is invalid. Please enter another value.")
-                dialog.addButton(QMessageBox.Ok)
-                dialog.exec()
+                WarningMessager.showWarning("Target frequency " + str(self.targEntries[targetName][0]) + " is invalid. Please enter another value.")
                 return
             targetFreq = self.targEntries[targetName][0]
             targetFrequencies.append(targetFreq)
@@ -1157,6 +1164,7 @@ class SystemSettingsControl(CollapseFrame):
             try:
                 self.optionVars[optionName].setText(str(optionValue))
             except AttributeError:
+                WarningMessager.showWarning("Unexpected Error", "Failed to update GUI option vars")
                 print(optionName)
         self.update()
 
@@ -1317,6 +1325,7 @@ class ExpertSettingsDialogPage(QWizardPage):
         Inner function to submit enterred information
         '''
         if not self.validateParameters():
+            WarningMessager.showWarning("Entered information could not be validated")
             return
         self.__parent.parent.submitGUIOptionVars(0xFF)
 
@@ -1359,11 +1368,7 @@ class AddTargetDialog(QWizard):
         Internal function to submit newly added target frequency 
         '''
         if not self.validate():
-            dialog = QMessageBox()
-            dialog.setIcon(QMessageBox.Critical)
-            dialog.setText("You have entered an invalid target frequency. Please try again.")
-            dialog.addButton(QMessageBox.Ok)
-            dialog.exec()
+            WarningMessager.showWarning("Invalid frequency", "You have entered an invalid target frequency. Please try again.")
             return
         self.name = self.page.targNameEntry.text()
         self.freq = int(self.page.targFreqEntry.text())
@@ -1462,6 +1467,7 @@ class ConnectionDialog(QWizard):
             self.model = rctCore.MAVModel(self.comms)
             self.model.start()
         except:
+            WarningMessager.showWarning("Unexpected Error", "Imputted connection settings were not submitted")
             return
 
 class ConnectionDialogPage(QWizardPage):
@@ -1617,6 +1623,7 @@ class MapControl(CollapseFrame):
             lon2 = self.__root.config['LastCoords']['lon2']
             return lat1, lon1, lat2, lon2
         except KeyError:
+            WarningMessager.showWarning(config_path, "Could not read config path")
             return None, None, None, None
             
         
@@ -1657,6 +1664,7 @@ class MapControl(CollapseFrame):
             temp = WebMap(self.__holder, p1lat, p1lon, 
                     p2lat, p2lon, False)
         except RuntimeError:
+            WarningMessager.showWarning("Unexpected Error", "Failed to load web map")
             return
         self.__mapFrame.setParent(None)
         self.__mapFrame = temp
@@ -1967,7 +1975,7 @@ class MapWidget(QWidget):
     def plotPrecision(self, coord, freq, numPings):
         data_dir = 'holder'
         outputFileName = '/%s/PRECISION_%03.3f_%d_heatmap.tiff' % (data_dir, freq / 1e7, numPings)
-        fileName = QDir().currentPath() + outputFileName
+        fileName = PyQt5.QtCore.QDir().currentPath() + outputFileName
         print(fileName)
         print(outputFileName)
 
@@ -2119,14 +2127,14 @@ class MapWidget(QWidget):
     def plotCone(self, coord):
         lat = coord[0]
         lon = coord[1]
-        heading = coord[3]
-        power = coord[4]
+        heading = coord[4]
+        #power = coord[3]
         #dummy power values to test calcColor
-        #pArr =  [2.4, 4, 5, 2.1, 3, 8, 5.9, 2, 1, 3, 5, 4]        
-        #aind = self.indCone % 12
-        #power = pArr[aind]
+        pArr =  [2.4, 4, 5, 2.1, 3, 8, 5.9, 2, 1, 3, 5, 4]        
+        aind = self.indCone % 12
+        power = pArr[aind]
 
-        point = self.transformToWeb.transform(QgsPointXY(lon, lat))
+        point = self.transformToMap.transform(QgsPointXY(lon, lat))
         if self.coneMin > power:
             self.coneMin = power
         if self.coneMax < power:
@@ -2201,7 +2209,6 @@ class MapWidget(QWidget):
         height = 4.0
         if (minAmp != maxAmp):
             height = 3.0 * (amp - minAmp)/(maxAmp - minAmp) + 1
-        print("Height: "+str(height))
         return height
 
     def plotPing(self, coord, power):
@@ -2494,12 +2501,7 @@ class MapOptions(QWidget):
         '''
         if self.isWebMap:
             if (self.mapWidget.toolRect.rectangle() == None):
-                msg = QMessageBox()
-                msg.setText("No specified area to cache!")
-                msg.setWindowTitle("Alert")
-                msg.setInformativeText("Use the rect tool to choose an area on the map to cache")
-                msg.setIcon(QMessageBox.Critical)
-                msg.exec_()
+                WarningMessager.showWarning("No specified area to cache!", "Use the rect tool to choose an area on the map to cache")
                 self.mapWidget.rect()
             else:
                 cacheThread = Thread(target=self.mapWidget.cacheMap)
@@ -2538,7 +2540,7 @@ class MapOptions(QWidget):
         lon2 = -117.234028
         
         if not self.hasPoint:
-            point = self.mapWidget.transformToWeb.transform(QgsPointXY(lon2, lat2))
+            point = self.mapWidget.transformToMap.transform(QgsPointXY(lon2, lat2))
             vpr = self.mapWidget.groundTruth.dataProvider()
             pnt = QgsGeometry.fromPointXY(point)
             f = QgsFeature()
@@ -2790,11 +2792,11 @@ class WebMap(MapWidget):
     def setupConeLayer(self):
         uri = "Point?crs=epsg:3857"
         coneLayer = QgsVectorLayer(uri, 'Cone', "memory")
-        path = QDir().filePath('../resources/searchingTriangle.svg')
+        path = PyQt5.QtCore.QDir().filePath('../resources/searchingTriangle.svg')
         symbolSVG = QgsSvgMarkerSymbolLayer(path)
         symbolSVG.setSize(4)
-        symbolSVG.setFillColor(QColor('#ff0000'))
-        symbolSVG.setStrokeColor(QColor('#ff0000'))
+        symbolSVG.setFillColor(PyQt5.QtGui.QColor('#ff0000'))
+        symbolSVG.setStrokeColor(PyQt5.QtGui.QColor('#ff0000'))
         #symbolSVG.setStrokeWidth(1)
         symbolSVG.setDataDefinedProperty(QgsSymbolLayer.PropertyFillColor, QgsProperty.fromField("Color"))
         symbolSVG.setDataDefinedProperty(QgsSymbolLayer.PropertyHeight, QgsProperty.fromField("Height"))
@@ -2804,15 +2806,16 @@ class WebMap(MapWidget):
         #coneLayer.renderer().symbol().setDataDefinedProperty(QgsProperty().fromField("Opacity"))
 
         cpr = coneLayer.dataProvider()
-        cpr.addAttributes([QgsField(name='Heading', type=QVariant.Double, len=30),
-                            QgsField(name="Amp", type=QVariant.Double, len=30),
-                            QgsField(name='Color', type=QVariant.String, len=30),
-                            QgsField(name="Height", type=QVariant.Double, len=30),
-                            QgsField(name="VAnchor", type=QVariant.String, len=30)])
+        cpr.addAttributes([QgsField(name='Heading', type=PyQt5.QtCore.QVariant.Double, len=30),
+                            QgsField(name="Amp", type=PyQt5.QtCore.QVariant.Double, len=30),
+                            QgsField(name='Color', type=PyQt5.QtCore.QVariant.String, len=30),
+                            QgsField(name="Height", type=PyQt5.QtCore.QVariant.Double, len=30),
+                            QgsField(name="VAnchor", type=PyQt5.QtCore.QVariant.String, len=30)])
         coneLayer.updateFields()
         coneLayer.setAutoRefreshInterval(500)
         coneLayer.setAutoRefreshEnabled(True)
         return coneLayer
+
     def setupPingLayer(self):
         '''
         Sets up the ping layer and renderer.
@@ -2885,7 +2888,7 @@ class WebMap(MapWidget):
         return layer, pingRenderer
     
     def setupPrecisionLayer(self):
-        path = QDir().currentPath()
+        path = PyQt5.QtCore.QDir().currentPath()
         uri = 'file:///' + path + '/holder/query.csv?encoding=%s&delimiter=%s&xField=%s&yField=%s&crs=%s&value=%s' % ("UTF-8",",", "easting", "northing","epsg:32611", "value")
         
         csv_layer= QgsVectorLayer(uri, "query", "delimitedtext")
@@ -2927,7 +2930,8 @@ class WebMap(MapWidget):
         if self.groundTruth is None:
             self.groundTruth = self.setupGroundTruth()
             
-        
+        if self.cones is None:
+            self.cones = self.setupConeLayer()
         
         if self.polygonLayer is None:
             self.polygonLayer = self.setUpPolygonLayer()
@@ -2960,6 +2964,7 @@ class WebMap(MapWidget):
             QgsProject.instance().addMapLayer(self.vehicle)
             QgsProject.instance().addMapLayer(self.vehiclePath)
             QgsProject.instance().addMapLayer(self.pingLayer)
+            QgsProject.instance().addMapLayer(self.cones)
             #QgsProject.instance().addMapLayer(self.precision)
             print('valid mapLayer')
         else:
@@ -3257,19 +3262,18 @@ def configSetup():
     '''
     config_path = 'gcsConfig.ini'
     if(not os.path.isfile(config_path)):
-        prefix_path = QFileDialog.getExistingDirectory(None, 'Select the Qgis directory')          
-        config = configparser.ConfigParser()
-        config['FilePaths'] = {}
-        config['FilePaths']['PrefixPath'] = prefix_path
-        if ("qgis" not in prefix_path):
-            msg = QMessageBox()
-            msg.setText("Warning, incorrect file chosen. Map tools may not function as expected")
-            msg.setWindowTitle("Alert")
-            msg.setIcon(QMessageBox.Critical)
-            msg.exec_()
-        with open(config_path, 'w') as configFile:
-            config.write(configFile)
-            return config, prefix_path
+        prefix_path = QFileDialog.getExistingDirectory(None, 
+                'Select the Qgis directory')
+        if ("qgis" in prefix_path):            
+            config = configparser.ConfigParser()
+            config['FilePaths'] = {}
+            config['FilePaths']['PrefixPath'] = prefix_path
+            with open(config_path, 'w') as configFile:
+                config.write(configFile)
+                return prefix_path
+        else:
+            WarningMessager.showWarning("Wrong file. Choose qgis file")
+            configSetup()
     else:
         config = configparser.ConfigParser()
         config.read(config_path)
