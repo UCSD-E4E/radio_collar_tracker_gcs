@@ -89,7 +89,7 @@ import random #REMOVE
 
 class WarningMessager:
     
-    def showWarning(title, text):
+    def showWarning(text: str, title: str ="Warning"):
         '''
         Creates warning popups
         Args: 
@@ -103,15 +103,6 @@ class WarningMessager:
         msg.setIcon(QMessageBox.Critical)
         msg.addButton(QMessageBox.Ok)
         msg.exec_()
-
-    def showWarning(text):
-        msg = QMessageBox()
-        msg.setText(text)
-        msg.setWindowTitle("Alert")
-        msg.setIcon(QMessageBox.Critical)
-        msg.addButton(QMessageBox.Ok)
-        msg.exec_()
-
 
 class GCS(QMainWindow):
     '''
@@ -926,7 +917,7 @@ class ComponentStatusDisplay(CollapseFrame):
                 style = "background-color: %s" % configOpts['bg']
                 self.statusLabels[varName].setStyleSheet(style)
             except KeyError:
-                WarningMessager.showWarning("Unexpected Error", "Failed to update GUI option vars")
+                WarningMessager.showWarning("Failed to update GUI option vars", "Unexpected Error")
                 continue
 
 class SystemSettingsControl(CollapseFrame):
@@ -1168,7 +1159,7 @@ class SystemSettingsControl(CollapseFrame):
             try:
                 self.optionVars[optionName].setText(str(optionValue))
             except AttributeError:
-                WarningMessager.showWarning("Unexpected Error", "Failed to update GUI option vars")
+                WarningMessager.showWarning("Failed to update GUI option vars", "Unexpected Error")
                 print(optionName)
         self.update()
 
@@ -1372,7 +1363,7 @@ class AddTargetDialog(QWizard):
         Internal function to submit newly added target frequency 
         '''
         if not self.validate():
-            WarningMessager.showWarning("Invalid frequency", "You have entered an invalid target frequency. Please try again.")
+            WarningMessager.showWarning("You have entered an invalid target frequency. Please try again.", "Invalid frequency")
             return
         self.name = self.page.targNameEntry.text()
         self.freq = int(self.page.targFreqEntry.text())
@@ -1471,7 +1462,7 @@ class ConnectionDialog(QWizard):
             self.model = rctCore.MAVModel(self.comms)
             self.model.start()
         except:
-            WarningMessager.showWarning("Unexpected Error", "Imputted connection settings were not submitted")
+            WarningMessager.showWarning("Imputted connection settings were not submitted")
             return
 
 class ConnectionDialogPage(QWizardPage):
@@ -1629,7 +1620,7 @@ class MapControl(CollapseFrame):
             lon2 = config['LastCoords']['lon2']
             return lat1, lon1, lat2, lon2
         except KeyError:
-            WarningMessager.showWarning(config_path, "Could not read config path")
+            WarningMessager.showWarning("Could not read config path", config_path)
             return None, None, None, None
             
         
@@ -1670,7 +1661,7 @@ class MapControl(CollapseFrame):
             temp = WebMap(self.__holder, p1lat, p1lon, 
                     p2lat, p2lon, False)
         except RuntimeError:
-            WarningMessager.showWarning("Unexpected Error", "Failed to load web map")
+            WarningMessager.showWarning("Failed to load web map")
             return
         self.__mapFrame.setParent(None)
         self.__mapFrame = temp
@@ -2289,7 +2280,7 @@ class MapOptions(QWidget):
         '''
         if self.isWebMap:
             if (self.mapWidget.toolRect.rectangle() == None):
-                WarningMessager.showWarning("No specified area to cache!", "Use the rect tool to choose an area on the map to cache")
+                WarningMessager.showWarning("Use the rect tool to choose an area on the map to cache", "No specified area to cache!")
                 self.mapWidget.rect()
             else:
                 cacheThread = Thread(target=self.mapWidget.cacheMap)
