@@ -114,7 +114,7 @@ class GCS(QMainWindow):
         self._buttons = []
         self._systemConnectionTab = None
         self.systemSettingWidget = None
-        self.__missionStatusText = "Start Recording"
+        self.__missionStatusBtn = None
         self.innerFreqFrame = None
         self.freqElements = []
         self.targEntries = {}
@@ -238,11 +238,12 @@ class GCS(QMainWindow):
         if self._mavModel == None:
             return
 
-        if self.__missionStatusText == 'Start Recording':
-            self.__missionStatusText ='Stop Recording'
+        if self.__missionStatusBtn.text() == 'Start Recording':
+            self.__missionStatusBtn.setText('Stop Recording')
+            
             self._mavModel.startMission(timeout=self.defaultTimeout)
         else:
-            self.__missionStatusText = 'Start Recording'
+            self.__missionStatusBtn.setText('Start Recording')
             self._mavModel.stopMission(timeout=self.defaultTimeout)
 
     def __updateStatus(self):
@@ -507,9 +508,9 @@ class GCS(QMainWindow):
 
 
         # START PAYLOAD RECORDING
-        btn_startRecord = QPushButton(self.__missionStatusText)
+        self.__missionStatusBtn = QPushButton("Start Recording")
         #                            textvariable=self.__missionStatusText, 
-        btn_startRecord.clicked.connect(lambda:self.__startStopMission())
+        self.__missionStatusBtn.clicked.connect(lambda:self.__startStopMission())
         
         btn_exportAll = QPushButton('Export Info')
         btn_exportAll.clicked.connect(lambda:self.exportAll())
@@ -519,7 +520,7 @@ class GCS(QMainWindow):
         wlay.addWidget(self.mapControl)
         wlay.addWidget(self.systemSettingsWidget)
         wlay.addWidget(self.upgradeDisplay)
-        wlay.addWidget(btn_startRecord)
+        wlay.addWidget(self.__missionStatusBtn)
         wlay.addWidget(btn_exportAll)
         
         wlay.addStretch()
@@ -835,7 +836,7 @@ class ComponentStatusDisplay(CollapseFrame):
         lbl_sys_status = QLabel('System Status')
         self.innerFrame.addWidget(lbl_sys_status, 4, 0)
 
-        lbl_sw_status = QLabel('Software Status')
+        lbl_sw_status = QLabel('Run Switch')
         self.innerFrame.addWidget(lbl_sw_status, 5, 0)
 
         entr_sdr_status = QLabel('')
@@ -950,7 +951,7 @@ class SystemSettingsControl(CollapseFrame):
                 freqLabel = QLabel('Target %d' % (rowIdx + 1))
                 freqVariable = freq
                 freqEntry = QLineEdit()
-                val = QIntValidator(cntrFreq-sampFreq, cntrFreq+sampFreq)                            
+                val = PyQt5.QtGui.QIntValidator(cntrFreq-sampFreq, cntrFreq+sampFreq)                            
                 freqEntry.setValidator(val)
                 freqEntry.setText(str(freqVariable))
 
@@ -1002,7 +1003,7 @@ class SystemSettingsControl(CollapseFrame):
                 freqEntry = QLineEdit()
                 cntrFreq = self.__root._mavModel.getOption('SDR_centerFreq')
                 sampFreq = self.__root._mavModel.getOption('SDR_samplingFreq')
-                val = QIntValidator(cntrFreq-sampFreq, cntrFreq+sampFreq)                            
+                val = PyQt5.QtGui.QIntValidator(cntrFreq-sampFreq, cntrFreq+sampFreq)                            
                 freqEntry.setValidator(val)
                 freqEntry.setText(freqVariable)
                 
@@ -1362,8 +1363,8 @@ class AddTargetDialogPage(QWizardPage):
         '''
         Internal function to create widgets
         '''
-        rx  = QRegExp("[0-9]{30}")                           
-        val = QRegExpValidator(rx)                            
+        rx  = PyQt5.QtCore.QRegExp("[0-9]{30}")                           
+        val = PyQt5.QtGui.QRegExpValidator(rx)                            
         frm_targetSettings = QGridLayout()
 
         lbl_targetName = QLabel('Target Name:')
@@ -1418,7 +1419,7 @@ class ConnectionDialog(QWizard):
         try:
             print(self.page.portEntry.text())
             self.port = rctTransport.RCTTCPClient(
-                addr='127.0.0.1', port=int(self.page.portEntry.text()))
+                addr=self.page.addrEntry.text(), port=int(self.page.portEntry.text()))
             self.comms = rctComms.gcsComms(self.port)
             self.model = rctCore.MAVModel(self.comms)
             self.model.start()
@@ -1439,7 +1440,9 @@ class ConnectionDialogPage(QWizardPage):
         super(ConnectionDialogPage, self).__init__(parent)
         self.__parent = parent
         self.__portEntryVal = 9000 # default value
+        self.__addrEntryVal = '127.0.0.1' # default value
         self.portEntry = None # default value
+        self.addrEntry = None
         self.port = None
         self.comms = None
         self.model = None
@@ -1471,7 +1474,10 @@ class ConnectionDialogPage(QWizardPage):
 
         self.portEntry = QLineEdit()
         self.portEntry.setText(str(self.__portEntryVal))
+        self.addrEntry = QLineEdit()
+        self.addrEntry.setText(self.__addrEntryVal)
         frm_port.addWidget(self.portEntry)
+        frm_port.addWidget(self.addrEntry)
 
 
 
