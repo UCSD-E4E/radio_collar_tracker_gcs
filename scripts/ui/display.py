@@ -1,14 +1,8 @@
 import utm
 import logging
 import rctCore
-from PyQt5.QtCore import *
-from PyQt5.QtWidgets import *
-from PyQt5.QtGui import *
+from PyQt5.QtWidgets import QGridLayout, QLabel, QPushButton, QVBoxLayout, QWidget, QFileDialog, QMainWindow, QScrollArea
 import queue as q
-from qgis.core import *    
-from qgis.gui import *  
-from qgis.utils import *
-from qgis.core import QgsProject
 import configparser
 import json
 from ui.popups import *

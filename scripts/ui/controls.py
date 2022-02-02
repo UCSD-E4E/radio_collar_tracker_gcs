@@ -1,10 +1,7 @@
 import time
-from PyQt5.QtCore import *
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import *
-from qgis.core import *    
-from qgis.gui import *  
-from qgis.utils import *
+from PyQt5.QtGui import QIntValidator
 from ui.popups import *
 
 class CollapseFrame(QWidget):

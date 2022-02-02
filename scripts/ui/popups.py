@@ -1,12 +1,9 @@
 import rctTransport
 import rctComms
 import rctCore
-from PyQt5.QtCore import *
+from PyQt5.QtCore import QRegExp
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import *
-from qgis.core import *    
-from qgis.gui import *  
-from qgis.utils import *
+from PyQt5.QtGui import QRegExpValidator
 
 class WarningMessager:
     
@@ -276,7 +273,7 @@ class ConnectionDialog(QWizard):
             self.model = rctCore.MAVModel(self.comms)
             self.model.start()
         except:
-            WarningMessager.showWarning("Imputted connection settings were not submitted")
+            WarningMessager.showWarning("Please specify valid connction settings")
             return
 
 class ConnectionDialogPage(QWizardPage):
