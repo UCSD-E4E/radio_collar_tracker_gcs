@@ -70,6 +70,7 @@ from qgis.gui import *
 from qgis.utils import *
 import configparser
 from ui.display import GCS
+from ui.popups import WarningMessager
 
 def configSetup():
     '''
