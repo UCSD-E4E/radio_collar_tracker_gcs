@@ -1,16 +1,5 @@
-import datetime as dt
-from optparse import TitledHelpFormatter
-from warnings import WarningMessage
 import utm
-import math
-import time
 import logging
-import sys
-import os
-import os.path
-import requests
-import rctTransport
-import rctComms
 import rctCore
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
@@ -20,12 +9,8 @@ from qgis.core import *
 from qgis.gui import *  
 from qgis.utils import *
 from qgis.core import QgsProject
-from threading import Thread
 import configparser
 import json
-import numpy as np
-import csv
-import random #REMOVE
 from ui.popups import *
 from ui.controls import *
 from ui.map import *
