@@ -1141,10 +1141,17 @@ class SystemSettingsControl(CollapseFrame):
         options = {}
         
         for keyword in acceptedKeywords:
-            try:
-                options[keyword] = int(self.optionVars[keyword].text())
-            except ValueError:
-                options[keyword] = float(self.optionVars[keyword].text())
+            print(keyword)
+            if (keyword == 'GPS_device') or (keyword == 'SYS_outputDir'):
+                options[keyword] = self.optionVars[keyword].text()
+            elif(keyword == 'SYS_autostart'):
+                options[keyword] = False
+
+            else:
+                try:
+                    options[keyword] = int(self.optionVars[keyword].text())
+                except ValueError:
+                    options[keyword] = float(self.optionVars[keyword].text())
         self.__root._mavModel.setOptions(
             timeout=self.__root.defaultTimeout, **options)
 
