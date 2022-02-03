@@ -2128,11 +2128,11 @@ class MapWidget(QWidget):
         lat = coord[0]
         lon = coord[1]
         heading = coord[4]
-        #power = coord[3]
+        power = coord[3]
         #dummy power values to test calcColor
         pArr =  [2.4, 4, 5, 2.1, 3, 8, 5.9, 2, 1, 3, 5, 4]        
         aind = self.indCone % 12
-        power = pArr[aind]
+        #power = pArr[aind]
 
         point = self.transformToMap.transform(QgsPointXY(lon, lat))
         if self.coneMin > power:
@@ -2783,6 +2783,18 @@ class WebMap(MapWidget):
         symbol = QgsMarkerSymbol.createSimple({'name':'square', 
                 'color':'cyan'})
         layer.renderer().setSymbol(symbol)
+
+        lat2 = 32.885889
+        lon2 = -117.234028
+
+        point = self.transformToMap.transform(QgsPointXY(lon2, lat2))
+        vpr = layer.dataProvider()
+        pnt = QgsGeometry.fromPointXY(point)
+        f = QgsFeature()
+        f.setGeometry(pnt)
+        vpr.addFeatures([f])
+        layer.updateExtents()
+        self.hasPoint = True
         
         return layer
 

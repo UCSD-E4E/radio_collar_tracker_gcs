@@ -86,6 +86,7 @@ class droneSim:
         RTL = 2
         LAND = 3
         END = 4
+        SPIN = 5
 
     def __init__(self, port: mavComms):
         '''
@@ -284,27 +285,7 @@ class droneSim:
                             (478145.0, 3638721.621778265, 30),
                             (478110.0, 3638731.0, 30)]
 
-        self.SM_waypoints = [(477974.06988529314, 3638776.3039655555, 30, 0),
-                             (477974.06988529314, 3638776.3039655555, 30, 90),
-                             (477974.06988529314, 3638776.3039655555, 30, 180),
-                             (477974.06988529314, 3638776.3039655555, 30, 270),
-                             (477974.06988529314, 3638776.3039655555, 30, 0),
-                             (478281.5079546513, 3638711.2010632926, 30, ),
-                             (478274.9146625505, 3638679.2543171947, 30, ),
-                             (477975.5071926904, 3638745.8378777136, 30),
-                             (477968.40893670684, 3638712.893777053, 30),
-                             (478266.818223601, 3638648.3095763493, 30),
-                             (478258.7096344019, 3638611.871386835, 30),
-                             (477961.8023651167, 3638675.453913263, 30),
-                             (477953.6915540979, 3638638.5166701586, 30),
-                             (478246.5868126497, 3638575.4419162693, 30),
-                             (478239.4937485707, 3638544.494662541, 30),
-                             (477943.58029727807, 3638604.5801627054, 30),
-                             (477968.0164183045, 3638761.8351352056, 30),
-                             (477976.95013863116, 3638774.1124560814, 30)]
-
         OG
-        '''
         self.SM_waypoints = [(477974.06988529314, 3638776.3039655555, 30),
                              (477974.06988529314, 3638776.3039655555, 30),
                              (477974.06988529314, 3638776.3039655555, 30),
@@ -323,6 +304,9 @@ class droneSim:
                              (477943.58029727807, 3638604.5801627054, 30),
                              (477968.0164183045, 3638761.8351352056, 30),
                              (477976.95013863116, 3638774.1124560814, 30)]
+        '''
+        self.SM_waypoints = [(478060, 3638631, 30),
+                             (478170, 3638631, 30)]
         self.SM_targetThreshold = 5
         self.SM_loopPeriod = 0.1
         self.SM_TakeoffVel = 5
@@ -376,6 +360,8 @@ class droneSim:
         self.SS_velocityVector = np.array([0, 0, 0])
         self.SS_vehicleTarget = np.array(self.SM_TakeoffTarget)
         self.SS_waypointIdx = 0
+        self.SS_vehicleHdg = 0
+        self.SS_hdgIndex = 0
         self.SS_payloadRunning = False
 
         # HS - Heartbeat State parameters
@@ -692,6 +678,13 @@ class droneSim:
                     wpTime = dt.datetime.now()
 
                     self.SS_waypointIdx += 1
+                    self.SS_vehicleState = droneSim.MISSION_STATE.SPIN
+
+            elif self.SS_vehicleState == droneSim.MISSION_STATE.SPIN:
+                self.SS_vehicleHdg = self.SS_hdgIndex*5
+                self.SS_hdgIndex += 1
+                if self.SS_vehicleHdg == 360:
+                    self.SS_hdgIndex = 0
                     if self.SS_waypointIdx < len(self.SM_waypoints):
                         self.SS_vehicleState = droneSim.MISSION_STATE.WAYPOINTS
                         self.SS_vehicleTarget = np.array(
@@ -734,15 +727,24 @@ class droneSim:
             # Ping Simulation #
             ###################
             if (curTime - prevPingTime).total_seconds() > self.SC_PingMeasurementPeriod:
+                lat, lon = utm.to_latlon(
+                    self.SS_vehiclePosition[0], self.SS_vehiclePosition[1], self.SM_utmZoneNum, self.SM_utmZone)
+                latT, lonT = utm.to_latlon(
+                    self.SS_vehicleTarget[0], self.SS_vehicleTarget[1], self.SM_utmZoneNum, self.SM_utmZone)
+                if self.SS_vehicleState == droneSim.MISSION_STATE.SPIN:
+                        hdg = self.SS_vehicleHdg
+                else:
+                    hdg = self.get_bearing(lat, lon, latT, lonT)
+                    self.SS_vehicleHdg = hdg
                 pingMeasurement = self.calculatePingMeasurement()
                 if pingMeasurement is not None:
                     print("in Ping Measurement")
-                    lat, lon = utm.to_latlon(
-                        self.SS_vehiclePosition[0], self.SS_vehiclePosition[1], self.SM_utmZoneNum, self.SM_utmZone)
+                    
                     newPing = rctPing(
                         lat, lon, pingMeasurement[0], pingMeasurement[1], self.SS_vehiclePosition[2], curTime.timestamp())
                     
-                    hdg = self.get_bearing(self.SS_vehiclePosition[0], self.SS_vehiclePosition[1], self.SS_vehicleTarget[0], self.SS_vehicleTarget[1])
+                    #hdg = self.get_bearing(self.SS_vehiclePosition[0], self.SS_vehiclePosition[1], self.SS_vehicleTarget[0], self.SS_vehicleTarget[1])
+    
                     print(hdg)
                     '''
                     if self.SS_payloadRunning:
@@ -768,6 +770,29 @@ class droneSim:
         brng = np.degrees(brng)
 
         return brng
+
+    def __antennaModel(self, beam_angle) -> float:
+        return np.abs(np.cos(beam_angle)) ** (2.99999)
+
+    def __computeHeadingMultiplier(self) -> float:
+        # Get my current heading
+        x = np.cos(np.deg2rad(self.SS_vehicleHdg))
+        y = np.sin(np.deg2rad(self.SS_vehicleHdg))
+        heading_vector = np.array([x, y, 0])
+
+        # Get the bearing to the transmitter
+        transmitter_vector = np.array(self.SP_Position) - np.array(self.SS_vehiclePosition)
+        transmitter_vector = transmitter_vector / np.linalg.norm(transmitter_vector)
+
+        # Compute the bearing from antenna to transmitter
+        dot = np.dot(heading_vector, transmitter_vector)
+        angle = np.arccos(dot)
+        print("Angle: ", np.rad2deg(angle))
+
+        # Plug into directivity model
+        model = self.__antennaModel(angle)
+        print("Model: ", model)
+        return model
 
     def calculatePingMeasurement(self):
         '''
@@ -800,7 +825,11 @@ class droneSim:
 
         Prx = P_tx - 10 * n * np.log10(d) - C
 
-        measurement = (Prx, f_tx)
+        measurement = [Prx, f_tx]
+
+        measurement[0] *= self.__computeHeadingMultiplier()
+
+        measurement = (measurement[0], measurement[1])
 
         # implement noise floor
         if Prx < P_n:
