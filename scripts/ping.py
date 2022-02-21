@@ -54,6 +54,7 @@ class rctPing:
         self.freq = freq
         self.alt = alt
         self.time = dt.datetime.fromtimestamp(time)
+        print("Time:", self.time)
 
 
     def toNumpy(self):
@@ -272,7 +273,7 @@ class LocationEstimator:
 
         self.result = res_x
         
-        self.doPrecision()
+        #self.doPrecision()
 
         return self.__params, self.__staleEstimate
 

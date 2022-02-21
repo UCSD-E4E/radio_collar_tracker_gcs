@@ -129,7 +129,7 @@ class OPTIONS_SCOPE:
     _keywordTypes = {
         'SDR_centerFreq': (int, '<L', 4),
         'SDR_samplingFreq': (int, '<L', 4),
-        'SDR_gain': ((int, float), '<f', 4),
+        'SDR_gain': (int, '<L', 4),
         'DSP_pingWidth': ((int, float), '<f', 4),
         'DSP_pingSNR': ((int, float), '<f', 4),
         'DSP_pingMax': ((int, float), '<f', 4),
@@ -634,6 +634,7 @@ class rctSETOPTCommand(rctBinaryPacket):
         self.options = {}
         self.scope = scope
         for keyword in acceptedKeywords:
+            print(keyword)
             assert(isinstance(kwargs[keyword],
                               OPTIONS_SCOPE._keywordTypes[keyword][0]))
             self.options[keyword] = kwargs[keyword]

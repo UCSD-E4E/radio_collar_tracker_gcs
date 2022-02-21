@@ -560,6 +560,7 @@ class droneSim:
         :param addr:
         '''
         scope = packet.scope
+        print(self.PP_options)
         packet = rctComms.rctOptionsPacket(scope, **self.PP_options)
         self.port.sendToGCS(packet)
 

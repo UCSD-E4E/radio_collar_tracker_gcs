@@ -1078,6 +1078,7 @@ class SystemSettingsControl(CollapseFrame):
         '''
         cntrFreq = int(self.optionVars['SDR_centerFreq'].text())
         sampFreq = int(self.optionVars['SDR_samplingFreq'].text())
+        gain = float(self.optionVars['SDR_gain'].text())
 
         targetFrequencies = []
         for targetName in self.targEntries:
@@ -1096,15 +1097,6 @@ class SystemSettingsControl(CollapseFrame):
         self.__root._mavModel.setFrequencies(
             targetFrequencies, self.__root.defaultTimeout)
 
-        if cntrFreq != '':
-            lastCntrFreq = self.__root._mavModel.getOption('SDR_centerFreq')
-            if int(cntrFreq) != lastCntrFreq:
-                self.clearTargets()
-        if sampFreq != '':
-            lastSampFreq = self.__root._mavModel.getOption(
-                'SDR_samplingFreq')
-            if int(sampFreq) != lastSampFreq:
-                self.clearTargets()
 
         self.submitGUIOptionVars(0x00)
 
@@ -1115,6 +1107,7 @@ class SystemSettingsControl(CollapseFrame):
             self.optionVars = options
         optionDict = self.__root._mavModel.getOptions(
             scope, timeout=self.__root.defaultTimeout)
+        print(optionDict)
         for optionName, optionValue in optionDict.items():
             try:
                 self.optionVars[optionName].setText(str(optionValue))
@@ -1146,6 +1139,11 @@ class SystemSettingsControl(CollapseFrame):
                 options[keyword] = self.optionVars[keyword].text()
             elif(keyword == 'SYS_autostart'):
                 options[keyword] = False
+            elif(keyword == 'GPS_mode'):
+                if self.optionVars[keyword].text() == 0:
+                    options[keyword] = "false"
+                else:
+                    options[keyword] = "true"
 
             else:
                 try:
@@ -1213,7 +1211,7 @@ class ExpertSettingsDialogPage(QWizardPage):
 
         self.__createWidget()
         # Configure member vars here
-        self.__parent.parent.updateGUIOptionVars(0xFF, self.optionVars)
+        self.__parent.parent.updateGUIOptionVars(0x01, self.optionVars)
 
     def __createWidget(self):
         '''
@@ -1245,28 +1243,28 @@ class ExpertSettingsDialogPage(QWizardPage):
         lbl_GPSMode = QLabel('GPS Mode')
         expSettingsFrame.addWidget(lbl_GPSMode, 7, 0)
 
-        self.optionVars['DSP_pingWidth'] = QLineEdit()
+        self.__parent.parent.optionVars['DSP_pingWidth'] = QLineEdit()
         expSettingsFrame.addWidget(self.optionVars['DSP_pingWidth'], 0, 1)
 
-        self.optionVars['DSP_pingMin'] = QLineEdit()
+        self.__parent.parent.optionVars['DSP_pingMin'] = QLineEdit()
         expSettingsFrame.addWidget(self.optionVars['DSP_pingMin'], 1, 1)
 
-        self.optionVars['DSP_pingMax'] = QLineEdit()
+        self.__parent.parent.optionVars['DSP_pingMax'] = QLineEdit()
         expSettingsFrame.addWidget(self.optionVars['DSP_pingMax'], 2, 1)
 
-        self.optionVars['DSP_pingSNR'] = QLineEdit()
+        self.__parent.parent.optionVars['DSP_pingSNR'] = QLineEdit()
         expSettingsFrame.addWidget(self.optionVars['DSP_pingSNR'], 3, 1)
 
-        self.optionVars['GPS_device'] = QLineEdit()
+        self.__parent.parent.optionVars['GPS_device'] = QLineEdit()
         expSettingsFrame.addWidget(self.optionVars['GPS_device'], 4, 1)
 
-        self.optionVars['GPS_baud'] = QLineEdit()
+        self.__parent.parent.optionVars['GPS_baud'] = QLineEdit()
         expSettingsFrame.addWidget(self.optionVars['GPS_baud'], 5, 1)
 
-        self.optionVars['SYS_outputDir'] = QLineEdit()
+        self.__parent.parent.optionVars['SYS_outputDir'] = QLineEdit()
         expSettingsFrame.addWidget(self.optionVars['SYS_outputDir'], 6, 1)
 
-        self.optionVars['GPS_mode'] = QLineEdit()
+        self.__parent.parent.optionVars['GPS_mode'] = QLineEdit()
         expSettingsFrame.addWidget(self.optionVars['GPS_mode'], 7, 1)
 
         btn_submit = QPushButton('submit')
