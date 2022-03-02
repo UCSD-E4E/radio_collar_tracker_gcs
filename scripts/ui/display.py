@@ -33,6 +33,7 @@ class GCS(QMainWindow):
         self._systemConnectionTab = None
         self.systemSettingWidget = None
         self.__missionStatusText = "Start Recording"
+        self.__missionStatusBtn = None
         self.innerFreqFrame = None
         self.freqElements = []
         self.targEntries = {}
@@ -178,11 +179,12 @@ class GCS(QMainWindow):
         if self._mavModel == None:
             return
 
-        if self.__missionStatusText == 'Start Recording':
-            self.__missionStatusText ='Stop Recording'
+        if self.__missionStatusBtn.text() == 'Start Recording':
+            self.__missionStatusBtn.setText('Stop Recording')
+            
             self._mavModel.startMission(timeout=self.defaultTimeout)
         else:
-            self.__missionStatusText = 'Start Recording'
+            self.__missionStatusBtn.setText('Start Recording')
             self._mavModel.stopMission(timeout=self.defaultTimeout)
 
     def __updateStatus(self):
@@ -362,7 +364,9 @@ class GCS(QMainWindow):
             config['LastCoords']['Lon2'] = str(lon2)
             with open(config_path, 'w') as configFile:
                 config.write(configFile)
-            
+        
+        if self._rctPort is not None:
+            self._rctPort.close()
         if self._mavModel is not None:
             self._mavModel.stop()
         super().closeEvent(event)
@@ -376,7 +380,7 @@ class GCS(QMainWindow):
         connectionDialog.exec_()
 
 
-        self._rctPort = connectionDialog.comms
+        self._rctPort = connectionDialog.port
         self._mavReceiver = connectionDialog.comms
         self._mavModel = connectionDialog.model
         if self._mavModel is None:
@@ -450,9 +454,8 @@ class GCS(QMainWindow):
 
 
         # START PAYLOAD RECORDING
-        btn_startRecord = QPushButton(self.__missionStatusText)
-        #                            textvariable=self.__missionStatusText, 
-        btn_startRecord.clicked.connect(lambda:self.__startStopMission())
+        self.__missionStatusBtn = QPushButton(self.__missionStatusText)
+        self.__missionStatusBtn.clicked.connect(lambda:self.__startStopMission())
         
         btn_exportAll = QPushButton('Export Info')
         btn_exportAll.clicked.connect(lambda:self.exportAll())
@@ -468,7 +471,7 @@ class GCS(QMainWindow):
         wlay.addWidget(self.mapControl)
         wlay.addWidget(self.systemSettingsWidget)
         wlay.addWidget(self.upgradeDisplay)
-        wlay.addWidget(btn_startRecord)
+        wlay.addWidget(self.__missionStatusBtn)
         wlay.addWidget(btn_exportAll)
         wlay.addWidget(btn_precision)
         wlay.addWidget(btn_heatMap)
@@ -741,7 +744,6 @@ class ComponentStatusDisplay(CollapseFrame):
     def updateGUIOptionVars(self, scope=0):
         varDict = self.__root._mavModel.state
         for varName, varValue in varDict.items():
-            print(varName)
             try:
                 configDict = self.compDicts[varName]
                 configOpts = configDict[str(varValue)]

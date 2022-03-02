@@ -23,6 +23,7 @@
 # 02/18/21  ML  Refactored layer functions in map classes
 # 02/11/21  ML  pruned imports
 # 02/11/21  ML  Added heatmap display for live precision visualization
+# 01/26/22  ML  Pruned experimental code/displays, removed all panda UI overlap
 # 10/21/20  ML  Removed testing components
 # 08/19/20  ML  Added config object to gcs, added appDirs for tiles output
 # 08/14/20  ML  Removed excel sheet outputs
@@ -81,18 +82,15 @@ def configSetup():
     '''
     config_path = 'gcsConfig.ini'
     if(not os.path.isfile(config_path)):
-        prefix_path = QFileDialog.getExistingDirectory(None, 
-                'Select the Qgis directory')
-        if ("qgis" in prefix_path):            
-            config = configparser.ConfigParser()
-            config['FilePaths'] = {}
-            config['FilePaths']['PrefixPath'] = prefix_path
-            with open(config_path, 'w') as configFile:
-                config.write(configFile)
-                return prefix_path
-        else:
-            WarningMessager.showWarning("Wrong file. Choose qgis file")
-            configSetup()
+        prefix_path = QFileDialog.getExistingDirectory(None, 'Select the Qgis directory')          
+        config = configparser.ConfigParser()
+        config['FilePaths'] = {}
+        config['FilePaths']['PrefixPath'] = prefix_path
+        if ("qgis" not in prefix_path):
+            WarningMessager.showWarning("Warning, incorrect file chosen. Map tools may not function as expected")
+        with open(config_path, 'w') as configFile:
+            config.write(configFile)
+            return config, prefix_path
     else:
         config = configparser.ConfigParser()
         config.read(config_path)
@@ -127,7 +125,7 @@ if __name__ == '__main__':
 
     app.initQgis()
 
-    ex = GCS(configObj)
+    ex = GCS()
     ex.show()
 
     exitcode = app.exec_()

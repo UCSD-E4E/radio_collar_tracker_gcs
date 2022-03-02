@@ -461,10 +461,15 @@ class droneSim:
         if not self.port.isOpen():
             raise RuntimeError
         print("Ping on %d at %3.7f, %3.7f, %3.0f m, measuring %3.3f" %
-              (dronePing.freq, dronePing.lat, dronePing.lon, dronePing.alt, dronePing.amplitude))
+              (dronePing.freq, dronePing.lat, dronePing.lon, dronePing.alt, dronePing.power))
         
-        conepacket = rctComms.rctConePacket(dronePing.lat, dronePing.lon, dronePing.alt, dronePing.amplitude, hdg)
+        conepacket = rctComms.rctConePacket(dronePing.lat, dronePing.lon, dronePing.alt, dronePing.power, hdg)
         self.port.sendCone(conepacket)
+
+        
+        #      (dronePing.freq, dronePing.lat, dronePing.lon, dronePing.alt, dronePing.power))
+        #packet = dronePing.toPacket()
+        #self.port.sendPing(packet)
 
     def setSystemState(self, system: str, state):
         '''
@@ -571,6 +576,7 @@ class droneSim:
         :param addr:
         '''
         scope = packet.scope
+        print(self.PP_options)
         packet = rctComms.rctOptionsPacket(scope, **self.PP_options)
         self.port.sendToGCS(packet)
 

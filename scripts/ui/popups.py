@@ -1,5 +1,5 @@
-import rctTransport
-import rctComms
+from RCTComms.comms import gcsComms
+from RCTComms.transport import RCTTCPClient
 import rctCore
 from PyQt5.QtCore import QRegExp
 from PyQt5.QtWidgets import *
@@ -90,6 +90,9 @@ class ExpertSettingsDialogPage(QWizardPage):
         lbl_GPSMode = QLabel('GPS Mode')
         expSettingsFrame.addWidget(lbl_GPSMode, 7, 0)
 
+        lbl_SYSautostart = QLabel("SYS Autostart")
+        expSettingsFrame.addWidget(lbl_SYSautostart, 8, 0)
+
         self.optionVars['DSP_pingWidth'] = QLineEdit()
         expSettingsFrame.addWidget(self.optionVars['DSP_pingWidth'], 0, 1)
 
@@ -114,9 +117,12 @@ class ExpertSettingsDialogPage(QWizardPage):
         self.optionVars['GPS_mode'] = QLineEdit()
         expSettingsFrame.addWidget(self.optionVars['GPS_mode'], 7, 1)
 
+        self.optionVars['SYS_autostart'] = QLineEdit()
+        expSettingsFrame.addWidget(self.optionVars['SYS_autostart'], 8, 1)
+
         btn_submit = QPushButton('submit')
         btn_submit.clicked.connect(lambda:self.submit())
-        expSettingsFrame.addWidget(btn_submit, 8, 0, 1, 2)
+        expSettingsFrame.addWidget(btn_submit, 9, 0, 1, 2)
 
         self.setLayout(expSettingsFrame)
 
@@ -266,13 +272,13 @@ class ConnectionDialog(QWizard):
         Internal Function to submit user inputted connection settings
         '''
         try:
-            self.port = rctTransport.RCTTCPClient(
+            self.port = RCTTCPClient(
                 addr=self.page.addrEntry.text(), port=int(self.page.portEntry.text()))
-            self.comms = rctComms.gcsComms(self.port)
+            self.comms = gcsComms(self.port)
             self.model = rctCore.MAVModel(self.comms)
             self.model.start()
         except:
-            WarningMessager.showWarning("Please specify valid connction settings")
+            WarningMessager.showWarning("Please specify valid connection settings")
             return
 
 class ConnectionDialogPage(QWizardPage):

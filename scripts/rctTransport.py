@@ -224,6 +224,7 @@ class RCTTCPClient(RCTAbstractTransport):
     def close(self):
         try:
             self.__socket.shutdown(socket.SHUT_RDWR)
+            self.__socket.close()
         except:
             pass
         self.__socket = None
