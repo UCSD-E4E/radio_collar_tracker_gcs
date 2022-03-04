@@ -130,7 +130,7 @@ class OPTIONS_SCOPE:
     _keywordTypes = {
         'SDR_centerFreq': (int, '<L', 4),
         'SDR_samplingFreq': (int, '<L', 4),
-        'SDR_gain': ((int, float), '<f', 4),
+        'SDR_gain': (int, '<L', 4),
         'DSP_pingWidth': ((int, float), '<f', 4),
         'DSP_pingSNR': ((int, float), '<f', 4),
         'DSP_pingMax': ((int, float), '<f', 4),
@@ -539,7 +539,7 @@ class rctConePacket(rctBinaryPacket):
 
         self._pclass = 0x04
         self._pid = 0x04
-        self._payload = struct.pack("<BQllHfl", 0x01, int(timestamp.timestamp(
+        self._payload = struct.pack("<BQllHff", 0x01, int(timestamp.timestamp(
         ) * 1e3), int(lat * 1e7), int(lon * 1e7), int(alt * 10), power, angle)
 
 
@@ -555,7 +555,7 @@ class rctConePacket(rctBinaryPacket):
         if not cls.matches(pcls, pid):
             raise RuntimeError("Incorrect packet type")
         _, timeMS, lat7, lon7, alt1, power, angle = struct.unpack(
-            '<BQllHfl', payload)
+            '<BQllHff', payload)
         timestamp = dt.datetime.fromtimestamp(timeMS / 1e3)
         lat = lat7 / 1e7
         lon = lon7 / 1e7
@@ -673,6 +673,7 @@ class rctSETOPTCommand(rctBinaryPacket):
         self.options = {}
         self.scope = scope
         for keyword in acceptedKeywords:
+            print(keyword)
             assert(isinstance(kwargs[keyword],
                               OPTIONS_SCOPE._keywordTypes[keyword][0]))
             self.options[keyword] = kwargs[keyword]

@@ -20,7 +20,12 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 02/18/21  ML  Refactored layer functions in map classes
+# 02/11/21  ML  pruned imports
 # 02/11/21  ML  Added heatmap display for live precision visualization
+# 01/26/22  ML  Pruned experimental code/displays, removed all panda UI overlap
+# 10/21/20  ML  Removed testing components
+# 08/19/20  ML  Added config object to gcs, added appDirs for tiles output
 # 08/14/20  ML  Removed excel sheet outputs
 # 08/11/20  ML  Added export settings, pings, and vehicle path as json file
 # 08/06/20  NH  Refactored map loading code for ease of debugging
@@ -62,9 +67,7 @@ import logging
 import sys
 import os
 import os.path
-from PyQt5.QtCore import *
-from PyQt5.QtWidgets import *
-from PyQt5.QtGui import *
+from PyQt5.QtWidgets import QFileDialog
 from qgis.core import *    
 from qgis.gui import *  
 from qgis.utils import *
@@ -79,23 +82,21 @@ def configSetup():
     '''
     config_path = 'gcsConfig.ini'
     if(not os.path.isfile(config_path)):
-        prefix_path = QFileDialog.getExistingDirectory(None, 
-                'Select the Qgis directory')
-        if ("qgis" in prefix_path):            
-            config = configparser.ConfigParser()
-            config['FilePaths'] = {}
-            config['FilePaths']['PrefixPath'] = prefix_path
-            with open(config_path, 'w') as configFile:
-                config.write(configFile)
-                return prefix_path
-        else:
-            WarningMessager.showWarning("Wrong file. Choose qgis file")
-            configSetup()
+        prefix_path = QFileDialog.getExistingDirectory(None, 'Select the Qgis directory')          
+        config = configparser.ConfigParser()
+        config['FilePaths'] = {}
+        config['FilePaths']['PrefixPath'] = prefix_path
+        if ("qgis" not in prefix_path):
+            WarningMessager.showWarning("Warning, incorrect file chosen. Map tools may not function as expected")
+        with open(config_path, 'w') as configFile:
+            config.write(configFile)
+            return config, prefix_path
     else:
         config = configparser.ConfigParser()
         config.read(config_path)
         prefix_path = config['FilePaths']['PrefixPath']
-        return prefix_path
+        return config, prefix_path
+
    
 
 
@@ -115,15 +116,18 @@ if __name__ == '__main__':
     ch.setFormatter(formatter)
     logger.addHandler(ch)
     
+  
     app = QgsApplication([], True)
-    prefix_path = configSetup() 
-    #prefix_path = config['FilePaths']['PrefixPath']
-    app.setPrefixPath(prefix_path, True) 
+    
+    configObj, prefix_path = configSetup()
+    
+    QgsApplication.setPrefixPath(prefix_path)
+
     app.initQgis()
 
     ex = GCS()
     ex.show()
 
     exitcode = app.exec_()
-    QgsApplication.exitQgis()
+    app.exitQgis()
     sys.exit(exitcode)
