@@ -685,13 +685,21 @@ class MapOptions(QWidget):
         Inner function to facilitate map caching
         '''
         if self.isWebMap:
-            if (self.mapWidget.toolRect.rectangle() == None):
-                WarningMessager.showWarning("Use the rect tool to choose an area on the map to cache", "No specified area to cache!")
-                self.mapWidget.rect()
-            else:
+            if (self.mapWidget.toolRect.rectangle() != None):
                 cacheThread = Thread(target=self.mapWidget.cacheMap)
                 cacheThread.start()
                 self.mapWidget.canvas.refresh()
+            elif(self.mapWidget.toolPolygon != None):
+                #Check if there is a polygon selected
+                print("Expected: there is a polygon selected")
+                #Call cache fxn?
+                cacheThread = Thread(target=self.mapWidget.cacheMap)
+                cacheThread.start()
+                self.mapWidget.canvas.refresh()
+            
+            else:
+                WarningMessager.showWarning("Use the rect tool to choose an area on the map to cache", "No specified area to cache!")
+                self.mapWidget.rect()
         else:
             print("alert")
 
