@@ -283,6 +283,7 @@ class SystemSettingsControl(CollapseFrame):
         '''
         cntrFreq = int(self.optionVars['SDR_centerFreq'].text())
         sampFreq = int(self.optionVars['SDR_samplingFreq'].text())
+    
 
         targetFrequencies = []
         for targetName in self.targEntries:
@@ -295,16 +296,6 @@ class SystemSettingsControl(CollapseFrame):
         self.__root._mavModel.setFrequencies(
             targetFrequencies, self.__root.defaultTimeout)
 
-        if cntrFreq != '':
-            lastCntrFreq = self.__root._mavModel.getOption('SDR_centerFreq')
-            if int(cntrFreq) != lastCntrFreq:
-                self.clearTargets()
-        if sampFreq != '':
-            lastSampFreq = self.__root._mavModel.getOption(
-                'SDR_samplingFreq')
-            if int(sampFreq) != lastSampFreq:
-                self.clearTargets()
-
         self.submitGUIOptionVars(0x00)
 
         self.updateGUIOptionVars()
@@ -315,11 +306,21 @@ class SystemSettingsControl(CollapseFrame):
         optionDict = self.__root._mavModel.getOptions(
             scope, timeout=self.__root.defaultTimeout)
         for optionName, optionValue in optionDict.items():
-            try:
-                self.optionVars[optionName].setText(str(optionValue))
-            except AttributeError:
-                WarningMessager.showWarning("Failed to update GUI option vars", "Unexpected Error")
-                print(optionName)
+            if optionName == 'GPS_mode' or optionName == 'SYS_autostart':
+                try:
+                    if optionValue:
+                        self.optionVars[optionName].setText('true')
+                    else:
+                        self.optionVars[optionName].setText('false')
+                except AttributeError:
+                    WarningMessager.showWarning("Failed to update GUI option vars", "Unexpected Error")
+                    print(optionName)
+            else:
+                try:
+                    self.optionVars[optionName].setText(str(optionValue))
+                except AttributeError:
+                    WarningMessager.showWarning("Failed to update GUI option vars", "Unexpected Error")
+                    print(optionName)
         self.update()
 
     def submitGUIOptionVars(self, scope: int):
@@ -341,10 +342,19 @@ class SystemSettingsControl(CollapseFrame):
         options = {}
 
         for keyword in acceptedKeywords:
-            try:
-                options[keyword] = int(self.optionVars[keyword].text())
-            except ValueError:
-                options[keyword] = float(self.optionVars[keyword].text())
+            if keyword == 'SYS_outputDir' or keyword == 'GPS_device':
+                options[keyword] = self.optionVars[keyword].text()
+            elif keyword == 'GPS_mode' or keyword == 'SYS_autostart':
+                val = self.optionVars[keyword].text()
+                if val == 'true':
+                    options[keyword] = True
+                else:
+                    options[keyword] = False
+            else:
+                try:
+                    options[keyword] = int(self.optionVars[keyword].text())
+                except ValueError:
+                    options[keyword] = float(self.optionVars[keyword].text())
         self.__root._mavModel.setOptions(
             timeout=self.__root.defaultTimeout, **options)
 

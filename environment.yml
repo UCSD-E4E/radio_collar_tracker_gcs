@@ -12,5 +12,4 @@ dependencies:
   - pip:
     - utm==0.5.0
     - xlwt
-    - appdirs
-
+    - appdirs==1.4.4

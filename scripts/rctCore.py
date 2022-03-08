@@ -545,6 +545,7 @@ class MAVModel:
             else:
                 raise KeyError
 
+        print(scope)
         self.PP_options.update(kwargs)
         acceptedKeywords = []
         if scope >= self.BASE_OPTIONS:
