@@ -6,11 +6,11 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QRegExpValidator
 
 class WarningMessager:
-    
+
     def showWarning(text: str, title: str ="Warning"):
         '''
         Creates warning popups
-        Args: 
+        Args:
             title: message header
             text: message body
         '''
@@ -24,7 +24,7 @@ class WarningMessager:
 
 class ExpertSettingsDialog(QWizard):
     '''
-    A Custom Dialog Widget to facilitate user input for expert 
+    A Custom Dialog Widget to facilitate user input for expert
     settings
     '''
     def __init__(self, parent, optionVars):
@@ -171,7 +171,7 @@ class AddTargetDialog(QWizard):
 
     def submit(self):
         '''
-        Internal function to submit newly added target frequency 
+        Internal function to submit newly added target frequency
         '''
         if not self.validate():
             WarningMessager.showWarning("You have entered an invalid target frequency. Please try again.", "Invalid frequency")
@@ -212,8 +212,8 @@ class AddTargetDialogPage(QWizardPage):
         '''
         Internal function to create widgets
         '''
-        rx  = QRegExp("[0-9]{30}")                           
-        val = QRegExpValidator(rx)                            
+        rx  = QRegExp("[0-9]{30}")
+        val = QRegExpValidator(rx)
         frm_targetSettings = QGridLayout()
 
         lbl_targetName = QLabel('Target Name:')
@@ -267,18 +267,20 @@ class ConnectionDialog(QWizard):
         '''
         try:
             print(self.page.portEntry.text())
+            # TODO: GCS should be server, not client
             self.port = rctTransport.RCTTCPClient(
                 addr='127.0.0.1', port=int(self.page.portEntry.text()))
             self.comms = rctComms.gcsComms(self.port)
             self.model = rctCore.MAVModel(self.comms)
             self.model.start()
+            self.__parent.systemSettingsWidget.connectionMade()
         except:
             WarningMessager.showWarning("Please specify valid connction settings")
             return
 
 class ConnectionDialogPage(QWizardPage):
     '''
-    Custom DialogPage widget - Allows the user to configure 
+    Custom DialogPage widget - Allows the user to configure
     settings to connect to the drone
     '''
     def __init__(self, parent):

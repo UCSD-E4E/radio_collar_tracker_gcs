@@ -77,7 +77,7 @@ class droneSim:
     '''
     class MISSION_STATE:
         '''
-        Mission State values.  These are the possible values of 
+        Mission State values.  These are the possible values of
         self.SS_vehicleState
         '''
         TAKEOFF = 0
@@ -101,7 +101,7 @@ class droneSim:
             'STS_sysStatus': 0,
             'STS_swStatus': 0,
         }
-        
+
         self.__txThread = None
 
         # PP - Payload parameters
@@ -200,7 +200,7 @@ class droneSim:
             rctComms.EVENTS.COMMAND_STOP, self.__doStopMission)
         self.port.registerCallback(
             rctComms.EVENTS.COMMAND_UPGRADE, self.__doUpgrade)
-        
+
         # Reset state parameters
         self.reset()
 
@@ -250,7 +250,7 @@ class droneSim:
                              (478140, 3638700, 30)]
         Square
         self.SM_waypoints = [(477995, 3638776, 30),
-                             (477995, 3638546, 30), 
+                             (477995, 3638546, 30),
                              (478225, 3638546, 30),
                              (478225, 3638776, 30),
                              (477995, 3638776, 30)]
@@ -459,7 +459,7 @@ class droneSim:
     def setSystemState(self, system: str, state):
         '''
         Sets the simulator's system state to the specified state.
-        :param system: One of STS_sdrStatus, STS_dirStatus, STS_gpsStatus, 
+        :param system: One of STS_sdrStatus, STS_dirStatus, STS_gpsStatus,
                         STS_sysStatus, or STS_swStatus
         :param state: The appropriate state number per ICD
         '''
@@ -640,7 +640,7 @@ class droneSim:
             itTime = (curTime - prevTime).total_seconds()
             # Time since last waypoint
             segTime = (curTime - wpTime).total_seconds()
-            
+
             ########################
             # Flight State Machine #
             ########################
@@ -704,7 +704,7 @@ class droneSim:
                     return
                 else:
                     self.SS_velocityVector = np.array([0, 0, 0])
-            
+
             sleep(self.SM_loopPeriod)
             ###################
             # Ping Simulation #
@@ -735,7 +735,7 @@ class droneSim:
 
     def calculatePingMeasurement(self):
         '''
-        Calculate the simulated ping measurement from the current state 
+        Calculate the simulated ping measurement from the current state
         variables
         '''
         # check against frequencies
@@ -782,86 +782,86 @@ class droneSim:
         e['PP_options'] = str(self.PP_options )
         e['SM_missionRun'] = str(self.SM_missionRun )
 
-        e['SM_utmZoneNum'] = str(self.SM_utmZoneNum) 
-        e['SM_utmZone'] = str(self.SM_utmZone) 
-        
+        e['SM_utmZoneNum'] = str(self.SM_utmZoneNum)
+        e['SM_utmZone'] = str(self.SM_utmZone)
+
         e['SM_origin'] = str(self.SM_origin)
-        
-        e['SM_TakeoffTarget'] = str(self.SM_TakeoffTarget) 
-        
+
+        e['SM_TakeoffTarget'] = str(self.SM_TakeoffTarget)
+
         e['SM_waypoints'] = str(self.SM_waypoints )
-        
-        e['SM_targetThreshold'] = str(self.SM_targetThreshold) 
-        
+
+        e['SM_targetThreshold'] = str(self.SM_targetThreshold)
+
         e['SM_loopPeriod'] = str(self.SM_loopPeriod )
-        
-        e['SM_TakeoffVel'] = str(self.SM_TakeoffVel) 
-        
+
+        e['SM_TakeoffVel'] = str(self.SM_TakeoffVel)
+
         e['SM_WPVel'] = str(self.SM_WPVel )
-        
+
         e['SM_RTLVel'] = str(self.SM_RTLVel)
-        
+
         e['SM_LandVel'] = str(self.SM_LandVel)
-        
+
 
         e['SC_VehiclePositionMsgPeriod'] = str(self.SC_VehiclePositionMsgPeriod)
-        
+
         e['SC_PingMeasurementPeriod'] = str(self.SC_PingMeasurementPeriod )
-        
+
         e['SC_PingMeasurementSigma'] = str(self.SC_PingMeasurementSigma )
-        
+
         e['SC_HeartbeatPeriod'] = str(self.SC_HeartbeatPeriod )
-        
+
 
         e['SP_TxPower'] = str(self.SP_TxPower )
-        
-        e['SP+TxPowerSigma'] = str(self.SP_TxPowerSigma) 
-        
+
+        e['SP+TxPowerSigma'] = str(self.SP_TxPowerSigma)
+
         e['SP_SystemLoss'] = str(self.SP_SystemLoss )
-        
+
         e['SP_SystemLossSigma'] = str(self.SP_SystemLossSigma )
-        
+
         e['SP_Exponent'] = str(self.SP_Exponent )
-        
-        e['SP_ExponentSigma'] = str(self.SP_ExponentSigma) 
-        
+
+        e['SP_ExponentSigma'] = str(self.SP_ExponentSigma)
+
         e['SP_Position'] = str(self.SP_Position )
-        
+
         e['SP_NoiseFloor'] = str(self.SP_NoiseFloor)
-        
+
         e['SP_NoiseFloorSigma:'] = str(self.SP_NoiseFloorSigma )
-        
+
         e['SP_TxFreq'] = str(self.SP_TxFreq )
-        
 
-        e['SV_VehiclePositionSigma'] = str(self.SV_vehiclePositionSigma) 
-        
 
-        e['SS_utmZoneNum'] = str(self.SS_utmZoneNum) 
-        
+        e['SV_VehiclePositionSigma'] = str(self.SV_vehiclePositionSigma)
+
+
+        e['SS_utmZoneNum'] = str(self.SS_utmZoneNum)
+
         e['SS_utmZone'] = str(self.SS_utmZone )
-        
+
         e['SS_VehiclePosition'] = str(self.SS_vehiclePosition )
-        
+
         e['SS_vehicleState'] = str(self.SS_vehicleState)
-        
+
         e['SS_startTime'] = str(self.SS_startTime )
-        
-        e['SS_velocityVector'] = str(self.SS_velocityVector) 
-        
-        e['SS_vehicleTarget'] = str(self.SS_vehicleTarget) 
-        
+
+        e['SS_velocityVector'] = str(self.SS_velocityVector)
+
+        e['SS_vehicleTarget'] = str(self.SS_vehicleTarget)
+
         e['SS_waypointIdx'] = str(self.SS_waypointIdx )
-        
+
         e['SS_payloadRunning'] = str(self.SS_payloadRunning )
-        
+
 
         e['HS_run'] = str(self.HS_run )
 
         settingsFile = filename + '.json'
         with open(settingsFile, 'w') as outfile:
             json.dump(e, outfile)
-        
+
 
 
 
@@ -888,6 +888,7 @@ if __name__ == '__main__':
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
+    # TODO: Drone should be client, not server
     if args.protocol == 'udp':
         port = rctTransport.RCTUDPServer(port=args.port)
     elif args.protocol == 'tcp':
