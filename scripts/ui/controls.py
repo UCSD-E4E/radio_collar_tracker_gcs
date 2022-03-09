@@ -283,7 +283,7 @@ class SystemSettingsControl(CollapseFrame):
         '''
         cntrFreq = int(self.optionVars['SDR_centerFreq'].text())
         sampFreq = int(self.optionVars['SDR_samplingFreq'].text())
-    
+
 
         targetFrequencies = []
         for targetName in self.targEntries:

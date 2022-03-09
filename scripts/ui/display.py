@@ -745,11 +745,15 @@ class ComponentStatusDisplay(CollapseFrame):
         varDict = self.__root._mavModel.state
         for varName, varValue in varDict.items():
             try:
-                configDict = self.compDicts[varName]
-                configOpts = configDict[str(varValue)]
-                self.statusLabels[varName].setText(configOpts['text'])
+                if varName in self.compDicts:
+                    configDict = self.compDicts[varName]
+                if str(varValue) in configDict:
+                    configOpts = configDict[str(varValue)]
+                if varName in self.statusLabels:
+                    self.statusLabels[varName].setText(configOpts['text'])
                 style = "background-color: %s" % configOpts['bg']
-                self.statusLabels[varName].setStyleSheet(style)
+                if varName in self.statusLabels:
+                    self.statusLabels[varName].setStyleSheet(style)
             except KeyError:
                 WarningMessager.showWarning("Failed to update GUI option vars", "Unexpected Error")
                 continue

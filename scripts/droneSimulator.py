@@ -462,11 +462,11 @@ class droneSim:
             raise RuntimeError
         print("Ping on %d at %3.7f, %3.7f, %3.0f m, measuring %3.3f" %
               (dronePing.freq, dronePing.lat, dronePing.lon, dronePing.alt, dronePing.power))
-        
+
         conepacket = rctComms.rctConePacket(dronePing.lat, dronePing.lon, dronePing.alt, dronePing.power, hdg)
         self.port.sendCone(conepacket)
 
-        
+
         #      (dronePing.freq, dronePing.lat, dronePing.lon, dronePing.alt, dronePing.power))
         #packet = dronePing.toPacket()
         #self.port.sendPing(packet)
@@ -745,12 +745,12 @@ class droneSim:
                 pingMeasurement = self.calculatePingMeasurement()
                 if pingMeasurement is not None:
                     print("in Ping Measurement")
-                    
+
                     newPing = rctPing(
                         lat, lon, pingMeasurement[0], pingMeasurement[1], self.SS_vehiclePosition[2], curTime.timestamp())
-                    
+
                     #hdg = self.get_bearing(self.SS_vehiclePosition[0], self.SS_vehiclePosition[1], self.SS_vehicleTarget[0], self.SS_vehicleTarget[1])
-    
+
                     print(hdg)
                     '''
                     if self.SS_payloadRunning:
