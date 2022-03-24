@@ -20,9 +20,9 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
-# 01/26/22  ML  Pruned experimental code. Implemented optimized heatmap 
+# 01/26/22  ML  Pruned experimental code. Implemented optimized heatmap
 #               calculation
-# 03/11/21  ML  Added normalization to heatMapArea in precision visualization 
+# 03/11/21  ML  Added normalization to heatMapArea in precision visualization
 #               function
 # 08/14/20  ML  Added ping resampling in estimate calculation
 # 10/05/20  ML  Added estimate precision visualization function
@@ -39,7 +39,7 @@ from scipy.optimize import least_squares
 from scipy.stats import norm, zscore
 import utm
 import time
-from RCTComms.comms import rctPingPacket
+from rctComms import rctPingPacket
 from osgeo import gdal
 from osgeo import osr
 import csv
@@ -70,8 +70,8 @@ class rctPing:
         # X, Y, Z, A
         easting, northing, _, _ = utm.from_latlon(self.lat, self.lon)
         return np.array([easting, northing, self.alt, self.power])
-    
-    
+
+
 
     def toDict(self):
         d = {}
@@ -119,20 +119,20 @@ class rctPing:
 
 def residuals(x, data):
     '''
-    Calculates the error for the signal propagation model parameterized by x 
+    Calculates the error for the signal propagation model parameterized by x
     over the data.
 
     @param x    Vector of signal model parameters: x[0] is the transmitter power,
                 x[1] is the path loss exponent, x[2] is the x coordinate of the
                 transmitter location in meters, x[3] is the y coordinate of the
                 transmitter location in meters, x[4] is the system loss constant.
-    @param data    Matrix of signal data.  This matrix must have shape (m, 3), 
+    @param data    Matrix of signal data.  This matrix must have shape (m, 3),
                 where m is the number of data samples.  data[:,0] is the vector
-                of received signal power.  data[:,1] is the vector of x 
+                of received signal power.  data[:,1] is the vector of x
                 coordinates of each measurement in meters.  data[:,2] is the
                 vector of y coordinates of each measurement in meters.
-    @returns    A vector of shape (m,) containing the difference between the 
-                data and estimated data using the provided signal model 
+    @returns    A vector of shape (m,) containing the difference between the
+                data and estimated data using the provided signal model
                 parameters.
     '''
     P = x[0]
@@ -152,7 +152,7 @@ def residuals(x, data):
 
 def mse(R, x, P, n, t, k):
     '''
-    Calculates the mean squared error for the signal propagation model 
+    Calculates the mean squared error for the signal propagation model
     parameterized by P, n, t, and k and the data given by R and x.
 
     @param R    The received signal power.
@@ -180,15 +180,15 @@ class DataManager:
         if pingFreq not in self.__estimators:
             self.__estimators[pingFreq] = LocationEstimator()
         self.__estimators[pingFreq].addPing(ping)
-        
+
         if self.zone == None:
             self.setZone(ping.lat, ping.lon)
-        
+
         return self.__estimators[pingFreq].doEstimate()
-    
+
     def addVehicleLocation(self, coord):
         self.__vehiclePath.append(coord)
-    
+
     def setZone(self, lat, lon):
         _, _, zone, let = utm.from_latlon(lat, lon)
         self.zone = zone
@@ -212,17 +212,17 @@ class DataManager:
         '''
         estimator = self.__estimators[frequency]
         return estimator.getPings()
-    
+
     def getNumPings(self, frequency: int):
         estimator = self.__estimators[frequency]
         return estimator.getNumPings()
-    
+
     def getVehiclePath(self):
         return self.__vehiclePath
-    
+
     def getUTMZone(self):
         return self.zone, self.let
-    
+
     def doPrecisions(self, frequency):
         estimator = self.__estimators[frequency]
         estimator.doPrecision()
@@ -241,7 +241,7 @@ class LocationEstimator:
         self.__staleEstimate = True
 
         self.result = None
-        
+
         self.last_l_tx0 = 0
         self.last_l_tx1 = 0
         self.index = 0
@@ -264,14 +264,14 @@ class LocationEstimator:
             # Location is average of current measurements
             # Power is max of measurements
             # N_0 = 4
-        
+
 
             X_tx_0 = np.mean(pings[:, 0])#0
             Y_tx_0 = np.mean(pings[:, 1])#1
             P_tx_0 = np.max(pings[:, 3])#3
             n_0 = 2
             self.__params = np.array([X_tx_0, Y_tx_0, P_tx_0, n_0])
-            res_x = least_squares(self.__residuals, self.__params, 
+            res_x = least_squares(self.__residuals, self.__params,
             bounds=([0, 167000, -np.inf, 2], [833000, 10000000, np.inf, 2.1]))
 
         if res_x.success:
@@ -281,7 +281,7 @@ class LocationEstimator:
             self.__staleEstimate = True
 
         self.result = res_x
-        
+
         #self.doPrecision()
 
         return self.__params, self.__staleEstimate
@@ -291,14 +291,14 @@ class LocationEstimator:
         l_tx = np.array([paramVector[0], paramVector[1], 0])
         P_tx = paramVector[2]
         n = paramVector[3]
-        
+
 
         d = np.linalg.norm(l_rx - l_tx)
-        
-        
+
+
         if d < 0.01:
             d = 0.01
-            
+
         Prx = P_tx - 10 * n * np.log10(d)
         return Prx
 
@@ -311,12 +311,12 @@ class LocationEstimator:
                 self.dToPrx(pingVector, paramVect)
 
         return result
-    
+
     def p_d(self, tx, dx, n, P_rx, P_tx, D_std):
             modeledDistance = self.RSSItoDistance(P_rx, P_tx, n)
             adjustedDistance = (np.linalg.norm(dx-tx)-modeledDistance)/D_std
             return math.exp((-(adjustedDistance**2)/2)) / (math.sqrt(2*math.pi) * D_std)
-            
+
     def RSSItoDistance(self, P_rx, P_tx, n, alt=0):
         dist = 10 ** ((P_tx - P_rx) / (10 * n))
         if alt != 0:
@@ -324,7 +324,7 @@ class LocationEstimator:
         return dist
 
     def doPrecision(self):
-        
+
         data_dir = 'holder'
         freq = 17350000
 
@@ -333,32 +333,32 @@ class LocationEstimator:
         print("%03.3f has %d pings" % (freq / 1e6, len(f_pings)))
 
         zonenum = 11
-        
+
         zone = 'S'
 
         res_x = self.__params
 
-        
+
         l_tx = res_x[0:2]
         P = res_x[2]
         n = res_x[3]
-        
-        
+
+
         pings = np.array(f_pings)
-        
+
         distances = np.linalg.norm(pings[:,0:3] - np.array([l_tx[0], l_tx[1], 0]), axis=1)
         calculatedDistances = self.RSSItoDistance(pings[:,3], P, n)
-        
+
         distanceErrors = calculatedDistances - distances
         stdDistances = np.std(distanceErrors)
         P_rx = pings[:,3]
-        
+
         size = 25
         tiffXSize = size
         tiffYSize = size
         pixelSize = 1
         heatMapArea = np.ones((tiffYSize, tiffXSize)) / (tiffXSize * tiffYSize) # [y, x]
-            
+
         self.last_l_tx0 = l_tx[0]
         self.last_l_tx1 = l_tx[1]
         self.index = len(pings) - 1
@@ -367,14 +367,14 @@ class LocationEstimator:
         self.refY = l_tx[1] + (size / 2)
         self.refX = l_tx[0] - (size / 2)
         self.maxX = l_tx[0] + (size / 2)
-    
+
         csv_dict = []
-            
+
         for y in range(tiffYSize):
-            for x in range(tiffXSize):             
+            for x in range(tiffXSize):
                 for i in range(len(pings)):
                     heatMapArea[y, x] *= self.p_d(np.array([x + self.refX, y + self.minY, 0]), pings[i,0:3], n, P_rx[i], P, stdDistances)
-  
+
                 csv_dict.append({"easting": self.refX+x, "northing": self.minY+y, "value": (heatMapArea[y, x])})
 
         sumH = heatMapArea.sum()
@@ -384,7 +384,7 @@ class LocationEstimator:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(csv_dict)
-        
+
 
         outputFileName = '%s/PRECISION_%03.3f_%d_heatmap.tiff' % (data_dir, freq / 1e6, len(pings))
         driver = gdal.GetDriverByName('GTiff')
@@ -395,7 +395,7 @@ class LocationEstimator:
             1,
             gdal.GDT_Float32, ['COMPRESS=LZW'])
         spatialReference = osr.SpatialReference()
-        
+
         spatialReference.SetUTM(zonenum, zone >= 'N')
         spatialReference.SetWellKnownGeogCS('WGS84')
         wkt = spatialReference.ExportToWkt()
@@ -413,7 +413,7 @@ class LocationEstimator:
         band.SetStatistics(np.amin(heatMapArea), np.amax(heatMapArea), np.mean(heatMapArea), np.std(heatMapArea))
         dataset.FlushCache()
         dataset = None
-        
+
 
 
     def getEstimate(self):
@@ -426,11 +426,9 @@ class LocationEstimator:
 
     def getPings(self):
         return self.__pings
-    
+
     def getNumPings(self):
         return len(self.__pings)
-    
+
     def setPings(self, pings):
         self.__pings = pings
-    
-

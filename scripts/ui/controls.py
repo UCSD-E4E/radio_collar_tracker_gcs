@@ -6,14 +6,14 @@ from ui.popups import *
 
 class CollapseFrame(QWidget):
     '''
-    Custom Collapsible Widget - used to aid in 
+    Custom Collapsible Widget - used to aid in
     creating a collapsible field attached to a button
     '''
     def __init__(self, title="", parent=None):
         '''
         Creates a new CollapseFrame Object
         Args:
-            title: String that will be the displayed label of the 
+            title: String that will be the displayed label of the
                    toggle button
             parent: The parent Widget of the CollapseFrame
         '''
@@ -53,7 +53,7 @@ class CollapseFrame(QWidget):
     @pyqtSlot()
     def on_pressed(self):
         '''
-        Internal Callback to be called when the toggle button is 
+        Internal Callback to be called when the toggle button is
         pressed. Facilitates the collapsing and displaying of the
         content_area contents
         '''
@@ -66,7 +66,7 @@ class CollapseFrame(QWidget):
     def setContentLayout(self, layout):
         '''
         Public function to allow the content_area widget's layout to be
-        set. This layout will contain the contents to be collapsed or 
+        set. This layout will contain the contents to be collapsed or
         displayed
         Args:
             layout: A QLayout type object(QVBoxLayout, QGridLayout, etc.)
@@ -74,10 +74,10 @@ class CollapseFrame(QWidget):
         lay = self.content_area.layout()
         del lay
         self.content_area.setLayout(layout)
-        
+
 class SystemSettingsControl(CollapseFrame):
     '''
-    This class provides for a custom widget that facilitates 
+    This class provides for a custom widget that facilitates
     configuring system settings for the drone
     '''
     def __init__(self, root):
@@ -115,7 +115,7 @@ class SystemSettingsControl(CollapseFrame):
 
     def update(self):
         '''
-        Function to facilitate the updating of internal widget 
+        Function to facilitate the updating of internal widget
         displays
         '''
         self.__updateWidget() #add updated values
@@ -126,7 +126,7 @@ class SystemSettingsControl(CollapseFrame):
         self.frm_targHolder.activate()
         CollapseFrame.repaint(self)
         self.__innerFrame.activate()
-        
+
 
     def __updateWidget(self):
         '''
@@ -152,7 +152,7 @@ class SystemSettingsControl(CollapseFrame):
                 freqLabel = QLabel('Target %d' % (rowIdx + 1))
                 freqVariable = freq
                 freqEntry = QLineEdit()
-                val = QIntValidator(cntrFreq-sampFreq, cntrFreq+sampFreq)                            
+                val = QIntValidator(cntrFreq-sampFreq, cntrFreq+sampFreq)
                 freqEntry.setValidator(val)
                 freqEntry.setText(str(freqVariable))
 
@@ -163,7 +163,7 @@ class SystemSettingsControl(CollapseFrame):
                 newWidg.setLayout(new)
                 self.frm_targHolder.addRow(newWidg)
 
-                
+
                 self.targEntries[freq] = [freq]
                 rowIdx += 1
 
@@ -204,10 +204,10 @@ class SystemSettingsControl(CollapseFrame):
                 freqEntry = QLineEdit()
                 cntrFreq = self.__root._mavModel.getOption('SDR_centerFreq')
                 sampFreq = self.__root._mavModel.getOption('SDR_samplingFreq')
-                val = QIntValidator(cntrFreq-sampFreq, cntrFreq+sampFreq)                            
+                val = QIntValidator(cntrFreq-sampFreq, cntrFreq+sampFreq)
                 freqEntry.setValidator(val)
                 freqEntry.setText(freqVariable)
-                
+
                 new.addWidget(freqLabel)
                 new.addWidget(freqEntry)
                 newWidg = QWidget()
@@ -225,27 +225,31 @@ class SystemSettingsControl(CollapseFrame):
         self.__innerFrame.addWidget(self.optionVars['SDR_samplingFreq'], 2, 1)
         self.__innerFrame.addWidget(self.optionVars['SDR_gain'], 3, 1)
 
-        btn_addTarget = QPushButton('Add Target')
-        btn_addTarget.clicked.connect(lambda:self.addTarget())
-        self.__innerFrame.addWidget(btn_addTarget, 0, 0, 1, 2)
-        btn_clearTargs = QPushButton('Clear Targets')
-        btn_clearTargs.clicked.connect(lambda:self.clearTargets())
-        self.__innerFrame.addWidget(btn_clearTargs, 5, 0)
+        self.btn_addTarget = QPushButton('Add Target')
+        self.btn_addTarget.clicked.connect(lambda:self.addTarget())
+        self.btn_addTarget.setEnabled(False)
+        self.__innerFrame.addWidget(self.btn_addTarget, 0, 0, 1, 2)
+        self.btn_clearTargs = QPushButton('Clear Targets')
+        self.btn_clearTargs.clicked.connect(lambda:self.clearTargets())
+        self.btn_clearTargs.setEnabled(False)
+        self.__innerFrame.addWidget(self.btn_clearTargs, 5, 0)
 
-        btn_submit = QPushButton('Update')
-        btn_submit.clicked.connect(lambda:self._updateButtonCallback())
-        self.__innerFrame.addWidget(btn_submit, 5, 1)
+        self.btn_submit = QPushButton('Update')
+        self.btn_submit.clicked.connect(lambda:self._updateButtonCallback())
+        self.btn_submit.setEnabled(False)
+        self.__innerFrame.addWidget(self.btn_submit, 5, 1)
 
-        btn_advSettings = QPushButton('Expert & Debug Configuration')
-        btn_advSettings.clicked.connect(lambda:self.__advancedSettings())
-        self.__innerFrame.addWidget(btn_advSettings, 6, 0, 1, 2)
+        self.btn_advSettings = QPushButton('Expert & Debug Configuration')
+        self.btn_advSettings.clicked.connect(lambda:self.__advancedSettings())
+        self.btn_advSettings.setEnabled(False)
+        self.__innerFrame.addWidget(self.btn_advSettings, 6, 0, 1, 2)
 
         self.setContentLayout(self.__innerFrame)
 
 
     def clearTargets(self):
         '''
-        Helper function to clear target frequencies from UI and 
+        Helper function to clear target frequencies from UI and
         MavMode
         '''
         self.__root._mavModel.setFrequencies(
@@ -279,7 +283,7 @@ class SystemSettingsControl(CollapseFrame):
         '''
         cntrFreq = int(self.optionVars['SDR_centerFreq'].text())
         sampFreq = int(self.optionVars['SDR_samplingFreq'].text())
-    
+
 
         targetFrequencies = []
         for targetName in self.targEntries:
@@ -336,7 +340,7 @@ class SystemSettingsControl(CollapseFrame):
             acceptedKeywords.extend(__engOptionKeywords)
 
         options = {}
-        
+
         for keyword in acceptedKeywords:
             if keyword == 'SYS_outputDir' or keyword == 'GPS_device':
                 options[keyword] = self.optionVars[keyword].text()
@@ -360,6 +364,21 @@ class SystemSettingsControl(CollapseFrame):
         '''
         cntrFreq = int(self.optionVars['SDR_centerFreq'].text())
         sampFreq = int(self.optionVars['SDR_samplingFreq'].text())
+        sdrGain = float(self.optionVars['SDR_gain'].text())
+
+        if (cntrFreq < 70000000 or cntrFreq > 6000000000):
+            WarningMessager.showWarning("Center frequency " + str(cntrFreq) +
+                " is invalid. Please enter another value.")
+            return
+        if (sampFreq < 0 or sampFreq > 56000000):
+            WarningMessager.showWarning("Sampling frequency " + str(sampFreq) +
+                " is invalid. Please enter another value.")
+            return
+        if (sdrGain < 0 or sdrGain > 70):
+            WarningMessager.showWarning("SDR gain" + str(sdrGain) +
+                " is invalid. Please enter another value.")
+            return
+
         addTargetWindow = AddTargetDialog(self.frm_targHolder, cntrFreq, sampFreq)
         addTargetWindow.exec_()
 
@@ -367,9 +386,21 @@ class SystemSettingsControl(CollapseFrame):
         name = addTargetWindow.name
         freq = addTargetWindow.freq
 
-        if freq is None:
+        if freq is None or not self.validateFrequency(freq):
+            #WarningMessager.showWarning("Target frequency " + str(freq) +
+                #" is invalid. Please enter another value.")
             return
 
         self.__root._mavModel.addFrequency(freq, self.__root.defaultTimeout)
 
         self.update()
+
+    def connectionMade(self):
+        '''
+        Helper method to enable system settings buttons once connection is made
+        '''
+
+        self.btn_addTarget.setEnabled(True)
+        self.btn_clearTargs.setEnabled(True)
+        self.btn_submit.setEnabled(True)
+        self.btn_advSettings.setEnabled(True)

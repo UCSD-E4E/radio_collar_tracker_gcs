@@ -110,7 +110,7 @@ class OPTIONS_SCOPE:
     '''
     Options Packet Values
     '''
-    
+
     ## Base Options
     BASE_OPTIONS = 0x00
     _baseOptionKeywords = ['SDR_centerFreq', 'SDR_samplingFreq', 'SDR_gain']
@@ -130,7 +130,7 @@ class OPTIONS_SCOPE:
     _keywordTypes = {
         'SDR_centerFreq': (int, '<L', 4),
         'SDR_samplingFreq': (int, '<L', 4),
-        'SDR_gain': (int, '<L', 4),
+        'SDR_gain': (float, '<f', 4),
         'DSP_pingWidth': ((int, float), '<f', 4),
         'DSP_pingSNR': ((int, float), '<f', 4),
         'DSP_pingMax': ((int, float), '<f', 4),
@@ -428,9 +428,9 @@ class rctUpgradeStatusPacket(rctBinaryPacket):
         _, state, strlen = struct.unpack('<BBH', payload[0x0000: 0x0004])
         msg = payload[0x0004:0x0004 + strlen].decode()
         return rctUpgradeStatusPacket(state, msg)
-    
+
 class rctUpgradePacket(rctBinaryPacket):
-    
+
     def __init__(self, numPacket, numTotal, fileBytes):
         self._pclass = 0x03
         self._pid = 0x02
@@ -438,11 +438,11 @@ class rctUpgradePacket(rctBinaryPacket):
         self.numTotal = hex(numTotal)
         self.fileBytes = fileBytes
         self._payload = struct.pack('<BHHH', 0x01, numPacket, numTotal, len(fileBytes) + fileBytes) #TODO: fix this encoding
-    
+
     @classmethod
     def matches(cls, packetClass: int, packetID: int):
         return packetClass == 0x03 and packetID == 0x02
-    
+
     @classmethod
     def from_bytes(cls, packet: bytes):
         header = packet[0:6]
@@ -561,7 +561,7 @@ class rctConePacket(rctBinaryPacket):
         lon = lon7 / 1e7
         alt = alt1 / 10
         return rctConePacket(lat, lon, alt, power, angle, timestamp)
-        
+
 
 
 class rctACKCommand(rctBinaryPacket):
@@ -1074,7 +1074,7 @@ class mavComms:
         }
 
         self.__parser = rctBinaryPacketFactory()
-        
+
     def isOpen(self):
         return self.__port.isOpen()
 

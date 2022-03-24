@@ -17,7 +17,7 @@ class GCS(QMainWindow):
     SBWidth = 500
 
     defaultTimeout = 5
-    
+
     sig = pyqtSignal()
 
     def __init__(self):
@@ -31,7 +31,7 @@ class GCS(QMainWindow):
         self._mavModel = None
         self._buttons = []
         self._systemConnectionTab = None
-        self.systemSettingWidget = None
+        self.systemSettingsWidget = None
         self.__missionStatusText = "Start Recording"
         self.__missionStatusBtn = None
         self.innerFreqFrame = None
@@ -46,10 +46,10 @@ class GCS(QMainWindow):
         self.__createWidgets()
         for button in self._buttons:
             button.config(state='disabled')
-                    
+
         self.queue = q.Queue()
         self.sig.connect(self.execute_inmain, Qt.QueuedConnection)
-        
+
     def execute_inmain(self):
         while not self.queue.empty():
             (fn, coord, frequency, numPings) = self.queue.get()
@@ -98,7 +98,7 @@ class GCS(QMainWindow):
         for button in self._buttons:
             button.config(state='disabled')
         WarningMessager.showWarning("No Heartbeats Received")
-        
+
     def __handleNewEstimate(self):
         '''
         Internal callback to handle when a new estimate is received
@@ -106,18 +106,18 @@ class GCS(QMainWindow):
         freqList = self._mavModel.EST_mgr.getFrequencies()
         for frequency in freqList:
             params, stale, res = self._mavModel.EST_mgr.getEstimate(frequency)
-            
+
             zone, let = self._mavModel.EST_mgr.getUTMZone()
             coord = utm.to_latlon(params[0], params[1], zone, let)
-            
+
             numPings = self._mavModel.EST_mgr.getNumPings(frequency)
-            
+
             if self.mapDisplay is not None:
                 self.mapDisplay.plotEstimate(coord, frequency)
                 #self.queue.put( (self.mapDisplay.plotPrecision, coord, frequency, numPings) )
                 #self.sig.emit()
                 #self.mapDisplay.plotPrecision(coord, frequency, numPings)
-                
+
             if self.mapOptions is not None:
                 self.mapOptions.estDistance(coord, stale, res)
 
@@ -147,7 +147,7 @@ class GCS(QMainWindow):
             return
         last = list(self._mavModel.state['VCL_track'])[-1]
         coord = self._mavModel.state['VCL_track'][last]
-        
+
         self._mavModel.EST_mgr.addVehicleLocation(coord)
 
         if self.mapDisplay is not None:
@@ -181,7 +181,7 @@ class GCS(QMainWindow):
 
         if self.__missionStatusBtn.text() == 'Start Recording':
             self.__missionStatusBtn.setText('Stop Recording')
-            
+
             self._mavModel.startMission(timeout=self.defaultTimeout)
         else:
             self.__missionStatusBtn.setText('Start Recording')
@@ -265,13 +265,13 @@ class GCS(QMainWindow):
             self.swStatusLabel.config(text='SW: ON', bg='green')
         else:
             self.swStatusLabel.config(text='SW: NULL', bg='red')
-            
+
     def exportAll(self):
         '''
         Exports pings, vehcle path, and settings as json file
         '''
         final = {}
-        
+
         if self.mapDisplay is not None:
             vPath = self._mavModel.EST_mgr.getVehiclePath()
             pingDict = {}
@@ -298,10 +298,10 @@ class GCS(QMainWindow):
                 newCoord['Coordinate'] = (coord[0], coord[1])
                 vDict[indPath] = newCoord
                 indPath = indPath + 1
-                
+
             final['Pings'] = pingDict
             final['Vehicle Path'] = vDict
-            
+
         if self.systemSettingsWidget is not None:
             optionVars = self.systemSettingsWidget.optionVars
             optionDict = {}
@@ -310,15 +310,15 @@ class GCS(QMainWindow):
                     optionDict[key] = optionVars[key]
                 elif optionVars[key] is not None:
                     optionDict[key] = optionVars[key].text()
-                    
+
             final['System Settings'] = optionDict
-          
-        if self._mavModel is not None:      
+
+        if self._mavModel is not None:
             varDict = self._mavModel.state
             newVarDict = {}
-            
+
             for key in varDict.keys():
-                if ((key == 'STS_sdrStatus') or (key == 'STS_dirStatus') or 
+                if ((key == 'STS_sdrStatus') or (key == 'STS_dirStatus') or
                     (key == 'STS_gpsStatus') or (key == 'STS_sysStatus')):
                     temp = {}
                     temp['name'] = varDict[key].name
@@ -328,13 +328,13 @@ class GCS(QMainWindow):
                     pass
                 else:
                     newVarDict[key] = varDict[key]
-    
-                
+
+
             final['States'] = newVarDict
-            
+
         with open('data.json', 'w') as outfile:
             json.dump(final, outfile)
-            
+
 
 
     def closeEvent(self, event):
@@ -342,7 +342,7 @@ class GCS(QMainWindow):
         Internal callback for window close
         '''
         trans = QgsCoordinateTransform(
-            QgsCoordinateReferenceSystem("EPSG:3857"), 
+            QgsCoordinateReferenceSystem("EPSG:3857"),
             QgsCoordinateReferenceSystem("EPSG:4326"),
             QgsProject.instance())
         if self.mapDisplay is not None:
@@ -351,10 +351,10 @@ class GCS(QMainWindow):
             lon1 = ext.xMinimum()
             lat2 = ext.yMinimum()
             lon2 = ext.xMaximum()
-            
 
-            
-            config_path = 'gcsConfig.ini'   
+
+
+            config_path = 'gcsConfig.ini'
             config = configparser.ConfigParser()
             config.read(config_path)
             config['LastCoords'] = {}
@@ -364,13 +364,13 @@ class GCS(QMainWindow):
             config['LastCoords']['Lon2'] = str(lon2)
             with open(config_path, 'w') as configFile:
                 config.write(configFile)
-        
+
         if self._rctPort is not None:
             self._rctPort.close()
         if self._mavModel is not None:
             self._mavModel.stop()
         super().closeEvent(event)
-            
+
 
     def __handleConnectInput(self):
         '''
@@ -416,7 +416,7 @@ class GCS(QMainWindow):
         frm_sideControl.setWidget(content)
         frm_sideControl.setWidgetResizable(True)
 
-        #wlay is the layout that holds all tabs 
+        #wlay is the layout that holds all tabs
         wlay = QVBoxLayout(content)
 
 
@@ -437,7 +437,7 @@ class GCS(QMainWindow):
         # DATA DISPLAY TOOLS
         self.mapOptions = MapOptions()
         self.mapOptions.resize(300, 100)
-        self.mapControl = MapControl(frm_sideControl, holder, 
+        self.mapControl = MapControl(frm_sideControl, holder,
                 self.mapOptions, self)
 
         # SYSTEM SETTINGS
@@ -446,23 +446,23 @@ class GCS(QMainWindow):
         scrollArea = QScrollArea()
         scrollArea.setWidgetResizable(True)
         scrollArea.setWidget(self.systemSettingsWidget)
-        
+
         self.upgradeDisplay = UpgradeDisplay(content, self)
         self.upgradeDisplay.resize(self.SBWidth, 400)
-        
+
 
 
 
         # START PAYLOAD RECORDING
         self.__missionStatusBtn = QPushButton(self.__missionStatusText)
         self.__missionStatusBtn.clicked.connect(lambda:self.__startStopMission())
-        
+
         btn_exportAll = QPushButton('Export Info')
         btn_exportAll.clicked.connect(lambda:self.exportAll())
-        
+
         btn_precision = QPushButton('Do Precision')
         btn_precision.clicked.connect(lambda:self._mavModel.EST_mgr.doPrecisions(173500000))
-        
+
         btn_heatMap = QPushButton('Display Heatmap')
         btn_heatMap.clicked.connect(lambda:self.mapDisplay.setupHeatMap())
 
@@ -475,7 +475,7 @@ class GCS(QMainWindow):
         wlay.addWidget(btn_exportAll)
         wlay.addWidget(btn_precision)
         wlay.addWidget(btn_heatMap)
-        
+
         wlay.addStretch()
         content.resize(self.SBWidth, 400)
         frm_sideControl.setMinimumWidth(self.SBWidth)
@@ -487,7 +487,7 @@ class GCS(QMainWindow):
 
 class UpgradeDisplay(CollapseFrame):
     '''
-    Custom CollapsFrame widget that is used to facilitate software 
+    Custom CollapsFrame widget that is used to facilitate software
     upgrades
     '''
     def __init__(self, parent, root: GCS):
@@ -498,42 +498,42 @@ class UpgradeDisplay(CollapseFrame):
             root: the GCS application root
         '''
         CollapseFrame.__init__(self, title='Upgrade Software')
-        
+
         self.__parent = parent
         self.__root = root
 
         self.__innerFrame = None
 
         self.filename = None
-        
+
         self.__createWidget()
-        
+
     def update(self):
         self.updateGUIOptionVars()
-        
+
     def __createWidget(self):
         '''
         Inner function to create internal widgets
         '''
         self.__innerFrame = QGridLayout()
-        
+
         file_lbl = QLabel('Selected File:')
         self.__innerFrame.addWidget(file_lbl, 1, 0)
-        
+
         self.filename = QLineEdit()
         self.__innerFrame.addWidget(self.filename, 1, 1)
 
         browse_file_btn = QPushButton('Browse for Upgrade File')
         browse_file_btn.clicked.connect(lambda:self.fileDialogue())
         self.__innerFrame.addWidget(browse_file_btn, 2, 0)
-        
+
         upgrade_btn = QPushButton('Upgrade')
         upgrade_btn.clicked.connect(lambda:self.sendUpgradeFile())
         self.__innerFrame.addWidget(upgrade_btn, 3, 0)
 
-        
+
         self.setContentLayout(self.__innerFrame)
-        
+
     def fileDialogue(self):
         '''
         Opens a dialog to allow the user to indicate a file
@@ -542,7 +542,7 @@ class UpgradeDisplay(CollapseFrame):
         if filename is None:
             return
         self.filename.setText(filename[0])
-        
+
     def sendUpgradeFile(self):
         '''
         Inner function to send a user specified upgrade file to the mavModel
@@ -550,7 +550,7 @@ class UpgradeDisplay(CollapseFrame):
         file = open(self.filename.text(), "rb")
         byteStream = file.read()
         self.__root._mavModel.sendUpgradePacket(byteStream)
-        
+
     def updateGUIOptionVars(self):
         pass
 
@@ -560,7 +560,7 @@ class StatusDisplay(CollapseFrame):
     '''
     def __init__(self, parent, root: GCS):
         CollapseFrame.__init__(self, 'Components')
-        
+
         self.__parent = parent
         self.__root = root
         self.componentStatusWidget = None
@@ -586,7 +586,7 @@ class StatusDisplay(CollapseFrame):
 
         entr_overall_status = QLabel('')
         self.__innerFrame.addWidget(entr_overall_status, 1, 1)
-        
+
         self.componentStatusWidget = ComponentStatusDisplay(root=self.__root)
         h1 = self.componentStatusWidget.innerFrame.sizeHint().height()
         self.__innerFrame.addWidget(self.componentStatusWidget, 2, 0, 1, 2)
@@ -623,7 +623,7 @@ class StatusDisplay(CollapseFrame):
         else:
             self.statusLabel.setText('Not Connected')
             self.statusLabel.setStyleSheet("background-color: yellow")
-            
+
         self.componentStatusWidget.update()
 
 class ComponentStatusDisplay(CollapseFrame):
@@ -672,12 +672,12 @@ class ComponentStatusDisplay(CollapseFrame):
             "RCT_STATES.finish": {'text': 'SYS: Stopping', 'bg': 'blue'},
             "RCT_STATES.fail": {'text': 'SYS: Failed!', 'bg': 'red'},
         }
-        
+
         self.swMap = {
             '0': {'text': 'SW: OFF', 'bg': 'yellow'},
             '1': {'text': 'SW: ON', 'bg': 'green'},
         }
-        
+
         self.compDicts = {
             "STS_sdrStatus": self.sdrMap,
             "STS_dirStatus": self.dirMap,
@@ -685,7 +685,7 @@ class ComponentStatusDisplay(CollapseFrame):
             "STS_sysStatus": self.sysMap,
             "STS_swStatus": self.swMap,
         }
-            
+
         #self.__parent = parent
         self.__root = root
 
@@ -745,19 +745,23 @@ class ComponentStatusDisplay(CollapseFrame):
         varDict = self.__root._mavModel.state
         for varName, varValue in varDict.items():
             try:
-                configDict = self.compDicts[varName]
-                configOpts = configDict[str(varValue)]
-                self.statusLabels[varName].setText(configOpts['text'])
+                if varName in self.compDicts:
+                    configDict = self.compDicts[varName]
+                if str(varValue) in configDict:
+                    configOpts = configDict[str(varValue)]
+                if varName in self.statusLabels:
+                    self.statusLabels[varName].setText(configOpts['text'])
                 style = "background-color: %s" % configOpts['bg']
-                self.statusLabels[varName].setStyleSheet(style)
+                if varName in self.statusLabels:
+                    self.statusLabels[varName].setStyleSheet(style)
             except KeyError:
                 WarningMessager.showWarning("Failed to update GUI option vars", "Unexpected Error")
                 continue
 
-class MapControl(CollapseFrame): 
+class MapControl(CollapseFrame):
     '''
     Custom Widget Class to facilitate Map Loading
-    '''   
+    '''
     def __init__(self, parent, holder, mapOptions, root: GCS):
         CollapseFrame.__init__(self, title='Map Display Tools')
         self.__parent = parent
@@ -795,7 +799,7 @@ class MapControl(CollapseFrame):
         controlPanel.addWidget(btn_loadMap)
 
 
-        
+
         frm_loadWebMap = QLabel('Load WebMap')
         controlPanel.addWidget(frm_loadWebMap)
         lay_loadWebMap = QGridLayout()
@@ -819,12 +823,12 @@ class MapControl(CollapseFrame):
         self.__p2lonEntry = QLineEdit()
         lay_loadWebMap.addWidget(self.__p2lonEntry, 1, 2)
 
-        
-        btn_loadWebMap = QPushButton('Load from Web') 
+
+        btn_loadWebMap = QPushButton('Load from Web')
         btn_loadWebMap.clicked.connect(lambda:self.__loadWebMap())
         lay_loadWebMap.addWidget(btn_loadWebMap, 3, 1, 1, 2)
-        
-        btn_loadCachedMap = QPushButton('Load from Cache') 
+
+        btn_loadCachedMap = QPushButton('Load from Cache')
         btn_loadCachedMap.clicked.connect(lambda:self.__loadCachedMap())
         lay_loadWebMap.addWidget(btn_loadCachedMap, 4, 1, 1, 2)
 
@@ -833,7 +837,7 @@ class MapControl(CollapseFrame):
 
 
         self.setContentLayout(controlPanel)
-        
+
     def __coordsFromConf(self):
         '''
         Internal function to pull past coordinates from the config
@@ -851,27 +855,27 @@ class MapControl(CollapseFrame):
         except KeyError:
             WarningMessager.showWarning("Could not read config path", config_path)
             return None, None, None, None
-            
-        
+
+
     def __loadWebMap(self):
         '''
-        Internal function to load map from web 
+        Internal function to load map from web
         '''
         lat1 = self.__p1latEntry.text()
         lon1 = self.__p1lonEntry.text()
         lat2 = self.__p2latEntry.text()
         lon2 = self.__p2lonEntry.text()
-        
-        
-        
+
+
+
         if (lat1 == '') or (lon1 == '') or (lat2 == '') or (lon2 == ''):
             lat1, lon1, lat2, lon2 = self.__coordsFromConf()
-            
+
             self.__p1latEntry.setText(lat1)
             self.__p1lonEntry.setText(lon1)
             self.__p2latEntry.setText(lat2)
             self.__p2lonEntry.setText(lon2)
-        
+
         if lat1 is None or lat2 is None or lon1 is None or lon2 is None:
             lat1 = 90
             lat2 = -90
@@ -885,9 +889,9 @@ class MapControl(CollapseFrame):
         p1lon = float(lon1)
         p2lat = float(lat2)
         p2lon = float(lon2)
-        
+
         try:
-            temp = WebMap(self.__holder, p1lat, p1lon, 
+            temp = WebMap(self.__holder, p1lat, p1lon,
                     p2lat, p2lon, False)
         except RuntimeError:
             WarningMessager.showWarning("Failed to load web map")
@@ -907,7 +911,7 @@ class MapControl(CollapseFrame):
         p2lat = float(self.__p2latEntry.text())
         p2lon = float(self.__p2lonEntry.text())
         self.__mapFrame.setParent(None)
-        self.__mapFrame = WebMap(self.__holder, p1lat, p1lon, 
+        self.__mapFrame = WebMap(self.__holder, p1lat, p1lon,
                 p2lat, p2lon, True)
         self.__mapFrame.resize(800, 500)
         self.__mapOptions.setMap(self.__mapFrame, True)
