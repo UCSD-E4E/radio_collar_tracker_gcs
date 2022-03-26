@@ -47,14 +47,13 @@ import datetime as dt
 from enum import Enum
 import logging
 import sys
-import rctTransport
 import numpy as np
 from time import sleep
 from ping import rctPing
 import utm
 import json
-from rctComms import mavComms, rctBinaryPacket
-import rctComms
+import RCTComms.comms
+import RCTComms.transport
 import time
 import math
 
@@ -88,7 +87,7 @@ class droneSim:
         END = 4
         SPIN = 5
 
-    def __init__(self, port: mavComms):
+    def __init__(self, port: RCTComms.comms.mavComms):
         '''
         Creates a new DroneSim object
         :param port:
@@ -189,19 +188,19 @@ class droneSim:
 
         # register command actions here
         self.port.registerCallback(
-            rctComms.EVENTS.COMMAND_GETF, self.__doGetFrequency)
+            RCTComms.comms.EVENTS.COMMAND_GETF, self.__doGetFrequency)
         self.port.registerCallback(
-            rctComms.EVENTS.COMMAND_SETF, self.__doSetFrequency)
+            RCTComms.comms.EVENTS.COMMAND_SETF, self.__doSetFrequency)
         self.port.registerCallback(
-            rctComms.EVENTS.COMMAND_GETOPT, self.__doGetOptions)
+            RCTComms.comms.EVENTS.COMMAND_GETOPT, self.__doGetOptions)
         self.port.registerCallback(
-            rctComms.EVENTS.COMMAND_SETOPT, self.__doSetOptions)
+            RCTComms.comms.EVENTS.COMMAND_SETOPT, self.__doSetOptions)
         self.port.registerCallback(
-            rctComms.EVENTS.COMMAND_START, self.__doStartMission)
+            RCTComms.comms.EVENTS.COMMAND_START, self.__doStartMission)
         self.port.registerCallback(
-            rctComms.EVENTS.COMMAND_STOP, self.__doStopMission)
+            RCTComms.comms.EVENTS.COMMAND_STOP, self.__doStopMission)
         self.port.registerCallback(
-            rctComms.EVENTS.COMMAND_UPGRADE, self.__doUpgrade)
+            RCTComms.comms.EVENTS.COMMAND_UPGRADE, self.__doUpgrade)
 
         # Reset state parameters
         self.reset()
@@ -463,7 +462,7 @@ class droneSim:
         print("Ping on %d at %3.7f, %3.7f, %3.0f m, measuring %3.3f" %
               (dronePing.freq, dronePing.lat, dronePing.lon, dronePing.alt, dronePing.power))
 
-        conepacket = rctComms.rctConePacket(dronePing.lat, dronePing.lon, dronePing.alt, dronePing.power, hdg)
+        conepacket = RCTComms.comms.rctConePacket(dronePing.lat, dronePing.lon, dronePing.alt, dronePing.power, hdg)
         self.port.sendCone(conepacket)
 
 
@@ -518,23 +517,23 @@ class droneSim:
         '''
         self.PP_options['SDR_samplingFreq'] = samplingFreq
 
-    def __ackCommand(self, command: rctBinaryPacket):
+    def __ackCommand(self, command: RCTComms.comms.rctBinaryPacket):
         '''
         Sends the command acknowledge packet for the given command.
         :param command:
         '''
-        self.port.sendToGCS(rctComms.rctACKCommand(command._pid, 1))
+        self.port.sendToGCS(RCTComms.comms.rctACKCommand(command._pid, 1))
 
-    def __doGetFrequency(self, packet: rctComms.rctGETFCommand, addr: str):
+    def __doGetFrequency(self, packet: RCTComms.comms.rctGETFCommand, addr: str):
         '''
         Callback for the Get Frequency command packet
         :param packet:
         :param addr:
         '''
-        self.port.sendToGCS(rctComms.rctFrequenciesPacket(
+        self.port.sendToGCS(RCTComms.comms.rctFrequenciesPacket(
             self.PP_options['TGT_frequencies']))
 
-    def __doStartMission(self, packet: rctComms.rctSTARTCommand, addr: str):
+    def __doStartMission(self, packet: RCTComms.comms.rctSTARTCommand, addr: str):
         '''
         Callback for the Start Mission command packet
         :param packet:
@@ -543,7 +542,7 @@ class droneSim:
         self.SS_payloadRunning = True
         self.__ackCommand(packet)
 
-    def __doStopMission(self, packet: rctComms.rctSTOPCommand, addr: str):
+    def __doStopMission(self, packet: RCTComms.comms.rctSTOPCommand, addr: str):
         '''
         Callback for the Stop Mission command packet
         :param packet:
@@ -552,7 +551,7 @@ class droneSim:
         self.SS_payloadRunning = False
         self.__ackCommand(packet)
 
-    def __doSetFrequency(self, packet: rctComms.rctSETFCommand, addr: str):
+    def __doSetFrequency(self, packet: RCTComms.comms.rctSETFCommand, addr: str):
         '''
         Callback for the Set Frequency command packet
         :param packet:
@@ -569,7 +568,7 @@ class droneSim:
         self.__ackCommand(packet)
         self.__doGetFrequency(packet, addr)
 
-    def __doGetOptions(self, packet: rctComms.rctGETOPTCommand, addr: str):
+    def __doGetOptions(self, packet: RCTComms.comms.rctGETOPTCommand, addr: str):
         '''
         Callback for the Get Options command packet
         :param packet:
@@ -577,10 +576,10 @@ class droneSim:
         '''
         scope = packet.scope
         print(self.PP_options)
-        packet = rctComms.rctOptionsPacket(scope, **self.PP_options)
+        packet = RCTComms.comms.rctOptionsPacket(scope, **self.PP_options)
         self.port.sendToGCS(packet)
 
-    def __doSetOptions(self, packet: rctComms.rctSETOPTCommand, addr: str):
+    def __doSetOptions(self, packet: RCTComms.comms.rctSETOPTCommand, addr: str):
         '''
         Callback for the Set Options command packet
         :param packet:
@@ -603,7 +602,7 @@ class droneSim:
         heartbeat packet every self.SC_HeartbeatPeriod seconds.
         '''
         while self.HS_run is True:
-            packet = rctComms.rctHeartBeatPacket(self.__state['STS_sysStatus'],
+            packet = RCTComms.comms.rctHeartBeatPacket(self.__state['STS_sysStatus'],
                                                  self.__state['STS_sdrStatus'],
                                                  self.__state['STS_gpsStatus'],
                                                  self.__state['STS_dirStatus'],
@@ -625,7 +624,7 @@ class droneSim:
             self.SS_vehiclePosition[0], self.SS_vehiclePosition[1], self.SS_utmZoneNum, self.SS_utmZone)
         alt = self.SS_vehiclePosition[2]
         hdg = 0
-        packet = rctComms.rctVehiclePacket(lat, lon, alt, hdg)
+        packet = RCTComms.comms.rctVehiclePacket(lat, lon, alt, hdg)
         self.port.sendVehicle(packet)# WAS .sendToAll
 
     def doMission(self, returnOnEnd: bool = False):
@@ -942,8 +941,8 @@ if __name__ == '__main__':
     parser.add_argument('--port', type=int, default=9000)
     parser.add_argument('--protocol', type=str,
                         choices=['udp', 'tcp'], required=True)
-    parser.add_argument('--target', type=str, default='255.255.255.255',
-                        help='Target IP Address.  Use 255.255.255.255 for broadcast')
+    parser.add_argument('--target', type=str, default='127.0.0.1',
+                        help='Target IP Address.  Use 255.255.255.255 for broadcast, 127.0.0.1 for local')
     args = parser.parse_args()
     logName = dt.datetime.now().strftime('%Y.%m.%d.%H.%M.%S_sim.log')
     logger = logging.getLogger()
@@ -959,14 +958,13 @@ if __name__ == '__main__':
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
-    # TODO: Drone should be client, not server
     if args.protocol == 'udp':
-        port = rctTransport.RCTUDPServer(port=args.port)
+        port = RCTComms.transport.RCTUDPClient(port=args.port, addr=args.target)
     elif args.protocol == 'tcp':
-        port = rctTransport.RCTTCPServer(port=args.port)
+        port = RCTComms.transport.RCTTCPClient(port=args.port, addr=args.target)
 
-    comms = mavComms(port)
-    sim = droneSim(comms)
+    mavModel = RCTComms.comms.mavComms(port)
+    sim = droneSim(mavModel)
     try:
         __IPYTHON__
     except NameError:

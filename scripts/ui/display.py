@@ -365,31 +365,29 @@ class GCS(QMainWindow):
             with open(config_path, 'w') as configFile:
                 config.write(configFile)
 
-        if self._rctPort is not None:
-            self._rctPort.close()
+        if self._mavReceiver is not None:
+            self._mavReceiver.stop()
         if self._mavModel is not None:
             self._mavModel.stop()
         super().closeEvent(event)
 
-
     def __handleConnectInput(self):
         '''
-        Internal callback to open Connect Settings
+        Internal callback to connect GCS to drone
         '''
         connectionDialog = ConnectionDialog(self)
         connectionDialog.exec_()
 
+        if connectionDialog.port is None or connectionDialog.comms is None or connectionDialog.model is None:
+            return
 
         self._rctPort = connectionDialog.port
         self._mavReceiver = connectionDialog.comms
         self._mavModel = connectionDialog.model
-        if self._mavModel is None:
-            return
 
-        self._systemConnectionTab.updateText("System: Connected")
         self.__registerModelCallbacks()
-        self.systemSettingsWidget.updateGUIOptionVars()
         self.statusWidget.updateGUIOptionVars()
+        self.systemSettingsWidget.connectionMade()
 
     def setMap(self, mapWidget):
         '''
@@ -424,10 +422,11 @@ class GCS(QMainWindow):
         self._systemConnectionTab = CollapseFrame(title='System: No Connection')
         self._systemConnectionTab.resize(self.SBWidth, 400)
         lay_sys = QVBoxLayout()
-        btn_connect = QPushButton("Connect")
-        btn_connect.resize(self.SBWidth, 100)
-        btn_connect.clicked.connect(lambda:self.__handleConnectInput())
-        lay_sys.addWidget(btn_connect)
+        btn_setup = QPushButton("Connect")
+        btn_setup.resize(self.SBWidth, 100)
+        btn_setup.clicked.connect(lambda:self.__handleConnectInput())
+        lay_sys.addWidget(btn_setup)
+
         self._systemConnectionTab.setContentLayout(lay_sys)
 
         # COMPONENTS TAB
@@ -747,13 +746,13 @@ class ComponentStatusDisplay(CollapseFrame):
             try:
                 if varName in self.compDicts:
                     configDict = self.compDicts[varName]
-                if str(varValue) in configDict:
-                    configOpts = configDict[str(varValue)]
-                if varName in self.statusLabels:
-                    self.statusLabels[varName].setText(configOpts['text'])
-                style = "background-color: %s" % configOpts['bg']
-                if varName in self.statusLabels:
-                    self.statusLabels[varName].setStyleSheet(style)
+                    if str(varValue) in configDict:
+                        configOpts = configDict[str(varValue)]
+                        if varName in self.statusLabels:
+                            self.statusLabels[varName].setText(configOpts['text'])
+                        style = "background-color: %s" % configOpts['bg']
+                        if varName in self.statusLabels:
+                            self.statusLabels[varName].setStyleSheet(style)
             except KeyError:
                 WarningMessager.showWarning("Failed to update GUI option vars", "Unexpected Error")
                 continue

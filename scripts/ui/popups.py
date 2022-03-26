@@ -1,5 +1,5 @@
 from RCTComms.comms import gcsComms
-from RCTComms.transport import RCTTCPClient
+from RCTComms.transport import RCTTCPServer
 import rctCore
 from PyQt5.QtCore import QRegExp
 from PyQt5.QtWidgets import *
@@ -272,13 +272,12 @@ class ConnectionDialog(QWizard):
         Internal Function to submit user inputted connection settings
         '''
         try:
-            # TODO: GCS should be server, not client
-            self.port = RCTTCPClient(
-                addr=self.page.addrEntry.text(), port=int(self.page.portEntry.text()))
-            self.comms = gcsComms(self.port)
+            self.port = RCTTCPServer(port=int(self.page.portEntry.text()), addr=(self.page.addrEntry.text()))
+            self.comms = gcsComms(self.port, self.__parent.systemSettingsWidget)
+            self.comms.start()
+
             self.model = rctCore.MAVModel(self.comms)
             self.model.start()
-            self.__parent.systemSettingsWidget.connectionMade()
         except:
             WarningMessager.showWarning("Please specify valid connection settings")
             return
@@ -312,9 +311,10 @@ class ConnectionDialogPage(QWizardPage):
         '''
         Internal function to create widgets
         '''
-        frm_holder = QHBoxLayout()
+        frm_holder = QVBoxLayout()
         frm_holder.addStretch(1)
-        frm_conType = QVBoxLayout()
+        #-----
+        frm_conType = QHBoxLayout()
         frm_conType.addStretch(1)
 
         lbl_conType = QLabel('Connection Type:')
@@ -322,26 +322,24 @@ class ConnectionDialogPage(QWizardPage):
 
         btn_TCP = QCheckBox('TCP')
         frm_conType.addWidget(btn_TCP)
-
-        frm_port = QVBoxLayout()
+        #-----
+        frm_port = QHBoxLayout()
         frm_port.addStretch(1)
 
         lbl_port = QLabel('Port')
         frm_port.addWidget(lbl_port)
 
-        lbl_addr = QLabel("IP Addr")
-        frm_port.addWidget(lbl_addr)
-
         self.portEntry = QLineEdit()
         self.portEntry.setText(str(self.__portEntryVal))
         frm_port.addWidget(self.portEntry)
 
+        lbl_addr = QLabel("IP Addr")
+        frm_port.addWidget(lbl_addr)
+
         self.addrEntry = QLineEdit()
         self.addrEntry.setText(self.__addrEntryVal)
         frm_port.addWidget(self.addrEntry)
-
-
-
-        frm_holder.addLayout(frm_conType)
+        #-----
         frm_holder.addLayout(frm_port)
+        frm_holder.addLayout(frm_conType)
         self.setLayout(frm_holder)

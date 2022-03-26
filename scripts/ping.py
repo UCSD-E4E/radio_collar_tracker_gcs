@@ -39,7 +39,7 @@ from scipy.optimize import least_squares
 from scipy.stats import norm, zscore
 import utm
 import time
-from rctComms import rctPingPacket
+from RCTComms.comms import rctPingPacket
 from osgeo import gdal
 from osgeo import osr
 import csv
