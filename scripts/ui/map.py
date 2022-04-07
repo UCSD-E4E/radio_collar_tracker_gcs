@@ -685,21 +685,13 @@ class MapOptions(QWidget):
         Inner function to facilitate map caching
         '''
         if self.isWebMap:
-            if (self.mapWidget.toolRect.rectangle() != None):
-                cacheThread = Thread(target=self.mapWidget.cacheMap)
-                cacheThread.start()
-                self.mapWidget.canvas.refresh()
-            elif(self.mapWidget.toolPolygon != None):
-                #Check if there is a polygon selected
-                print("Expected: there is a polygon selected")
-                #Call cache fxn?
-                cacheThread = Thread(target=self.mapWidget.cacheMap)
-                cacheThread.start()
-                self.mapWidget.canvas.refresh()
-            
-            else:
+            if (self.mapWidget.toolRect.rectangle() == None):
                 WarningMessager.showWarning("Use the rect tool to choose an area on the map to cache", "No specified area to cache!")
                 self.mapWidget.rect()
+            else:
+                cacheThread = Thread(target=self.mapWidget.cacheMap)
+                cacheThread.start()
+                self.mapWidget.canvas.refresh()
         else:
             print("alert")
 
@@ -845,7 +837,8 @@ class MapOptions(QWidget):
         if self.mapWidget.toolPolygon is None:
             return
         elif len(self.mapWidget.toolPolygon.vertices) == 0:
-            return
+            WarningMessager.showWarning("Use the polygon tool to choose an area on the map to export", "No specified area to export!")
+            self.mapWidget.polygon()
         else:
             
             pts = self.mapWidget.toolPolygon.vertices
@@ -1194,7 +1187,7 @@ class WebMap(MapWidget):
             print("Rectangle:", r.xMinimum(),
                     r.yMinimum(), r.xMaximum(), r.yMaximum()
                  )
-            '''
+            
             if (r != None):
                 zoomStart = 17
                 tilecount = 0
@@ -1216,7 +1209,7 @@ class WebMap(MapWidget):
                 print("Download Complete")
             else:
                 print("Download Failed")
-            '''
+            
             
     def downloadTile(self, xtile, ytile, zoom):
         '''
