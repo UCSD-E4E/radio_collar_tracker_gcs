@@ -644,16 +644,21 @@ class MapOptions(QWidget):
         exportTab = CollapseFrame('Export')
         btn_pingExport = QPushButton('Pings')
         btn_pingExport.clicked.connect(lambda:self.exportPing())
+
         btn_vehiclePathExport = QPushButton('Vehicle Path')
         btn_vehiclePathExport.clicked.connect(lambda:self.exportVehiclePath())
 
         btn_polygonExport = QPushButton('Polygon')
         btn_polygonExport.clicked.connect(lambda:self.exportPolygon())
+
+        btn_coneExport = QPushButton('Cones')
+        btn_coneExport.clicked.connect(lambda:self.exportCone())
         
         lay_export = QVBoxLayout()
         lay_export.addWidget(btn_pingExport)
         lay_export.addWidget(btn_vehiclePathExport)
         lay_export.addWidget(btn_polygonExport)
+        lay_export.addWidget(btn_coneExport)
         exportTab.setContentLayout(lay_export)
         
         lay_mapOptions.addWidget(exportTab)        
@@ -857,6 +862,19 @@ class MapOptions(QWidget):
             
             QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.polygonLayer, file, 
                                                     QgsCoordinateTransformContext(), options)
+
+    def exportCone(self):
+        '''
+        Method to export a MapWidget's cones to a shapefile
+        '''
+        folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
+        file = folder + '/cones.shp'
+        options = QgsVectorFileWriter.SaveVectorOptions()
+        options.driverName = "ESRI Shapefile"
+
+        QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.cones, 
+                                        file, 
+                                        QgsCoordinateTransformContext(), options)
            
 class WebMap(MapWidget):
     '''
