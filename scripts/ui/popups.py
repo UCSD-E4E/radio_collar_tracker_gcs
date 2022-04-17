@@ -272,7 +272,7 @@ class ConnectionDialog(QWizard):
         Internal Function to submit user inputted connection settings
         '''
         try:
-            self.port = RCTTCPServer(port=int(self.page.portEntry.text()), addr=(self.page.addrEntry.text()))
+            self.port = RCTTCPServer(port=int(self.page.portEntry.text()))
             self.comms = gcsComms(self.port, self.__parent.systemSettingsWidget)
             self.comms.start()
 
@@ -297,8 +297,6 @@ class ConnectionDialogPage(QWizardPage):
         self.__parent = parent
         self.__portEntryVal = 9000 # default value
         self.portEntry = None # default value
-        self.__addrEntryVal = '127.0.0.1'
-        self.addrEntry = None
         self.port = None
         self.comms = None
         self.model = None
@@ -333,12 +331,6 @@ class ConnectionDialogPage(QWizardPage):
         self.portEntry.setText(str(self.__portEntryVal))
         frm_port.addWidget(self.portEntry)
 
-        lbl_addr = QLabel("IP Addr")
-        frm_port.addWidget(lbl_addr)
-
-        self.addrEntry = QLineEdit()
-        self.addrEntry.setText(self.__addrEntryVal)
-        frm_port.addWidget(self.addrEntry)
         #-----
         frm_holder.addLayout(frm_port)
         frm_holder.addLayout(frm_conType)
