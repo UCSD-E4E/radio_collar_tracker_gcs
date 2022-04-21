@@ -872,9 +872,9 @@ class MapOptions(QWidget):
         options = QgsVectorFileWriter.SaveVectorOptions()
         options.driverName = "ESRI Shapefile"
 
-        QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.cones, 
-                                        file, 
-                                        QgsCoordinateTransformContext(), options)
+        QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.cones, file, 
+                                                QgsCoordinateTransformContext(), 
+                                                options)
            
 class WebMap(MapWidget):
     '''
