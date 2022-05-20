@@ -1242,7 +1242,8 @@ class WebMap(MapWidget):
         
         if(not os.path.isfile(download_path)):
             print("downloading %r" % url)
-            source = requests.get(url, headers = {'User-agent': 'Mozilla/5.0'})
+            # requires up to date user agent
+            source = requests.get(url, headers = {'User-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.54 Safari/537.36'})
             cont = source.content
             source.close()
             destination = open(download_path,'wb')

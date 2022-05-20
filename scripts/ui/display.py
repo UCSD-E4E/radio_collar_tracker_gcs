@@ -856,11 +856,7 @@ class MapControl(CollapseFrame):
             WarningMessager.showWarning("Could not read config path", config_path)
             return None, None, None, None
 
-
-    def __loadWebMap(self):
-        '''
-        Internal function to load map from web
-        '''
+    def __initLatLon(self):
         lat1 = self.__p1latEntry.text()
         lon1 = self.__p1lonEntry.text()
         lat2 = self.__p2latEntry.text()
@@ -877,10 +873,10 @@ class MapControl(CollapseFrame):
             self.__p2lonEntry.setText(lon2)
 
         if lat1 is None or lat2 is None or lon1 is None or lon2 is None:
-            lat1 = 90
-            lat2 = -90
-            lon1 = -180
-            lon2 = 180
+            lat1 = "90"
+            lat2 = "-90"
+            lon1 = "-180"
+            lon2 = "180"
             self.__p1latEntry.setText(lat1)
             self.__p1lonEntry.setText(lon1)
             self.__p2latEntry.setText(lat2)
@@ -889,7 +885,14 @@ class MapControl(CollapseFrame):
         p1lon = float(lon1)
         p2lat = float(lat2)
         p2lon = float(lon2)
-
+        
+        return [p1lat, p1lon, p2lat, p2lon]
+    
+    def __loadWebMap(self):
+        '''
+        Internal function to load map from web
+        '''
+        p1lat, p1lon, p2lat, p2lon = self.__initLatLon()
         try:
             temp = WebMap(self.__holder, p1lat, p1lon,
                     p2lat, p2lon, False)
@@ -906,10 +909,7 @@ class MapControl(CollapseFrame):
         '''
         Internal function to load map from cached tiles
         '''
-        p1lat = float(self.__p1latEntry.text())
-        p1lon = float(self.__p1lonEntry.text())
-        p2lat = float(self.__p2latEntry.text())
-        p2lon = float(self.__p2lonEntry.text())
+        p1lat, p1lon, p2lat, p2lon = self.__initLatLon()
         self.__mapFrame.setParent(None)
         self.__mapFrame = WebMap(self.__holder, p1lat, p1lon,
                 p2lat, p2lon, True)
