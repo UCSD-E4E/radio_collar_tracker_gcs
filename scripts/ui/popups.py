@@ -275,7 +275,7 @@ class ConnectionDialog(QWizard):
             # TODO: GCS should be server, not client
             self.port = RCTTCPClient(
                 addr=self.page.addrEntry.text(), port=int(self.page.portEntry.text()))
-            self.comms = gcsComms(self.port)
+            self.comms = gcsComms(self.port, self)
             self.model = rctCore.MAVModel(self.comms)
             self.model.start()
             self.__parent.systemSettingsWidget.connectionMade()

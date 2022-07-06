@@ -47,14 +47,14 @@ import datetime as dt
 from enum import Enum
 import logging
 import sys
-import rctTransport
+import RCTComms.comms as rctTransport
 import numpy as np
 from time import sleep
 from ping import rctPing
 import utm
 import json
-from rctComms import mavComms, rctBinaryPacket
-import rctComms
+from RCTComms.comms import mavComms, rctBinaryPacket
+import RCTComms.comms as rctComms
 import time
 import math
 

@@ -45,7 +45,7 @@
 ###############################################################################
 
 from enum import Enum, auto
-import rctComms
+import RCTComms.comms as rctComms
 import logging
 import threading
 import ping
