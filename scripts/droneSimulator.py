@@ -47,7 +47,7 @@ import datetime as dt
 from enum import Enum
 import logging
 import sys
-import RCTComms.comms as rctTransport
+import RCTComms.transport as rctTransport
 import numpy as np
 from time import sleep
 from ping import rctPing
