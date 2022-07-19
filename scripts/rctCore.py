@@ -264,7 +264,7 @@ class MAVModel:
                              shall be a function with no parameters to be called
                              for progress
         '''
-        #self.__rx.start(guiTickCallback) #self.__rx is the same gcsComms that's started elsewhere
+        self.__rx.start()
         self.__log.info("MVAModel started")
 
     def __processFrequencies(self, packet: RCTComms.comms.rctFrequenciesPacket, addr: str):
@@ -343,7 +343,7 @@ class MAVModel:
         '''
         Stops the MAVModel and underlying resources
         '''
-        #self.__rx.stop() #self.__rx is the same gcsComms that's stopped elsewhere
+        self.__rx.stop()
         self.__log.info("MVAModel stopped")
 
     def registerCallback(self, event: Events, callback):

@@ -250,20 +250,17 @@ class ConnectionDialog(QWizard):
     '''
     Custom Dialog widget to facilitate connecting to the drone
     '''
-    def __init__(self, parent):
+    def __init__(self, portVal):
         '''
         Creates new ConnectionDialog widget
         Args:
-            parent: the parent widget of this object
+            portVal: the port value used
         '''
         super(ConnectionDialog, self).__init__()
-        self.__parent = parent
         self.setWindowTitle('Connect Settings')
-        self.page = ConnectionDialogPage(self)
+        self.page = ConnectionDialogPage(portVal)
+        self.portVal = portVal
         self.addPage(self.page)
-        self.port = None
-        self.comms = None
-        self.model = None
         self.resize(640,480)
         self.button(QWizard.FinishButton).clicked.connect(lambda:self.submit())
 
@@ -271,36 +268,22 @@ class ConnectionDialog(QWizard):
         '''
         Internal Function to submit user inputted connection settings
         '''
-        try:
-            self.port = RCTTCPServer(port=int(self.page.portEntry.text()))
-            self.comms = gcsComms(self.port, self.__parent.systemSettingsWidget)
-            self.comms.start()
-
-            self.model = rctCore.MAVModel(self.comms)
-            self.model.start()
-        except:
-            WarningMessager.showWarning("Please specify valid connection settings")
-            return
+        self.portVal = int(self.page.portEntry.text())
 
 class ConnectionDialogPage(QWizardPage):
     '''
     Custom DialogPage widget - Allows the user to configure
     settings to connect to the drone
     '''
-    def __init__(self, parent):
+    def __init__(self, portVal):
         '''
         Creates a new AddTargetDialog
         Args:
-            parent: The parent ConnectionDialog widget
+            portVal: The port value used
         '''
-        super(ConnectionDialogPage, self).__init__(parent)
-        self.__parent = parent
-        self.__portEntryVal = 9000 # default value
+        super(ConnectionDialogPage, self).__init__()
+        self.__portEntryVal = portVal # default value
         self.portEntry = None # default value
-        self.port = None
-        self.comms = None
-        self.model = None
-
 
         self.__createWidget()
 
