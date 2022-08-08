@@ -85,13 +85,10 @@ class GCS(QMainWindow):
             print("Server could not be started")
 
     def __connectionHandler(self, connection, id):
-        print("connect id: " + str(id))
         comms = gcsComms(connection, partial(self.__disconnectHandler, id))
         model = rctCore.MAVModel(comms)
-        print('about to start model')
         model.start()
         self._mavModels[id] = model
-        print(self._mavModels)
         if self._mavModel is None:
             self._mavModel = model
             self.__registerModelCallbacks()
@@ -100,11 +97,6 @@ class GCS(QMainWindow):
         self.__log.info('Connected {}'.format(id))
 
     def __disconnectHandler(self, id):
-        # debugging
-        print("disconnect id: " + str(id))
-        print("mav list: ", end='')
-        print(self._mavModels)
-
         mavModel = self._mavModels[id]
         del self._mavModels[id]
         if (mavModel == self._mavModel):
@@ -134,7 +126,6 @@ class GCS(QMainWindow):
         '''
         Internal Heartbeat callback
         '''
-        self.statusWidget.updateGUIOptionVars()
 
     def __startCommand(self):
         '''
