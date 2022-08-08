@@ -8,6 +8,8 @@ import json
 from ui.popups import *
 from ui.controls import *
 from ui.map import *
+from functools import partial
+from RCTComms.transport import RCTTCPServer
 
 class GCS(QMainWindow):
     '''
@@ -18,6 +20,8 @@ class GCS(QMainWindow):
 
     defaultTimeout = 5
 
+    defaultPortVal = 9000
+
     sig = pyqtSignal()
 
     def __init__(self):
@@ -26,8 +30,9 @@ class GCS(QMainWindow):
         '''
         super().__init__()
         self.__log = logging.getLogger('rctGCS.GCS')
-        self._rctPort = None
-        self._mavReceiver = None
+        self.portVal = self.defaultPortVal
+        self._server = None
+        self._mavModels = {}
         self._mavModel = None
         self._buttons = []
         self._systemConnectionTab = None
@@ -49,6 +54,7 @@ class GCS(QMainWindow):
 
         self.queue = q.Queue()
         self.sig.connect(self.execute_inmain, Qt.QueuedConnection)
+        self.__startServer()
 
     def execute_inmain(self):
         while not self.queue.empty():
@@ -69,6 +75,54 @@ class GCS(QMainWindow):
         self._mavModel.registerCallback(
             rctCore.Events.ConeInfo, self.__handleNewCone)
 
+    def __startServer(self):
+        if self._server is not None:
+            self._server.close()
+        self._server = RCTTCPServer(self.portVal, self.__connectionHandler)
+        if self._server is not None:
+            self._server.open()
+        else:
+            print("Server could not be started")
+
+    def __connectionHandler(self, connection, id):
+        print("connect id: " + str(id))
+        comms = gcsComms(connection, partial(self.__disconnectHandler, id))
+        model = rctCore.MAVModel(comms)
+        print('about to start model')
+        model.start()
+        self._mavModels[id] = model
+        print(self._mavModels)
+        if self._mavModel is None:
+            self._mavModel = model
+            self.__registerModelCallbacks()
+        self.updateConnectionsLabel()
+        self.systemSettingsWidget.connectionMade()
+        self.__log.info('Connected {}'.format(id))
+
+    def __disconnectHandler(self, id):
+        # debugging
+        print("disconnect id: " + str(id))
+        print("mav list: ", end='')
+        print(self._mavModels)
+
+        mavModel = self._mavModels[id]
+        del self._mavModels[id]
+        if (mavModel == self._mavModel):
+            self._mavModel = None
+        if len(self._mavModels) == 0:
+            self.systemSettingsWidget.disconnected()
+        self.updateConnectionsLabel()
+        self.__log.info('Disconnected {}'.format(id))
+
+    def updateConnectionsLabel(self):
+        numConnections = len(self._mavModels)
+        label = "System: No Connection"
+        if numConnections == 1:
+            label = "System: 1 Connection"
+        elif numConnections > 1:
+            label = "System: {} Connections".format(numConnections)
+        self._systemConnectionTab.updateText(label)
+
     def mainloop(self, n=0):
         '''
         Main Application Loop
@@ -80,6 +134,7 @@ class GCS(QMainWindow):
         '''
         Internal Heartbeat callback
         '''
+        self.statusWidget.updateGUIOptionVars()
 
     def __startCommand(self):
         '''
@@ -365,29 +420,27 @@ class GCS(QMainWindow):
             with open(config_path, 'w') as configFile:
                 config.write(configFile)
 
-        if self._mavReceiver is not None:
-            self._mavReceiver.stop()
-        if self._mavModel is not None:
-            self._mavModel.stop()
+        for id in self._mavModels:
+            mavModel = self._mavModels[id]
+            mavModel.stop()
+        self._mavModels = {}
+        self._mavModel = None
+        self._server.close()
+        self._server = None
         super().closeEvent(event)
 
     def __handleConnectInput(self):
         '''
         Internal callback to connect GCS to drone
         '''
-        connectionDialog = ConnectionDialog(self)
+        connectionDialog = ConnectionDialog(self.portVal)
         connectionDialog.exec_()
 
-        if connectionDialog.port is None or connectionDialog.comms is None or connectionDialog.model is None:
+        if connectionDialog.portVal is None or connectionDialog.portVal == self.portVal:
             return
 
-        self._rctPort = connectionDialog.port
-        self._mavReceiver = connectionDialog.comms
-        self._mavModel = connectionDialog.model
-
-        self.__registerModelCallbacks()
-        self.statusWidget.updateGUIOptionVars()
-        self.systemSettingsWidget.connectionMade()
+        self._portVal = connectionDialog.portVal
+        self.__startServer()
 
     def setMap(self, mapWidget):
         '''
@@ -422,7 +475,7 @@ class GCS(QMainWindow):
         self._systemConnectionTab = CollapseFrame(title='System: No Connection')
         self._systemConnectionTab.resize(self.SBWidth, 400)
         lay_sys = QVBoxLayout()
-        btn_setup = QPushButton("Connect")
+        btn_setup = QPushButton("Connection Settings")
         btn_setup.resize(self.SBWidth, 100)
         btn_setup.clicked.connect(lambda:self.__handleConnectInput())
         lay_sys.addWidget(btn_setup)
@@ -607,16 +660,16 @@ class StatusDisplay(CollapseFrame):
         sys_status = varDict["STS_sysStatus"]
         sw_status = varDict["STS_swStatus"]
 
-        if sys_status == "RCT_STATES.finish":
+        if sys_status == rctCore.RCT_STATES.finish:
             self.statusLabel.setText('Stopping')
             self.statusLabel.setStyleSheet("background-color: red")
-        elif sdr_status == "SDR_INIT_STATES.fail" or dir_status == "OUTPUT_DIR_STATES.fail" or gps_status == "GPS_STATES.fail" or sys_status == "RCT_STATES.fail" or (sw_status != 0 and sw_status != 1):
+        elif sdr_status == rctCore.SDR_INIT_STATES.fail or dir_status == rctCore.OUTPUT_DIR_STATES.fail or gps_status == rctCore.EXTS_STATES.fail or sys_status == rctCore.RCT_STATES.fail or (sw_status != 0 and sw_status != 1):
             self.statusLabel.setText('Failed')
             self.statusLabel.setStyleSheet("background-color: red")
-        elif sys_status == "RCT_STATES.start" or sys_status == "RCT_STATES.wait_end":
+        elif sys_status == rctCore.RCT_STATES.start or sys_status == rctCore.RCT_STATES.wait_end:
             self.statusLabel.setText('Running')
             self.statusLabel.setStyleSheet("background-color: green")
-        elif sdr_status == "SDR_INIT_STATES.rdy" and dir_status == "OUTPUT_DIR_STATES.rdy" and gps_status == "EXTS_STATES.rdy" and sys_status == "RCT_STATES.wait_start" and sw_status == 1:
+        elif sdr_status == rctCore.SDR_INIT_STATES.rdy and dir_status == rctCore.OUTPUT_DIR_STATES.rdy and gps_status == rctCore.EXTS_STATES.rdy and sys_status == rctCore.RCT_STATES.wait_start and sw_status == 1:
             self.statusLabel.setText('Idle')
             self.statusLabel.setStyleSheet("background-color: yellow")
         else:
@@ -876,10 +929,10 @@ class MapControl(CollapseFrame):
             self.__p2lonEntry.setText(lon2)
 
         if lat1 is None or lat2 is None or lon1 is None or lon2 is None:
-            lat1 = 90
-            lat2 = -90
-            lon1 = -180
-            lon2 = 180
+            lat1 = "90"
+            lat2 = "-90"
+            lon1 = "-180"
+            lon2 = "180"
             self.__p1latEntry.setText(lat1)
             self.__p1lonEntry.setText(lon1)
             self.__p2latEntry.setText(lat2)

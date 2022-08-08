@@ -399,20 +399,17 @@ class SystemSettingsControl(CollapseFrame):
         '''
         Helper method to enable system settings buttons once connection is made
         '''
-        
-        self.updateGUIOptionVars()
+
         self.btn_addTarget.setEnabled(True)
         self.btn_clearTargs.setEnabled(True)
         self.btn_submit.setEnabled(True)
         self.btn_advSettings.setEnabled(True)
-        self.__root._systemConnectionTab.updateText("System: Connected")
 
     def disconnected(self):
         '''
         Helper method to disable system settings buttons once mavModel stops
         '''
 
-        self.__root._mavModel = None
         self.btn_addTarget.setEnabled(False)
         self.btn_clearTargs.setEnabled(False)
         self.btn_submit.setEnabled(False)

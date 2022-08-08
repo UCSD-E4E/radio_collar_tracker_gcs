@@ -3,7 +3,7 @@
 To run the simulator:
 ```
 usage: droneSimulator.py [-h] [--port PORT] --protocol {udp,tcp}
-                         [--target TARGET]
+                         [--target TARGET] [--clients NUM_CLIENTS]
 droneSimulator.py: error: the following arguments are required: --protocol
 ```
 
@@ -104,6 +104,12 @@ droneSim.getFrequencies()
 droneSim.transmitPosition()
 droneSim.doMission(returnOnEnd:bool)
 droneSim.calculatePingMeasurement()
+```
+
+Use the following functions when using multiple clients
+```
+addClient()
+doAll(action:str, args:[])
 ```
 
 ###Executing a Mission
