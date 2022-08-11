@@ -147,6 +147,8 @@ class Events(Enum):
     NoHeartbeat - Callback when no heartbeat has been received for GC_HeartbeatWatchdogTime seconds
     NewPing - Callback when new ping is received
     NewEstimate - Callback when new estimate is generated
+    NewConnection - Callback when a new client connects to server
+    Disconnected - Callback when no more clients are connected
 
     '''
     Heartbeat = auto(),
@@ -265,7 +267,7 @@ class MAVModel:
                              for progress
         '''
         self.__rx.start()
-        self.__log.info("MVAModel started")
+        self.__log.info("MAVModel started")
 
     def __processFrequencies(self, packet: RCTComms.comms.rctFrequenciesPacket, addr: str):
         '''
@@ -344,7 +346,7 @@ class MAVModel:
         Stops the MAVModel and underlying resources
         '''
         self.__rx.stop()
-        self.__log.info("MVAModel stopped")
+        self.__log.info("MAVModel stopped")
 
     def registerCallback(self, event: Events, callback):
         '''

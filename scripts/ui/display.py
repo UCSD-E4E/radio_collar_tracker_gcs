@@ -21,7 +21,7 @@ class GCS(QMainWindow):
     defaultTimeout = 5
 
     defaultPortVal = 9000
-    
+
     sig = pyqtSignal()
 
     def __init__(self):
@@ -80,8 +80,11 @@ class GCS(QMainWindow):
         if self._server is not None:
             self._server.close()
         self._server = RCTTCPServer(self.portVal, self.__connectionHandler)
-        self._server.open()
-        
+        if self._server is not None:
+            self._server.open()
+        else:
+            print("Server could not be started")
+
     def __connectionHandler(self, connection, id):
         comms = gcsComms(connection, partial(self.__disconnectHandler, id))
         model = rctCore.MAVModel(comms)
@@ -92,7 +95,7 @@ class GCS(QMainWindow):
             self.__useDefaultModel()
         self.updateConnections()
         self.__log.info('Connected {}'.format(id))
-        
+
     def __disconnectHandler(self, id):
         mavModel = self._mavModels[id]
         del self._mavModels[id]
@@ -111,7 +114,6 @@ class GCS(QMainWindow):
         elif numConnections > 1:
             label = "System: {} Connections".format(numConnections)
         self._systemConnectionTab.updateText(label)
-        
         self.model_select.clear()
         index = 0
         for id in self._mavModels:
@@ -144,8 +146,7 @@ class GCS(QMainWindow):
         '''
         if len(self._mavModels) > 0:
             self.__changeModel(list(self._mavModels.keys())[0])
-            
-    
+
     def mainloop(self, n=0):
         '''
         Main Application Loop
@@ -157,6 +158,7 @@ class GCS(QMainWindow):
         '''
         Internal Heartbeat callback
         '''
+        self.statusWidget.updateGUIOptionVars()
 
     def __startCommand(self):
         '''
@@ -468,7 +470,7 @@ class GCS(QMainWindow):
 
         self.portVal = connectionDialog.portVal
         self.__startServer()
-        
+
     def setMap(self, mapWidget):
         '''
         Function to set the mapDisplay widget
@@ -693,16 +695,16 @@ class StatusDisplay(CollapseFrame):
         sys_status = varDict["STS_sysStatus"]
         sw_status = varDict["STS_swStatus"]
 
-        if sys_status == "RCT_STATES.finish":
+        if sys_status == rctCore.RCT_STATES.finish:
             self.statusLabel.setText('Stopping')
             self.statusLabel.setStyleSheet("background-color: red")
-        elif sdr_status == "SDR_INIT_STATES.fail" or dir_status == "OUTPUT_DIR_STATES.fail" or gps_status == "GPS_STATES.fail" or sys_status == "RCT_STATES.fail" or (sw_status != 0 and sw_status != 1):
+        elif sdr_status == rctCore.SDR_INIT_STATES.fail or dir_status == rctCore.OUTPUT_DIR_STATES.fail or gps_status == rctCore.EXTS_STATES.fail or sys_status == rctCore.RCT_STATES.fail or (sw_status != 0 and sw_status != 1):
             self.statusLabel.setText('Failed')
             self.statusLabel.setStyleSheet("background-color: red")
-        elif sys_status == "RCT_STATES.start" or sys_status == "RCT_STATES.wait_end":
+        elif sys_status == rctCore.RCT_STATES.start or sys_status == rctCore.RCT_STATES.wait_end:
             self.statusLabel.setText('Running')
             self.statusLabel.setStyleSheet("background-color: green")
-        elif sdr_status == "SDR_INIT_STATES.rdy" and dir_status == "OUTPUT_DIR_STATES.rdy" and gps_status == "EXTS_STATES.rdy" and sys_status == "RCT_STATES.wait_start" and sw_status == 1:
+        elif sdr_status == rctCore.SDR_INIT_STATES.rdy and dir_status == rctCore.OUTPUT_DIR_STATES.rdy and gps_status == rctCore.EXTS_STATES.rdy and sys_status == rctCore.RCT_STATES.wait_start and sw_status == 1:
             self.statusLabel.setText('Idle')
             self.statusLabel.setStyleSheet("background-color: yellow")
         else:
