@@ -124,7 +124,7 @@ class SystemSettingsControl(CollapseFrame):
         self.widg_targHolder.repaint()
         self.scroll_targHolder.repaint()
         self.frm_targHolder.activate()
-        CollapseFrame.repaint(self)
+        #CollapseFrame.repaint(self) // cases thread problems?
         self.__innerFrame.activate()
 
 
@@ -405,16 +405,13 @@ class SystemSettingsControl(CollapseFrame):
         self.btn_clearTargs.setEnabled(True)
         self.btn_submit.setEnabled(True)
         self.btn_advSettings.setEnabled(True)
-        self.__root._systemConnectionTab.updateText("System: Connected")
 
     def disconnected(self):
         '''
         Helper method to disable system settings buttons once mavModel stops
         '''
 
-        self.__root._mavModel = None
         self.btn_addTarget.setEnabled(False)
         self.btn_clearTargs.setEnabled(False)
         self.btn_submit.setEnabled(False)
         self.btn_advSettings.setEnabled(False)
-        self.__root._systemConnectionTab.updateText("System: No Connection")
