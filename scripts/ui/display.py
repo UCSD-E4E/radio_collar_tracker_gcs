@@ -80,10 +80,7 @@ class GCS(QMainWindow):
         if self._server is not None:
             self._server.close()
         self._server = RCTTCPServer(self.portVal, self.__connectionHandler)
-        if self._server is not None:
-            self._server.open()
-        else:
-            print("Server could not be started")
+        self._server.open()
 
     def __connectionHandler(self, connection, id):
         comms = gcsComms(connection, partial(self.__disconnectHandler, id))
@@ -100,6 +97,7 @@ class GCS(QMainWindow):
         mavModel = self._mavModels[id]
         del self._mavModels[id]
         if mavModel == self._mavModel:
+            self._mavModel = None
             self.__useDefaultModel()
         if self._mavModel is None:
             self.systemSettingsWidget.disconnected()

@@ -399,12 +399,11 @@ class SystemSettingsControl(CollapseFrame):
         '''
         Helper method to enable system settings buttons once connection is made
         '''
-
+        self.updateGUIOptionVars() 
         self.btn_addTarget.setEnabled(True)
         self.btn_clearTargs.setEnabled(True)
         self.btn_submit.setEnabled(True)
         self.btn_advSettings.setEnabled(True)
-        self.__root.statusWidget.updateGUIOptionVars()
 
     def disconnected(self):
         '''
