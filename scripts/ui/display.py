@@ -156,7 +156,6 @@ class GCS(QMainWindow):
         '''
         Internal Heartbeat callback
         '''
-        self.statusWidget.updateGUIOptionVars()
 
     def __startCommand(self):
         '''
