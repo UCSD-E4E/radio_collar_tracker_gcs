@@ -9,7 +9,7 @@ from ui.popups import *
 from ui.controls import *
 from ui.map import *
 from functools import partial
-from RCTComms.transport import RCTTCPServer
+from RCTComms.transport import RCTTCPServer, RCTAbstractTransport
 
 class GCS(QMainWindow):
     '''
@@ -23,6 +23,12 @@ class GCS(QMainWindow):
     defaultPortVal = 9000
 
     sig = pyqtSignal()
+
+    connectSignal = pyqtSignal(RCTAbstractTransport, int)
+    
+    disconnectSignal = pyqtSignal(int)
+    
+    mavEventSignal = pyqtSignal(rctCore.Events, int)
 
     def __init__(self):
         '''
@@ -61,29 +67,40 @@ class GCS(QMainWindow):
             (fn, coord, frequency, numPings) = self.queue.get()
             fn(coord, frequency, numPings)
 
+    def __mavEventHandler(self, event, id):
+        if event == rctCore.Events.Heartbeat:
+            self.__heartbeatCallback(id)
+        if event == rctCore.Events.Exception:
+            self.__handleRemoteException(id)
+        if event == rctCore.Events.VehicleInfo:
+            self.__handleVehicleInfo(id)
+        if event == rctCore.Events.NewPing:
+            self.__handleNewPing(id)
+        if event == rctCore.Events.NewEstimate:
+            self.__handleNewEstimate(id)
+        if event == rctCore.Events.ConeInfo:
+            self.__handleNewCone(id)
+
     def __registerModelCallbacks(self, id):
         mavModel = self._mavModels[id]
-        mavModel.registerCallback(
-            rctCore.Events.Heartbeat, partial(self.__heartbeatCallback, id))
-        mavModel.registerCallback(
-            rctCore.Events.Exception, partial(self.__handleRemoteException, id))
-        mavModel.registerCallback(
-            rctCore.Events.VehicleInfo, partial(self.__handleVehicleInfo, id))
-        mavModel.registerCallback(
-            rctCore.Events.NewPing, partial(self.__handleNewPing, id))
-        mavModel.registerCallback(
-            rctCore.Events.NewEstimate, partial(self.__handleNewEstimate, id))
-        mavModel.registerCallback(
-            rctCore.Events.ConeInfo, partial(self.__handleNewCone, id))
+        eventTypes = [rctCore.Events.Heartbeat, rctCore.Events.Exception, 
+        rctCore.Events.VehicleInfo, rctCore.Events.NewPing, 
+        rctCore.Events.NewEstimate, rctCore.Events.ConeInfo]
+        for eventType in eventTypes:
+            mavModel.registerCallback(eventType, 
+            partial(self.mavEventSignal.emit, eventType, id))
 
     def __startServer(self):
         if self._server is not None:
             self._server.close()
-        self._server = RCTTCPServer(self.portVal, self.__connectionHandler)
+        self.connectSignal.connect(self.__connectionHandler)
+        self.disconnectSignal.connect(self.__disconnectHandler) 
+        self.mavEventSignal.connect(self.__mavEventHandler)      
+        self._server = RCTTCPServer(self.portVal, self.connectSignal.emit)
         self._server.open()
 
-    def __connectionHandler(self, connection, id):
-        comms = gcsComms(connection, partial(self.__disconnectHandler, id))
+    def __connectionHandler(self, connection, id):        
+        comms = gcsComms(connection, partial(self.disconnectSignal.emit, id))
         model = rctCore.MAVModel(comms)
         model.start()
         self._mavModels[id] = model
@@ -136,14 +153,23 @@ class GCS(QMainWindow):
         '''
         Changing the selected _mavModel by index
         '''
-        self.__changeModel(list(self._mavModels.keys())[index])
+        if index < 0 or index > len(self._mavModels):
+            return
+        try:
+            self.__changeModel(list(self._mavModels.keys())[index])
+        except:
+            print('Failed to change Model to {}'.format(index))
+            self.__useDefaultModel()
          
     def __useDefaultModel(self):
         '''
         Using the first model as the default if possible
         '''
-        if len(self._mavModels) > 0:
-            self.__changeModel(list(self._mavModels.keys())[0])
+        try:        
+            if len(self._mavModels) > 0:
+                self.__changeModel(list(self._mavModels.keys())[0])
+        except:
+            self._mavModel = None
 
     def mainloop(self, n=0):
         '''
@@ -453,6 +479,9 @@ class GCS(QMainWindow):
         self._mavModel = None
         self._server.close()
         self._server = None
+        self.connectSignal.disconnect(self.__connectionHandler)
+        self.disconnectSignal.disconnect(self.__disconnectHandler)  
+        self.mavEventSignal.disconnect(self.__mavEventHandler)
         super().closeEvent(event)
 
     def __handleConnectInput(self):
