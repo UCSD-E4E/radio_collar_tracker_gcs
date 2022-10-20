@@ -37,9 +37,12 @@ from v1.0.  Working branch v1.0a, becomes v2.0 on release
 
 ### Configuration
 1.  Download this repository and check out the appropriate branch
-2.  Navigate to the `radio_collar_tracker_gcs` project in a python capable terminal
-3.  Run `conda env create -f environment.yml`
-4.  Open VSCode. Naviagate to the `Extensions` tab and download `Python Extension Pack`.
-5.  Restart VSCode. Open the `radio_collar_tracker_gcs` project
-6.  Open the command palette (`Ctrl`+`Shift`+`P`)
-7.  Select `Python: Select Interpreter`/`Python 3.6.13 ('rctGCS')`
+2.  Download the comms directory and checkout the appropriate branch
+3.  Navigate to the radio_collar_tracker_comms project in a python capable terminal
+4.  Run python -m pip install .
+5.  Navigate to the `radio_collar_tracker_gcs` project in a python capable terminal
+6.  Run `conda env create -f environment.yml`
+7.  Open VSCode. Naviagate to the `Extensions` tab and download `Python Extension Pack`.
+8.  Restart VSCode. Open the `radio_collar_tracker_gcs` project
+9.  Open the command palette (`Ctrl`+`Shift`+`P`)
+10.  Select `Python: Select Interpreter`/`Python 3.6.13 ('rctGCS')`
