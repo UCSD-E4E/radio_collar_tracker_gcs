@@ -37,9 +37,9 @@ from v1.0.  Working branch v1.0a, becomes v2.0 on release
 
 ### Configuration
 1.  Download this repository and check out the appropriate branch
-2.  Download the comms directory and checkout the appropriate branch
-3.  Navigate to the radio_collar_tracker_comms project in a python capable terminal
-4.  Run python -m pip install .
+2.  Download the [comms directory](https://github.com/UCSD-E4E/radio_collar_tracker_comms/tree/communications_HG) and checkout the appropriate branch
+3.  Navigate to the `radio_collar_tracker_comms` project in a python capable terminal
+4.  Run `python -m pip install .`
 5.  Navigate to the `radio_collar_tracker_gcs` project in a python capable terminal
 6.  Run `conda env create -f environment.yml`
 7.  Open VSCode. Naviagate to the `Extensions` tab and download `Python Extension Pack`.
