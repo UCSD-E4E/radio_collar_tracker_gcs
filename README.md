@@ -3,13 +3,13 @@ This is the redevelopment of the Radio Telemetry Tracker Ground Control Station
 from v1.0.  Working branch v1.0a, becomes v2.0 on release
 
 ## Installation on Ubuntu (18.04+) and Windows 10+
-1.  [Install Anaconda 2020.02](https://www.anaconda.com/products/individual)
+1.  [Install Anaconda 2020.02](https://www.anaconda.com/products/individual) or Miniconda (https://docs.conda.io/en/latest/miniconda.html)
 2.  Download this repository and [radio_collar_tracker_comms](https://github.com/UCSD-E4E/radio_collar_tracker_comms/tree/communications_HG)
-3.  Navigate to the `radio_collar_tracker_comms` project in a python capable terminal
-4.  Run `python -m pip install .`
-5.  Navigate to the `radio_collar_tracker_gcs` project in a python capable terminal
-6.  Run `conda env create -f environment.yml`
-7.  Run `conda activate rctGCS`
+3.  Navigate to the `radio_collar_tracker_gcs` project in a python capable terminal
+4.  Run `conda env create -f environment.yml`
+5.  Run `conda activate rctGCS`
+6.  Navigate to the `radio_collar_tracker_comms` project in a python capable terminal
+7.  Run `python -m pip install .`
 
 ## Running `rctGCS`
 -   Windows:
@@ -18,7 +18,12 @@ from v1.0.  Working branch v1.0a, becomes v2.0 on release
     1.  From the command line, run `conda activate rctGCS`
     2.  Navigate to the `scripts` folder.
     3.  Run `python rctGCS.py`
-    
+
+## Configuring `rctGCS`
+1. When prompted, select the QGis directory
+    1. This is `${USER_HOME}/${CONDA_HOME}/pkgs/qgis-3.*`
+2. While connected to the internet, click the `Load from Web` button to load the map and cache the desired extents.
+
 ## Running the simulator for GCS
 1. Navigate to the `scripts` folder and run `rctGCS` with the following commands:
     - `$ conda activate rctGCS`
