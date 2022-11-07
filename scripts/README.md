@@ -106,7 +106,7 @@ droneSim.doMission(returnOnEnd:bool)
 droneSim.calculatePingMeasurement()
 ```
 
-Use the following functions when using multiple clients
+Use the following functions when using multiple clients (only available in towerMode)
 ```
 addClient()
 doAll(action:str, args:[])

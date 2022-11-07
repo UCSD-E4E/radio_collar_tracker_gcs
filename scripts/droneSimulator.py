@@ -48,6 +48,7 @@ import datetime as dt
 from enum import Enum
 import logging
 import sys
+import RCTComms.transport as rctTransport
 import numpy as np
 from time import sleep
 from ping import rctPing
@@ -57,6 +58,7 @@ import RCTComms.comms
 import RCTComms.transport
 import time
 import math
+from ui.display import towerMode
 
 def getIPs():
     '''
@@ -979,7 +981,13 @@ def doAll(action:str, args=None):
     except TypeError:
         print("Error: Ensure you have provided all required arguments in a list.")
 
+def connectionHandler(connection, id):
+    print('Connected {}'.format(id))
+    comms = RCTComms.comms.mavComms(connection)
+    sim = droneSim(comms)
+    simList.append(sim)
 
+simList = []
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Radio Collar Tracker Payload Control Simulator')
@@ -1004,17 +1012,28 @@ if __name__ == '__main__':
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
-    simList = []
     if args.protocol == 'udp':
-        for i in range(args.clients):
-            port = RCTComms.transport.RCTUDPClient(port=args.port, addr=args.target)
+        if towerMode:
+            for i in range(args.clients):
+                port = RCTComms.transport.RCTUDPClient(port=args.port, addr=args.target)
+                sim = droneSim(RCTComms.comms.mavComms(port))
+                simList.append(sim)
+        else:
+            port = RCTComms.transport.RCTUDPServer(port=args.port)
             sim = droneSim(RCTComms.comms.mavComms(port))
-            simList.append(sim)
     elif args.protocol == 'tcp':
-        for i in range(args.clients):
-            port = RCTComms.transport.RCTTCPClient(port=args.port, addr=args.target)
-            sim = droneSim(RCTComms.comms.mavComms(port))
-            simList.append(sim)
+        if towerMode:
+            for i in range(args.clients):
+                port = RCTComms.transport.RCTTCPClient(port=args.port, addr=args.target)
+                sim = droneSim(RCTComms.comms.mavComms(port))
+                simList.append(sim)
+        else:
+            connected = False
+            port = RCTComms.transport.RCTTCPServer(args.port, connectionHandler, addr=args.target)
+            port.open()
+            while len(simList) == 0:
+                continue
+            sim = simList[0]
 
     try:
         __IPYTHON__
