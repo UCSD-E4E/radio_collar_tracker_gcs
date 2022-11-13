@@ -11,8 +11,6 @@ from ui.map import *
 from functools import partial
 from RCTComms.transport import RCTTCPServer
 
-towerMode = False
-
 class GCS(QMainWindow):
     '''
     Ground Control Station GUI
@@ -24,7 +22,9 @@ class GCS(QMainWindow):
 
     defaultPortVal = 9000
 
-    towerMode = towerMode
+    f = open('gcsconfig.json')
+    options = json.load(f)
+    f.close()
 
     sig = pyqtSignal()
 
@@ -43,6 +43,11 @@ class GCS(QMainWindow):
         self.systemSettingsWidget = None
         self.__missionStatusText = "Start Recording"
         self.__missionStatusBtn = None
+        if self.options["towerMode"]:
+            self.__runningModeText = "Switch to Tower Mode"
+        else:
+            self.__runningModeText = "Switch to Drone Mode"
+        self.__runningModeBtn = None
         self.innerFreqFrame = None
         self.freqElements = []
         self.targEntries = {}
@@ -58,8 +63,6 @@ class GCS(QMainWindow):
 
         self.queue = q.Queue()
         self.sig.connect(self.execute_inmain, Qt.QueuedConnection)
-        if self.towerMode:
-            self.__startTransport()
 
     def execute_inmain(self):
         while not self.queue.empty():
@@ -83,7 +86,7 @@ class GCS(QMainWindow):
     def __startTransport(self):
         if self._transport is not None:
             self._transport.close()
-        if self.towerMode:
+        if GCS.options['towerMode']:
             self._transport = RCTTCPServer(self.portVal, self.connectionHandler)
         if self._transport is not None:
             self._transport.open()
@@ -102,6 +105,7 @@ class GCS(QMainWindow):
         self.updateConnectionsLabel()
         self.systemSettingsWidget.connectionMade()
         self.__missionStatusBtn.setEnabled(True)
+        self.__runningModeBtn.setEnabled(False)
         self.__btn_exportAll.setEnabled(True)
         self.__btn_precision.setEnabled(True)
         self.__btn_heatMap.setEnabled(True)
@@ -116,6 +120,7 @@ class GCS(QMainWindow):
         if len(self._mavModels) == 0:
             self.systemSettingsWidget.disconnected()
             self.__missionStatusBtn.setEnabled(False)
+            self.__runningModeBtn.setEnabled(True)
             self.__btn_exportAll.setEnabled(False)
             self.__btn_precision.setEnabled(False)
             self.__btn_heatMap.setEnabled(False)
@@ -248,6 +253,30 @@ class GCS(QMainWindow):
         else:
             self.__missionStatusBtn.setText('Start Recording')
             self._mavModel.stopMission(timeout=self.defaultTimeout)
+
+    def __toggleRunningMode(self):
+        '''
+        Switch between running in drone and tower modes
+        '''
+        if self._mavModel is not None:
+            WarningMessager.showWarning('Cannot toggle running modes once a connection has been made!')
+            return
+
+        if self.__runningModeBtn.text() == 'Switch to Tower Mode':
+            self.__runningModeBtn.setText('Switch to Drone Mode')
+            GCS.options['towerMode'] = True
+        else:
+            self.__runningModeBtn.setText('Switch to Tower Mode')
+            GCS.options['towerMode'] = False
+
+        f = open('gcsconfig.json', 'w')
+        json.dump(GCS.options, f)
+        f.close()
+        print('towerMode is now ' + str(GCS.options['towerMode']))
+
+        if self._transport is not None:
+            self._transport.close()
+            self._transport = None
 
     def __updateStatus(self):
         '''
@@ -516,6 +545,10 @@ class GCS(QMainWindow):
         self.__missionStatusBtn.setEnabled(False)
         self.__missionStatusBtn.clicked.connect(lambda:self.__startStopMission())
 
+        self.__runningModeBtn = QPushButton(self.__runningModeText)
+        self.__runningModeBtn.setEnabled(True)
+        self.__runningModeBtn.clicked.connect(lambda:self.__toggleRunningMode())
+
         self.__btn_exportAll = QPushButton('Export Info')
         self.__btn_exportAll.setEnabled(False)
         self.__btn_exportAll.clicked.connect(lambda:self.exportAll())
@@ -534,6 +567,7 @@ class GCS(QMainWindow):
         wlay.addWidget(self.systemSettingsWidget)
         wlay.addWidget(self.upgradeDisplay)
         wlay.addWidget(self.__missionStatusBtn)
+        wlay.addWidget(self.__runningModeBtn)
         wlay.addWidget(self.__btn_exportAll)
         wlay.addWidget(self.__btn_precision)
         wlay.addWidget(self.__btn_heatMap)
