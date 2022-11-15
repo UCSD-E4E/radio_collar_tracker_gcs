@@ -68,6 +68,10 @@ import sys
 import os
 import os.path
 from PyQt5.QtWidgets import QFileDialog
+from pathlib import Path
+if 'CONDA_PREFIX' in os.environ:
+    sys.path.insert(0, Path(sys.executable).parent.joinpath("Library", "python", "plugins").as_posix())
+    sys.path.insert(0, Path(sys.executable).parent.joinpath("Library", "python").as_posix())
 from qgis.core import *    
 from qgis.gui import *  
 from qgis.utils import *
