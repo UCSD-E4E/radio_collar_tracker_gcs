@@ -22,7 +22,7 @@ from v1.0.  Working branch v1.0a, becomes v2.0 on release
 ## Configuring `rctGCS`
 1. When prompted, select the QGis directory
     1. This is `${USER_HOME}/${CONDA_HOME}/pkgs/qgis-3.*`
-2. While connected to the internet, click the `Load from Web` button to load the map and cache the desired extents.
+2. While connected to the internet, click `Map Display Tools` ->  `Load from Web` button to load the map and cache the desired extents.
 
 ## Running the simulator for GCS
 1. Navigate to the `scripts` folder and run `rctGCS` with the following commands:
