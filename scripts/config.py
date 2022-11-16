@@ -1,10 +1,12 @@
 '''Provides global configuration structures
 '''
+from __future__ import annotations
+
 import os
 from configparser import ConfigParser
 from enum import Enum
 from pathlib import Path
-from socket import gethostbyname, gaierror
+from socket import gaierror, gethostbyname
 from typing import Any, Dict, Tuple
 
 
@@ -27,6 +29,7 @@ class Configuration:
         self.__map_extent_se: Tuple[float, float] = (-90., 180.)
 
         self.__qgis_prefix_path: Path = self.__get_qgis_path()
+        self.__qgis_prefix_set: bool = False
 
         self.__connection_addr: str = '127.0.0.1'
         self.__connection_port: int = 9000
@@ -35,7 +38,8 @@ class Configuration:
     def __create_dict(self):
         return {
             "FilePaths": {
-                "PrefixPath": self.__qgis_prefix_path.as_posix()
+                "PrefixPath": self.__qgis_prefix_path.as_posix(),
+                "PrefixSet" : self.__qgis_prefix_set
             },
             "LastCoords": {
                 'lat1': self.__map_extent_nw[0],
@@ -61,6 +65,8 @@ class Configuration:
             self.__qgis_prefix_path = self.__get_qgis_path()
         else:
             self.__qgis_prefix_path = Path(parser['FilePaths']['PrefixPath'])
+
+        self.__qgis_prefix_set = parser['FilePaths'].getboolean('PrefixSet')
 
         self.__map_extent_nw = (
             parser['LastCoords'].getfloat('lat1'),
@@ -184,6 +190,21 @@ class Configuration:
             raise ValueError
         self.__qgis_prefix_path = value
 
+    @property
+    def qgis_prefix_set(self) -> bool:
+        """QGis Prefix Set Flag
+
+        Returns:
+            bool: True if set, otherwise False
+        """
+        return self.__qgis_prefix_set
+
+    @qgis_prefix_set.setter
+    def qgis_prefix_set(self, value: Any) -> None:
+        if not isinstance(value, bool):
+            raise TypeError
+        self.__qgis_prefix_set = value
+
     @classmethod
     def __get_qgis_path(cls) -> Path:
         if "_CONDA_ROOT" not in os.environ:
@@ -191,6 +212,14 @@ class Configuration:
         pkgs_dir = Path(os.environ['_CONDA_ROOT']).joinpath('pkgs')
         qgis_dirs = [qgis_dir for qgis_dir in pkgs_dir.glob('qgis*') if qgis_dir.is_dir()]
         return sorted(qgis_dirs)[-1]
+
+    def __enter__(self) -> Configuration:
+        self.load()
+        return self
+
+    def __exit__(self, exc, exp, exv) -> None:
+        self.write()
+
 
 __config_instance: Dict[Path, Configuration] = {}
 def get_instance(path: Path) -> Configuration:
