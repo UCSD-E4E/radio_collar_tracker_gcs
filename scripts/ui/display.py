@@ -638,7 +638,11 @@ class StatusDisplay(CollapseFrame):
         elif sys_status == rctCore.RCT_STATES.start or sys_status == rctCore.RCT_STATES.wait_end:
             self.statusLabel.setText('Running')
             self.statusLabel.setStyleSheet("background-color: green")
-        elif sdr_status == rctCore.SDR_INIT_STATES.rdy and dir_status == rctCore.OUTPUT_DIR_STATES.rdy and gps_status == rctCore.EXTS_STATES.rdy and sys_status == rctCore.RCT_STATES.wait_start and sw_status == 1:
+        elif sdr_status == rctCore.SDR_INIT_STATES.rdy and \
+                dir_status == rctCore.OUTPUT_DIR_STATES.rdy and \
+                gps_status == rctCore.EXTS_STATES.rdy and \
+                sys_status == rctCore.RCT_STATES.wait_start and \
+                sw_status == 0:
             self.statusLabel.setText('Idle')
             self.statusLabel.setStyleSheet("background-color: yellow")
         elif sys_status == rctCore.RCT_STATES.init:
