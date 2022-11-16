@@ -9,7 +9,7 @@ from ui.popups import *
 from ui.controls import *
 from ui.map import *
 from functools import partial
-from RCTComms.transport import RCTTCPServer
+from RCTComms.transport import RCTTCPServer, RCTAbstractTransport
 
 class GCS(QMainWindow):
     '''
@@ -27,6 +27,12 @@ class GCS(QMainWindow):
     f.close()
 
     sig = pyqtSignal()
+
+    connectSignal = pyqtSignal(RCTAbstractTransport, int)
+    
+    disconnectSignal = pyqtSignal(int)
+    
+    mavEventSignal = pyqtSignal(rctCore.Events, int)
 
     def __init__(self):
         '''
@@ -69,20 +75,38 @@ class GCS(QMainWindow):
             (fn, coord, frequency, numPings) = self.queue.get()
             fn(coord, frequency, numPings)
 
-    def __registerModelCallbacks(self):
-        self._mavModel.registerCallback(
-            rctCore.Events.Heartbeat, self.__heartbeatCallback)
-        self._mavModel.registerCallback(
-            rctCore.Events.Exception, self.__handleRemoteException)
-        self._mavModel.registerCallback(
-            rctCore.Events.VehicleInfo, self.__handleVehicleInfo)
-        self._mavModel.registerCallback(
-            rctCore.Events.NewPing, self.__handleNewPing)
-        self._mavModel.registerCallback(
-            rctCore.Events.NewEstimate, self.__handleNewEstimate)
-        self._mavModel.registerCallback(
-            rctCore.Events.ConeInfo, self.__handleNewCone)
+    def __mavEventHandler(self, event, id):
+        if event == rctCore.Events.Heartbeat:
+            self.__heartbeatCallback(id)
+        if event == rctCore.Events.Exception:
+            self.__handleRemoteException(id)
+        if event == rctCore.Events.VehicleInfo:
+            self.__handleVehicleInfo(id)
+        if event == rctCore.Events.NewPing:
+            self.__handleNewPing(id)
+        if event == rctCore.Events.NewEstimate:
+            self.__handleNewEstimate(id)
+        if event == rctCore.Events.ConeInfo:
+            self.__handleNewCone(id)
 
+    def __registerModelCallbacks(self, id):
+        mavModel = self._mavModels[id]
+        eventTypes = [rctCore.Events.Heartbeat, rctCore.Events.Exception, 
+        rctCore.Events.VehicleInfo, rctCore.Events.NewPing, 
+        rctCore.Events.NewEstimate, rctCore.Events.ConeInfo]
+        for eventType in eventTypes:
+            mavModel.registerCallback(eventType, 
+            partial(self.mavEventSignal.emit, eventType, id))
+
+    def __startServer(self):
+        if self._server is not None:
+            self._server.close()
+        self.connectSignal.connect(self.__connectionHandler)
+        self.disconnectSignal.connect(self.__disconnectHandler) 
+        self.mavEventSignal.connect(self.__mavEventHandler)      
+        self._server = RCTTCPServer(self.portVal, self.connectSignal.emit)
+        self._server.open()
+        
     def __startTransport(self):
         if self._transport is not None:
             self._transport.close()
@@ -100,7 +124,7 @@ class GCS(QMainWindow):
         self._mavModels[id] = model
         if self._mavModel is None:
             self._mavModel = model
-            self.__registerModelCallbacks()
+            self.__registerModelCallbacks(id)
 
         self.updateConnectionsLabel()
         self.systemSettingsWidget.connectionMade()
@@ -115,7 +139,7 @@ class GCS(QMainWindow):
     def __disconnectHandler(self, id):
         mavModel = self._mavModels[id]
         del self._mavModels[id]
-        if (mavModel == self._mavModel):
+        if mavModel == self._mavModel:
             self._mavModel = None
         if len(self._mavModels) == 0:
             self.systemSettingsWidget.disconnected()
@@ -136,6 +160,35 @@ class GCS(QMainWindow):
             label = "System: {} Connections".format(numConnections)
         self._systemConnectionTab.updateText(label)
 
+    def __changeModel(self, id):
+        '''
+        Changing the selected _mavModel
+        '''
+        self._mavModel = self._mavModels[id]
+        self.systemSettingsWidget.connectionMade()
+
+    def __changeModelByIndex(self, index):
+        '''
+        Changing the selected _mavModel by index
+        '''
+        if index < 0 or index > len(self._mavModels):
+            return
+        try:
+            self.__changeModel(list(self._mavModels.keys())[index])
+        except:
+            print('Failed to change Model to {}'.format(index))
+            self.__useDefaultModel()
+
+    def __useDefaultModel(self):
+        '''
+        Using the first model as the default if possible
+        '''
+        try:        
+            if len(self._mavModels) > 0:
+                self.__changeModel(list(self._mavModels.keys())[0])
+        except:
+            self._mavModel = None
+
     def mainloop(self, n=0):
         '''
         Main Application Loop
@@ -143,7 +196,7 @@ class GCS(QMainWindow):
         :type n:
         '''
 
-    def __heartbeatCallback(self):
+    def __heartbeatCallback(self, id):
         '''
         Internal Heartbeat callback
         '''
@@ -166,18 +219,19 @@ class GCS(QMainWindow):
             button.config(state='disabled')
         WarningMessager.showWarning("No Heartbeats Received")
 
-    def __handleNewEstimate(self):
+    def __handleNewEstimate(self, id):
         '''
         Internal callback to handle when a new estimate is received
         '''
-        freqList = self._mavModel.EST_mgr.getFrequencies()
+        mavModel = self._mavModels[id]
+        freqList = mavModel.EST_mgr.getFrequencies()
         for frequency in freqList:
-            params, stale, res = self._mavModel.EST_mgr.getEstimate(frequency)
+            params, stale, res = mavModel.EST_mgr.getEstimate(frequency)
 
-            zone, let = self._mavModel.EST_mgr.getUTMZone()
+            zone, let = mavModel.EST_mgr.getUTMZone()
             coord = utm.to_latlon(params[0], params[1], zone, let)
 
-            numPings = self._mavModel.EST_mgr.getNumPings(frequency)
+            numPings = mavModel.EST_mgr.getNumPings(frequency)
 
             if self.mapDisplay is not None:
                 self.mapDisplay.plotEstimate(coord, frequency)
@@ -187,16 +241,17 @@ class GCS(QMainWindow):
 
             if self.mapOptions is not None:
                 self.mapOptions.estDistance(coord, stale, res)
+    
 
-
-    def __handleNewPing(self):
+    def __handleNewPing(self, id):
         '''
         Internal callback to handle when a new ping is received
         '''
-        freqList = self._mavModel.EST_mgr.getFrequencies()
+        mavModel = self._mavModels[id]
+        freqList = mavModel.EST_mgr.getFrequencies()
         for frequency in freqList:
-            last = self._mavModel.EST_mgr.getPings(frequency)[-1].tolist()
-            zone, let = self._mavModel.EST_mgr.getUTMZone()
+            last = mavModel.EST_mgr.getPings(frequency)[-1].tolist()
+            zone, let = mavModel.EST_mgr.getUTMZone()
             u = (last[0], last[1], zone, let)
             coord = utm.to_latlon(*u)
             power = last[3]
@@ -206,39 +261,42 @@ class GCS(QMainWindow):
 
 
 
-    def __handleVehicleInfo(self):
+    def __handleVehicleInfo(self, id):
         '''
         Internal Callback for Vehicle Info
         '''
-        if self._mavModel == None:
+        mavModel = self._mavModels[id]
+        if mavModel == None:
             return
-        last = list(self._mavModel.state['VCL_track'])[-1]
-        coord = self._mavModel.state['VCL_track'][last]
+        last = list(mavModel.state['VCL_track'])[-1]
+        coord = mavModel.state['VCL_track'][last]
 
-        self._mavModel.EST_mgr.addVehicleLocation(coord)
+        mavModel.EST_mgr.addVehicleLocation(coord)
 
         if self.mapDisplay is not None:
-            self.mapDisplay.plotVehicle(coord)
+            self.mapDisplay.plotVehicle(id, coord)
 
-    def __handleNewCone(self):
+    def __handleNewCone(self, id):
         '''
         Internal callback to handle new cone info
         '''
-        if self._mavModel == None:
+        mavModel = self._mavModels[id]
+        if mavModel == None:
             return
 
-        recentCone = list(self._mavModel.state['CONE_track'])[-1]
-        cone = self._mavModel.state['CONE_track'][recentCone]
+        recentCone = list(mavModel.state['CONE_track'])[-1]
+        cone = mavModel.state['CONE_track'][recentCone]
 
         if self.mapDisplay is not None:
             self.mapDisplay.plotCone(cone)
 
-    def __handleRemoteException(self):
+    def __handleRemoteException(self, id):
         '''
         Internal callback for an exception message
         '''
+        mavModel = self._mavModels[id]
         WarningMessager.showWarning('An exception has occured!\n%s\n%s' % (
-            self._mavModel.lastException[0], self._mavModel.lastException[1]))
+            mavModel.lastException[0], mavModel.lastException[1]))
 
     def __startStopMission(self):
         # State machine for start recording -> stop recording
@@ -515,7 +573,13 @@ class GCS(QMainWindow):
         btn_setup = QPushButton("Connection Settings")
         btn_setup.resize(self.SBWidth, 100)
         btn_setup.clicked.connect(lambda:self.__handleConnectInput())
+        self.model_select = QComboBox()
+        self.model_select.resize(self.SBWidth, 100)
+        self.model_select.currentIndexChanged.connect(self.__changeModelByIndex)
+        self.model_select.hide()
         lay_sys.addWidget(btn_setup)
+        lay_sys.addWidget(self.model_select)
+
 
         self._systemConnectionTab.setContentLayout(lay_sys)
 
