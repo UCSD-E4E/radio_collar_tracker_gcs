@@ -1,13 +1,16 @@
-import utm
-import logging
-import rctCore
-from PyQt5.QtWidgets import QGridLayout, QLabel, QPushButton, QVBoxLayout, QWidget, QFileDialog, QMainWindow, QScrollArea
-import queue as q
 import configparser
 import json
-from ui.popups import *
+import logging
+import queue as q
+
+import rctCore
+import utm
+from PyQt5.QtWidgets import (QFileDialog, QGridLayout, QLabel, QMainWindow,
+                             QPushButton, QScrollArea, QVBoxLayout, QWidget)
 from ui.controls import *
 from ui.map import *
+from ui.popups import *
+
 
 class GCS(QMainWindow):
     '''
