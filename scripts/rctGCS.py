@@ -64,40 +64,34 @@
 ###############################################################################
 import datetime as dt
 import logging
-import sys
 import os
 import os.path
+import sys
+from pathlib import Path
+
+from config import get_instance
 from PyQt5.QtWidgets import QFileDialog
-from qgis.core import *    
-from qgis.gui import *  
+from qgis.core import *
+from qgis.gui import *
 from qgis.utils import *
-import configparser
 from ui.display import GCS
 from ui.popups import WarningMessager
 
-def configSetup():
+
+def configSetup() -> Path:
     '''
     Helper function to set up paths to QGIS lbrary files, and 
     config file
-    '''
-    config_path = 'gcsConfig.ini'
-    if(not os.path.isfile(config_path)):
-        prefix_path = QFileDialog.getExistingDirectory(None, 'Select the Qgis directory')          
-        config = configparser.ConfigParser()
-        config['FilePaths'] = {}
-        config['FilePaths']['PrefixPath'] = prefix_path
-        if ("qgis" not in prefix_path):
-            WarningMessager.showWarning("Warning, incorrect file chosen. Map tools may not function as expected")
-        with open(config_path, 'w') as configFile:
-            config.write(configFile)
-            return config, prefix_path
-    else:
-        config = configparser.ConfigParser()
-        config.read(config_path)
-        prefix_path = config['FilePaths']['PrefixPath']
-        return config, prefix_path
-
+    '''    
+    with get_instance(Path('gcsConfig.ini')) as config:
+        if not config.qgis_prefix_set:
+            qgis_path = Path(QFileDialog.getExistingDirectory(None, 'Select the Qgis directory'))
+            if 'qgis' not in qgis_path.as_posix():
+                WarningMessager.showWarning("Warning, incorrect file chosen. Map tools may not "
+                    "function as expected")
+            config.qgis_prefix_path = qgis_path
    
+    return qgis_path
 
 
 if __name__ == '__main__':
@@ -119,7 +113,7 @@ if __name__ == '__main__':
   
     app = QgsApplication([], True)
     
-    configObj, prefix_path = configSetup()
+    prefix_path = configSetup()
     
     QgsApplication.setPrefixPath(prefix_path)
 
