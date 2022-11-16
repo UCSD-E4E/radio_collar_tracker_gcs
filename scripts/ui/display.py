@@ -626,17 +626,20 @@ class StatusDisplay(CollapseFrame):
         sys_status = varDict["STS_sysStatus"]
         sw_status = varDict["STS_swStatus"]
 
-        if sys_status == "RCT_STATES.finish":
+        if sys_status == rctCore.RCT_STATES.finish:
             self.statusLabel.setText('Stopping')
             self.statusLabel.setStyleSheet("background-color: red")
-        elif sdr_status == "SDR_INIT_STATES.fail" or dir_status == "OUTPUT_DIR_STATES.fail" or gps_status == "GPS_STATES.fail" or sys_status == "RCT_STATES.fail" or (sw_status != 0 and sw_status != 1):
+        elif sdr_status == rctCore.SDR_INIT_STATES.fail or dir_status == rctCore.OUTPUT_DIR_STATES.fail or gps_status == rctCore.EXTS_STATES.fail or sys_status == rctCore.RCT_STATES.fail or (sw_status != 0 and sw_status != 1):
             self.statusLabel.setText('Failed')
             self.statusLabel.setStyleSheet("background-color: red")
-        elif sys_status == "RCT_STATES.start" or sys_status == "RCT_STATES.wait_end":
+        elif sys_status == rctCore.RCT_STATES.start or sys_status == rctCore.RCT_STATES.wait_end:
             self.statusLabel.setText('Running')
             self.statusLabel.setStyleSheet("background-color: green")
-        elif sdr_status == "SDR_INIT_STATES.rdy" and dir_status == "OUTPUT_DIR_STATES.rdy" and gps_status == "EXTS_STATES.rdy" and sys_status == "RCT_STATES.wait_start" and sw_status == 1:
+        elif sdr_status == rctCore.SDR_INIT_STATES.rdy and dir_status == rctCore.OUTPUT_DIR_STATES.rdy and gps_status == rctCore.EXTS_STATES.rdy and sys_status == rctCore.RCT_STATES.wait_start and sw_status == 1:
             self.statusLabel.setText('Idle')
+            self.statusLabel.setStyleSheet("background-color: yellow")
+        elif sys_status == rctCore.RCT_STATES.init:
+            self.statusLabel.setText("Initializing")
             self.statusLabel.setStyleSheet("background-color: yellow")
         else:
             self.statusLabel.setText('Not Connected')
