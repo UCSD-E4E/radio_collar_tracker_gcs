@@ -2,6 +2,7 @@ import configparser
 import json
 import logging
 import queue as q
+from typing import Dict
 
 import rctCore
 import utm
@@ -64,7 +65,7 @@ class GCS(QMainWindow):
 
     def __registerModelCallbacks(self):
         self._mavModel.registerCallback(
-            rctCore.Events.Heartbeat, self.__heartbeatCallback)
+            rctCore.Events.Heartbeat, self.__heartbeat_cb)
         self._mavModel.registerCallback(
             rctCore.Events.Exception, self.__handleRemoteException)
         self._mavModel.registerCallback(
@@ -83,10 +84,11 @@ class GCS(QMainWindow):
         :type n:
         '''
 
-    def __heartbeatCallback(self):
+    def __heartbeat_cb(self):
         '''
         Internal Heartbeat callback
         '''
+        self.statusWidget.updateGUIOptionVars()
 
     def __startCommand(self):
         '''
@@ -620,7 +622,9 @@ class StatusDisplay(CollapseFrame):
         self.content_height = h1 + h2 + h3 + h3
         self.setContentLayout(self.__innerFrame)
 
-    def updateGUIOptionVars(self, scope=0):
+    def updateGUIOptionVars(self):
+        """Updates the component status display variables
+        """
         varDict = self.__root._mavModel.state
 
         sdr_status = varDict["STS_sdrStatus"]
@@ -643,8 +647,10 @@ class StatusDisplay(CollapseFrame):
                 gps_status == rctCore.EXTS_STATES.rdy and \
                 sys_status == rctCore.RCT_STATES.wait_start and \
                 sw_status == 0:
-            self.statusLabel.setText('Idle')
-            self.statusLabel.setStyleSheet("background-color: yellow")
+            if self.statusLabel.text != "Idle":
+                self.statusLabel.setText('Idle')
+            if self.statusLabel.styleSheet() != "background-color: yellow":
+                self.statusLabel.setStyleSheet("background-color: yellow")
         elif sys_status == rctCore.RCT_STATES.init:
             self.statusLabel.setText("Initializing")
             self.statusLabel.setStyleSheet("background-color: yellow")
@@ -719,7 +725,7 @@ class ComponentStatusDisplay(CollapseFrame):
 
         self.innerFrame = None
 
-        self.statusLabels = {}
+        self.statusLabels: Dict[str, QLabel] = {}
 
         self.__createWidget()
 
@@ -781,7 +787,8 @@ class ComponentStatusDisplay(CollapseFrame):
                     self.statusLabels[varName].setText(configOpts['text'])
                 style = "background-color: %s" % configOpts['bg']
                 if varName in self.statusLabels:
-                    self.statusLabels[varName].setStyleSheet(style)
+                    if self.statusLabels[varName].styleSheet() != style:
+                        self.statusLabels[varName].setStyleSheet(style)
             except KeyError:
                 WarningMessager.showWarning("Failed to update GUI option vars", "Unexpected Error")
                 continue
