@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 08/07/22  HG  Added multiple-client functionality
 # 08/06/20  NH  Fixed reset on init
 # 07/29/20  NH  Added docstrings
 # 05/23/20  NH  Fixed simulator run/stop actions
@@ -48,15 +49,17 @@ import datetime as dt
 from enum import Enum
 import logging
 import sys
-import rctTransport
+import RCTComms.transport as rctTransport
 import numpy as np
 from time import sleep
 from ping import rctPing
 import utm
 import json
-from rctComms import mavComms, rctBinaryPacket
-import rctComms
+import RCTComms.comms
+import RCTComms.transport
 import time
+import math
+from ui.display import towerMode
 
 def getIPs():
     '''
@@ -78,7 +81,7 @@ class droneSim:
     '''
     class MISSION_STATE:
         '''
-        Mission State values.  These are the possible values of 
+        Mission State values.  These are the possible values of
         self.SS_vehicleState
         '''
         TAKEOFF = 0
@@ -86,8 +89,9 @@ class droneSim:
         RTL = 2
         LAND = 3
         END = 4
+        SPIN = 5
 
-    def __init__(self, port: mavComms):
+    def __init__(self, port: RCTComms.comms.mavComms):
         '''
         Creates a new DroneSim object
         :param port:
@@ -102,7 +106,7 @@ class droneSim:
             'STS_sysStatus': 0,
             'STS_swStatus': 0,
         }
-        
+
         self.__txThread = None
 
         # PP - Payload parameters
@@ -189,20 +193,20 @@ class droneSim:
 
         # register command actions here
         self.port.registerCallback(
-            rctComms.EVENTS.COMMAND_GETF, self.__doGetFrequency)
+            RCTComms.comms.EVENTS.COMMAND_GETF, self.__doGetFrequency)
         self.port.registerCallback(
-            rctComms.EVENTS.COMMAND_SETF, self.__doSetFrequency)
+            RCTComms.comms.EVENTS.COMMAND_SETF, self.__doSetFrequency)
         self.port.registerCallback(
-            rctComms.EVENTS.COMMAND_GETOPT, self.__doGetOptions)
+            RCTComms.comms.EVENTS.COMMAND_GETOPT, self.__doGetOptions)
         self.port.registerCallback(
-            rctComms.EVENTS.COMMAND_SETOPT, self.__doSetOptions)
+            RCTComms.comms.EVENTS.COMMAND_SETOPT, self.__doSetOptions)
         self.port.registerCallback(
-            rctComms.EVENTS.COMMAND_START, self.__doStartMission)
+            RCTComms.comms.EVENTS.COMMAND_START, self.__doStartMission)
         self.port.registerCallback(
-            rctComms.EVENTS.COMMAND_STOP, self.__doStopMission)
+            RCTComms.comms.EVENTS.COMMAND_STOP, self.__doStopMission)
         self.port.registerCallback(
-            rctComms.EVENTS.COMMAND_UPGRADE, self.__doUpgrade)
-        
+            RCTComms.comms.EVENTS.COMMAND_UPGRADE, self.__doUpgrade)
+
         # Reset state parameters
         self.reset()
 
@@ -252,7 +256,7 @@ class droneSim:
                              (478140, 3638700, 30)]
         Square
         self.SM_waypoints = [(477995, 3638776, 30),
-                             (477995, 3638546, 30), 
+                             (477995, 3638546, 30),
                              (478225, 3638546, 30),
                              (478225, 3638776, 30),
                              (477995, 3638776, 30)]
@@ -286,8 +290,11 @@ class droneSim:
                             (478110.0, 3638731.0, 30)]
 
         OG
-        '''
         self.SM_waypoints = [(477974.06988529314, 3638776.3039655555, 30),
+                             (477974.06988529314, 3638776.3039655555, 30),
+                             (477974.06988529314, 3638776.3039655555, 30),
+                             (477974.06988529314, 3638776.3039655555, 30),
+                             (477974.06988529314, 3638776.3039655555, 30),
                              (478281.5079546513, 3638711.2010632926, 30),
                              (478274.9146625505, 3638679.2543171947, 30),
                              (477975.5071926904, 3638745.8378777136, 30),
@@ -301,6 +308,9 @@ class droneSim:
                              (477943.58029727807, 3638604.5801627054, 30),
                              (477968.0164183045, 3638761.8351352056, 30),
                              (477976.95013863116, 3638774.1124560814, 30)]
+        '''
+        self.SM_waypoints = [(478060, 3638631, 30),
+                             (478170, 3638631, 30)]
         self.SM_targetThreshold = 5
         self.SM_loopPeriod = 0.1
         self.SM_TakeoffVel = 5
@@ -354,6 +364,8 @@ class droneSim:
         self.SS_velocityVector = np.array([0, 0, 0])
         self.SS_vehicleTarget = np.array(self.SM_TakeoffTarget)
         self.SS_waypointIdx = 0
+        self.SS_vehicleHdg = 0
+        self.SS_hdgIndex = 0
         self.SS_payloadRunning = False
         self.SS_heading = 0
 
@@ -445,7 +457,7 @@ class droneSim:
         self.stop()
         self.start()
 
-    def gotPing(self, dronePing: rctPing):
+    def gotPing(self, dronePing: rctPing, hdg:float):
         '''
         Helper function to send a ping packet.  This must be called while the
         port is open.
@@ -454,15 +466,17 @@ class droneSim:
         if not self.port.isOpen():
             raise RuntimeError
         print("Ping on %d at %3.7f, %3.7f, %3.0f m, measuring %3.3f" %
-              (dronePing.freq, dronePing.lat, dronePing.lon, dronePing.alt, dronePing.amplitude))
-        #packet = dronePing.toPacket()
-        conepacket = rctComms.rctConePacket(dronePing.lat, dronePing.lon, dronePing.alt, dronePing.amplitude, 30)
+              (dronePing.freq, dronePing.lat, dronePing.lon, dronePing.alt, dronePing.power))
+
+        conepacket = RCTComms.comms.rctConePacket(dronePing.lat, dronePing.lon, dronePing.alt, dronePing.power, hdg)
+
+
         self.port.sendCone(conepacket)
 
     def setSystemState(self, system: str, state):
         '''
         Sets the simulator's system state to the specified state.
-        :param system: One of STS_sdrStatus, STS_dirStatus, STS_gpsStatus, 
+        :param system: One of STS_sdrStatus, STS_dirStatus, STS_gpsStatus,
                         STS_sysStatus, or STS_swStatus
         :param state: The appropriate state number per ICD
         '''
@@ -506,23 +520,23 @@ class droneSim:
         '''
         self.PP_options['SDR_samplingFreq'] = samplingFreq
 
-    def __ackCommand(self, command: rctBinaryPacket):
+    def __ackCommand(self, command: RCTComms.comms.rctBinaryPacket):
         '''
         Sends the command acknowledge packet for the given command.
         :param command:
         '''
-        self.port.sendToGCS(rctComms.rctACKCommand(command._pid, 1))
+        self.port.sendToGCS(RCTComms.comms.rctACKCommand(command._pid, 1))
 
-    def __doGetFrequency(self, packet: rctComms.rctGETFCommand, addr: str):
+    def __doGetFrequency(self, packet: RCTComms.comms.rctGETFCommand, addr: str):
         '''
         Callback for the Get Frequency command packet
         :param packet:
         :param addr:
         '''
-        self.port.sendToGCS(rctComms.rctFrequenciesPacket(
+        self.port.sendToGCS(RCTComms.comms.rctFrequenciesPacket(
             self.PP_options['TGT_frequencies']))
 
-    def __doStartMission(self, packet: rctComms.rctSTARTCommand, addr: str):
+    def __doStartMission(self, packet: RCTComms.comms.rctSTARTCommand, addr: str):
         '''
         Callback for the Start Mission command packet
         :param packet:
@@ -531,7 +545,7 @@ class droneSim:
         self.SS_payloadRunning = True
         self.__ackCommand(packet)
 
-    def __doStopMission(self, packet: rctComms.rctSTOPCommand, addr: str):
+    def __doStopMission(self, packet: RCTComms.comms.rctSTOPCommand, addr: str):
         '''
         Callback for the Stop Mission command packet
         :param packet:
@@ -540,7 +554,7 @@ class droneSim:
         self.SS_payloadRunning = False
         self.__ackCommand(packet)
 
-    def __doSetFrequency(self, packet: rctComms.rctSETFCommand, addr: str):
+    def __doSetFrequency(self, packet: RCTComms.comms.rctSETFCommand, addr: str):
         '''
         Callback for the Set Frequency command packet
         :param packet:
@@ -557,17 +571,18 @@ class droneSim:
         self.__ackCommand(packet)
         self.__doGetFrequency(packet, addr)
 
-    def __doGetOptions(self, packet: rctComms.rctGETOPTCommand, addr: str):
+    def __doGetOptions(self, packet: RCTComms.comms.rctGETOPTCommand, addr: str):
         '''
         Callback for the Get Options command packet
         :param packet:
         :param addr:
         '''
         scope = packet.scope
-        packet = rctComms.rctOptionsPacket(scope, **self.PP_options)
+        print(self.PP_options)
+        packet = RCTComms.comms.rctOptionsPacket(scope, **self.PP_options)
         self.port.sendToGCS(packet)
 
-    def __doSetOptions(self, packet: rctComms.rctSETOPTCommand, addr: str):
+    def __doSetOptions(self, packet: RCTComms.comms.rctSETOPTCommand, addr: str):
         '''
         Callback for the Set Options command packet
         :param packet:
@@ -590,7 +605,7 @@ class droneSim:
         heartbeat packet every self.SC_HeartbeatPeriod seconds.
         '''
         while self.HS_run is True:
-            packet = rctComms.rctHeartBeatPacket(self.__state['STS_sysStatus'],
+            packet = RCTComms.comms.rctHeartBeatPacket(self.__state['STS_sysStatus'],
                                                  self.__state['STS_sdrStatus'],
                                                  self.__state['STS_gpsStatus'],
                                                  self.__state['STS_dirStatus'],
@@ -612,8 +627,9 @@ class droneSim:
             self.SS_vehiclePosition[0], self.SS_vehiclePosition[1], self.SS_utmZoneNum, self.SS_utmZone)
         alt = self.SS_vehiclePosition[2]
         hdg = 0
-        packet = rctComms.rctVehiclePacket(lat, lon, alt, hdg)
-        self.port.sendVehicle(packet)# WAS .sendToAll
+        packet = RCTComms.comms.rctVehiclePacket(lat, lon, alt, hdg)
+
+        self.port.sendVehicle(packet)
 
     def doMission(self, returnOnEnd: bool = False):
         '''
@@ -643,7 +659,7 @@ class droneSim:
             itTime = (curTime - prevTime).total_seconds()
             # Time since last waypoint
             segTime = (curTime - wpTime).total_seconds()
-            
+
             ########################
             # Flight State Machine #
             ########################
@@ -671,6 +687,13 @@ class droneSim:
                     wpTime = dt.datetime.now()
 
                     self.SS_waypointIdx += 1
+                    self.SS_vehicleState = droneSim.MISSION_STATE.SPIN
+
+            elif self.SS_vehicleState == droneSim.MISSION_STATE.SPIN:
+                self.SS_vehicleHdg = self.SS_hdgIndex*5
+                self.SS_hdgIndex += 1
+                if self.SS_vehicleHdg == 360:
+                    self.SS_hdgIndex = 0
                     if self.SS_waypointIdx < len(self.SM_waypoints):
                         self.SS_vehicleState = droneSim.MISSION_STATE.WAYPOINTS
                         self.SS_vehicleTarget = np.array(
@@ -707,25 +730,37 @@ class droneSim:
                     return
                 else:
                     self.SS_velocityVector = np.array([0, 0, 0])
-            
+
             sleep(self.SM_loopPeriod)
             ###################
             # Ping Simulation #
             ###################
             if (curTime - prevPingTime).total_seconds() > self.SC_PingMeasurementPeriod:
+                lat, lon = utm.to_latlon(
+                    self.SS_vehiclePosition[0], self.SS_vehiclePosition[1], self.SM_utmZoneNum, self.SM_utmZone)
+                latT, lonT = utm.to_latlon(
+                    self.SS_vehicleTarget[0], self.SS_vehicleTarget[1], self.SM_utmZoneNum, self.SM_utmZone)
+                if self.SS_vehicleState == droneSim.MISSION_STATE.SPIN:
+                        hdg = self.SS_vehicleHdg
+                else:
+                    hdg = self.get_bearing(lat, lon, latT, lonT)
+                    self.SS_vehicleHdg = hdg
                 pingMeasurement = self.calculatePingMeasurement()
                 if pingMeasurement is not None:
                     print("in Ping Measurement")
-                    lat, lon = utm.to_latlon(
-                        self.SS_vehiclePosition[0], self.SS_vehiclePosition[1], self.SM_utmZoneNum, self.SM_utmZone)
+
                     newPing = rctPing(
                         lat, lon, pingMeasurement[0], pingMeasurement[1], self.SS_vehiclePosition[2], curTime.timestamp())
+
+                    #hdg = self.get_bearing(self.SS_vehiclePosition[0], self.SS_vehiclePosition[1], self.SS_vehicleTarget[0], self.SS_vehicleTarget[1])
+
+                    print(hdg)
                     '''
                     if self.SS_payloadRunning:
                         self.gotPing(newPing)
                     '''
                     if newPing is not None:
-                        self.gotPing(newPing)
+                        self.gotPing(newPing, hdg)
                 prevPingTime = curTime
 
             ###################
@@ -736,13 +771,22 @@ class droneSim:
                 prevPosTime = curTime
             prevTime = curTime
 
+    def get_bearing(self, lat1, long1, lat2, long2):
+        dLon = (long2 - long1)
+        x = math.cos(math.radians(lat2)) * math.sin(math.radians(dLon))
+        y = math.cos(math.radians(lat1)) * math.sin(math.radians(lat2)) - math.sin(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.cos(math.radians(dLon))
+        brng = np.arctan2(x,y)
+        brng = np.degrees(brng)
+
+        return brng
+
     def __antennaModel(self, beam_angle) -> float:
-        return np.cos(beam_angle) ** (2.99999)
+        return np.abs(np.cos(beam_angle)) ** (2.99999)
 
     def __computeHeadingMultiplier(self) -> float:
         # Get my current heading
-        x = np.cos(np.deg2rad(self.SS_heading))
-        y = np.sin(np.deg2rad(self.SS_heading))
+        x = np.cos(np.deg2rad(self.SS_vehicleHdg))
+        y = np.sin(np.deg2rad(self.SS_vehicleHdg))
         heading_vector = np.array([x, y, 0])
 
         # Get the bearing to the transmitter
@@ -752,13 +796,16 @@ class droneSim:
         # Compute the bearing from antenna to transmitter
         dot = np.dot(heading_vector, transmitter_vector)
         angle = np.arccos(dot)
+        print("Angle: ", np.rad2deg(angle))
 
         # Plug into directivity model
-        return self.__antennaModel(angle)
+        model = self.__antennaModel(angle)
+        print("Model: ", model)
+        return model
 
     def calculatePingMeasurement(self):
         '''
-        Calculate the simulated ping measurement from the current state 
+        Calculate the simulated ping measurement from the current state
         variables
         '''
         # check against frequencies
@@ -787,9 +834,11 @@ class droneSim:
 
         Prx = P_tx - 10 * n * np.log10(d) - C
 
-        measurement = (Prx, f_tx)
+        measurement = [Prx, f_tx]
 
         measurement[0] *= self.__computeHeadingMultiplier()
+
+        measurement = (measurement[0], measurement[1])
 
         # implement noise floor
         if Prx < P_n:
@@ -808,99 +857,153 @@ class droneSim:
         e['PP_options'] = str(self.PP_options )
         e['SM_missionRun'] = str(self.SM_missionRun )
 
-        e['SM_utmZoneNum'] = str(self.SM_utmZoneNum) 
-        e['SM_utmZone'] = str(self.SM_utmZone) 
-        
+        e['SM_utmZoneNum'] = str(self.SM_utmZoneNum)
+        e['SM_utmZone'] = str(self.SM_utmZone)
+
         e['SM_origin'] = str(self.SM_origin)
-        
-        e['SM_TakeoffTarget'] = str(self.SM_TakeoffTarget) 
-        
+
+        e['SM_TakeoffTarget'] = str(self.SM_TakeoffTarget)
+
         e['SM_waypoints'] = str(self.SM_waypoints )
-        
-        e['SM_targetThreshold'] = str(self.SM_targetThreshold) 
-        
+
+        e['SM_targetThreshold'] = str(self.SM_targetThreshold)
+
         e['SM_loopPeriod'] = str(self.SM_loopPeriod )
-        
-        e['SM_TakeoffVel'] = str(self.SM_TakeoffVel) 
-        
+
+        e['SM_TakeoffVel'] = str(self.SM_TakeoffVel)
+
         e['SM_WPVel'] = str(self.SM_WPVel )
-        
+
         e['SM_RTLVel'] = str(self.SM_RTLVel)
-        
+
         e['SM_LandVel'] = str(self.SM_LandVel)
-        
+
 
         e['SC_VehiclePositionMsgPeriod'] = str(self.SC_VehiclePositionMsgPeriod)
-        
+
         e['SC_PingMeasurementPeriod'] = str(self.SC_PingMeasurementPeriod )
-        
+
         e['SC_PingMeasurementSigma'] = str(self.SC_PingMeasurementSigma )
-        
+
         e['SC_HeartbeatPeriod'] = str(self.SC_HeartbeatPeriod )
-        
+
 
         e['SP_TxPower'] = str(self.SP_TxPower )
-        
-        e['SP+TxPowerSigma'] = str(self.SP_TxPowerSigma) 
-        
+
+        e['SP+TxPowerSigma'] = str(self.SP_TxPowerSigma)
+
         e['SP_SystemLoss'] = str(self.SP_SystemLoss )
-        
+
         e['SP_SystemLossSigma'] = str(self.SP_SystemLossSigma )
-        
+
         e['SP_Exponent'] = str(self.SP_Exponent )
-        
-        e['SP_ExponentSigma'] = str(self.SP_ExponentSigma) 
-        
+
+        e['SP_ExponentSigma'] = str(self.SP_ExponentSigma)
+
         e['SP_Position'] = str(self.SP_Position )
-        
+
         e['SP_NoiseFloor'] = str(self.SP_NoiseFloor)
-        
+
         e['SP_NoiseFloorSigma:'] = str(self.SP_NoiseFloorSigma )
-        
+
         e['SP_TxFreq'] = str(self.SP_TxFreq )
-        
 
-        e['SV_VehiclePositionSigma'] = str(self.SV_vehiclePositionSigma) 
-        
 
-        e['SS_utmZoneNum'] = str(self.SS_utmZoneNum) 
-        
+        e['SV_VehiclePositionSigma'] = str(self.SV_vehiclePositionSigma)
+
+
+        e['SS_utmZoneNum'] = str(self.SS_utmZoneNum)
+
         e['SS_utmZone'] = str(self.SS_utmZone )
-        
+
         e['SS_VehiclePosition'] = str(self.SS_vehiclePosition )
-        
+
         e['SS_vehicleState'] = str(self.SS_vehicleState)
-        
+
         e['SS_startTime'] = str(self.SS_startTime )
-        
-        e['SS_velocityVector'] = str(self.SS_velocityVector) 
-        
-        e['SS_vehicleTarget'] = str(self.SS_vehicleTarget) 
-        
+
+        e['SS_velocityVector'] = str(self.SS_velocityVector)
+
+        e['SS_vehicleTarget'] = str(self.SS_vehicleTarget)
+
         e['SS_waypointIdx'] = str(self.SS_waypointIdx )
-        
+
         e['SS_payloadRunning'] = str(self.SS_payloadRunning )
 
         e['SS_heading'] = str(self.SS_heading )
         
+
 
         e['HS_run'] = str(self.HS_run )
 
         settingsFile = filename + '.json'
         with open(settingsFile, 'w') as outfile:
             json.dump(e, outfile)
-        
 
+def addClient():
+    '''
+    Connects another client and adds the associated simulator to simList
+    '''
 
+    if args.protocol == 'udp':
+        port = RCTComms.transport.RCTUDPClient(port=args.port, addr=args.target)
+    elif args.protocol == 'tcp':
+        port = RCTComms.transport.RCTTCPClient(port=args.port, addr=args.target)
 
+    sim = droneSim(RCTComms.comms.mavComms(port))
+    simList.append(sim)
+
+def doAll(action:str, args=None):
+    '''
+    Calls the specified action on each simulator in simList
+
+    :param action: the function to be called
+    '''
+    try:
+        for sim in simList:
+            if action == "start":
+                sim.start()
+            elif action == "stop":
+                sim.stop()
+            elif action == "restart":
+                sim.restart()
+            elif action == "gotPing":
+                sim.gotPing(args[0])
+            elif action == "setException":
+                sim.setException(args[0], args[1])
+            elif action == "getFrequencies":
+                sim.getFrequencies()
+            elif action == "transmitPosition":
+                sim.transmitPosition()
+            elif action == "doMission":
+                sim.doMission(args[0])
+            elif action == "calculatePingMeasurement":
+                sim.calculatePingMeasurement()
+            else:
+                print("Error: Select one of the following functions:")
+                print("\'start\', \'stop\', \'restart\', \'gotPing\', ", end='')
+                print("\'setException\', \'getFrequencies\', ", end='')
+                print("\'transmitPosition\', \'doMission\', \'calculatePingMeasurement\'")
+                break
+    except TypeError:
+        print("Error: Ensure you have provided all required arguments in a list.")
+
+def connectionHandler(connection, id):
+    print('Connected {}'.format(id))
+    comms = RCTComms.comms.mavComms(connection)
+    sim = droneSim(comms)
+    simList.append(sim)
+
+simList = []
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Radio Collar Tracker Payload Control Simulator')
     parser.add_argument('--port', type=int, default=9000)
     parser.add_argument('--protocol', type=str,
                         choices=['udp', 'tcp'], required=True)
-    parser.add_argument('--target', type=str, default='255.255.255.255',
-                        help='Target IP Address.  Use 255.255.255.255 for broadcast')
+    parser.add_argument('--target', type=str, default='127.0.0.1',
+                        help='Target IP Address.  Use 255.255.255.255 for broadcast, 127.0.0.1 for local')
+    parser.add_argument('--clients', type=int, default=1)
     args = parser.parse_args()
     logName = dt.datetime.now().strftime('%Y.%m.%d.%H.%M.%S_sim.log')
     logger = logging.getLogger()
@@ -917,13 +1020,30 @@ if __name__ == '__main__':
     logger.addHandler(ch)
 
     if args.protocol == 'udp':
-        port = rctTransport.RCTUDPServer(port=args.port)
+        if towerMode:
+            for i in range(args.clients):
+                port = RCTComms.transport.RCTUDPClient(port=args.port, addr=args.target)
+                sim = droneSim(RCTComms.comms.mavComms(port))
+                simList.append(sim)
+        else:
+            port = RCTComms.transport.RCTUDPServer(port=args.port)
+            sim = droneSim(RCTComms.comms.mavComms(port))
     elif args.protocol == 'tcp':
-        port = rctTransport.RCTTCPServer(port=args.port)
+        if towerMode:
+            for i in range(args.clients):
+                port = RCTComms.transport.RCTTCPClient(port=args.port, addr=args.target)
+                sim = droneSim(RCTComms.comms.mavComms(port))
+                simList.append(sim)
+        else:
+            connected = False
+            port = RCTComms.transport.RCTTCPServer(args.port, connectionHandler, addr=args.target)
+            port.open()
+            while len(simList) == 0:
+                continue
+            sim = simList[0]
 
-    comms = mavComms(port)
-    sim = droneSim(comms)
     try:
         __IPYTHON__
     except NameError:
-        sim.start()
+        for sim in simList:
+            sim.start()
