@@ -3,6 +3,7 @@ from RCTComms.transport import RCTTCPClient
 import rctCore
 from PyQt5.QtCore import QRegExp
 from PyQt5.QtWidgets import *
+from PyQt5.QtWidgets import QWidget, QWizard, QWizardPage, QCheckBox
 from PyQt5.QtGui import QRegExpValidator
 
 class WarningMessager:
@@ -250,7 +251,11 @@ class ConnectionDialog(QWizard):
     '''
     Custom Dialog widget to facilitate connecting to the drone
     '''
-    def __init__(self, parent):
+    def __init__(self,
+            parent: QWidget,
+            default_ip: str = '127.0.0.1',
+            default_port: int = 9000,
+            default_protocol: str = 'tcp'):
         '''
         Creates new ConnectionDialog widget
         Args:
@@ -259,7 +264,11 @@ class ConnectionDialog(QWizard):
         super(ConnectionDialog, self).__init__()
         self.__parent = parent
         self.setWindowTitle('Connect Settings')
-        self.page = ConnectionDialogPage(self)
+        self.page = ConnectionDialogPage(self,
+            default_ip=default_ip,
+            default_port=default_port,
+            default_protocol=default_protocol
+        )
         self.addPage(self.page)
         self.port = None
         self.comms = None
@@ -288,7 +297,11 @@ class ConnectionDialogPage(QWizardPage):
     Custom DialogPage widget - Allows the user to configure
     settings to connect to the drone
     '''
-    def __init__(self, parent):
+    def __init__(self,
+            parent: QWidget,
+            default_ip: str = '127.0.0.1',
+            default_port: int = 9000,
+            default_protocol: str = 'tcp'):
         '''
         Creates a new AddTargetDialog
         Args:
@@ -296,9 +309,10 @@ class ConnectionDialogPage(QWizardPage):
         '''
         super(ConnectionDialogPage, self).__init__(parent)
         self.__parent = parent
-        self.__portEntryVal = 9000 # default value
+        self.__port_entry_val = default_port # default value
         self.portEntry = None # default value
-        self.__addrEntryVal = '127.0.0.1'
+        self.__addr_entry_val = default_ip
+        self.__protocol_val = default_protocol
         self.addrEntry = None
         self.port = None
         self.comms = None
@@ -320,8 +334,12 @@ class ConnectionDialogPage(QWizardPage):
         lbl_conType = QLabel('Connection Type:')
         frm_conType.addWidget(lbl_conType)
 
-        btn_TCP = QCheckBox('TCP')
-        frm_conType.addWidget(btn_TCP)
+        btn_tcp = QCheckBox('TCP')
+        if self.__protocol_val == 'tcp':
+            btn_tcp.setChecked(True)
+        else:
+            btn_tcp.setChecked(False)
+        frm_conType.addWidget(btn_tcp)
 
         frm_port = QVBoxLayout()
         frm_port.addStretch(1)
@@ -333,11 +351,11 @@ class ConnectionDialogPage(QWizardPage):
         frm_port.addWidget(lbl_addr)
 
         self.portEntry = QLineEdit()
-        self.portEntry.setText(str(self.__portEntryVal))
+        self.portEntry.setText(str(self.__port_entry_val))
         frm_port.addWidget(self.portEntry)
 
         self.addrEntry = QLineEdit()
-        self.addrEntry.setText(self.__addrEntryVal)
+        self.addrEntry.setText(self.__addr_entry_val)
         frm_port.addWidget(self.addrEntry)
 
 
