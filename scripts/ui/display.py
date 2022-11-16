@@ -20,6 +20,10 @@ class GCS(QMainWindow):
 
     sig = pyqtSignal()
 
+    NO_CONNECTION_TEXT = 'System: No Connection'
+    CONNECT_BUTTON_TEXT = "Connect"
+    DISCONNECT_BUTTON_TEXT = "Disonnect"
+
     def __init__(self):
         '''
         Creates the GCS Application Object
@@ -390,6 +394,20 @@ class GCS(QMainWindow):
         self.__registerModelCallbacks()
         self.systemSettingsWidget.updateGUIOptionVars()
         self.statusWidget.updateGUIOptionVars()
+        self.__btn_connect.setText(self.DISCONNECT_BUTTON_TEXT)
+        self.__btn_connect.clicked.disconnect()
+        self.__btn_connect.clicked.connect(self.__handleDisconnectInput)
+
+    def __handleDisconnectInput(self):
+        """Disconnect from current MAV
+        """
+        self._systemConnectionTab.updateText(self.NO_CONNECTION_TEXT)
+        self._rctPort = None
+        self._mavReceiver = None
+        self._mavModel = None
+        self.__btn_connect.setText(self.CONNECT_BUTTON_TEXT)
+        self.__btn_connect.clicked.disconnect()
+        self.__btn_connect.clicked.connect(self.__handleConnectInput)
 
     def setMap(self, mapWidget):
         '''
@@ -421,13 +439,13 @@ class GCS(QMainWindow):
 
 
         # SYSTEM TAB
-        self._systemConnectionTab = CollapseFrame(title='System: No Connection')
+        self._systemConnectionTab = CollapseFrame(title=self.NO_CONNECTION_TEXT)
         self._systemConnectionTab.resize(self.SBWidth, 400)
         lay_sys = QVBoxLayout()
-        btn_connect = QPushButton("Connect")
-        btn_connect.resize(self.SBWidth, 100)
-        btn_connect.clicked.connect(lambda:self.__handleConnectInput())
-        lay_sys.addWidget(btn_connect)
+        self.__btn_connect = QPushButton(self.CONNECT_BUTTON_TEXT)
+        self.__btn_connect.resize(self.SBWidth, 100)
+        self.__btn_connect.clicked.connect(self.__handleConnectInput)
+        lay_sys.addWidget(self.__btn_connect)
         self._systemConnectionTab.setContentLayout(lay_sys)
 
         # COMPONENTS TAB
