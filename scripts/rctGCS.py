@@ -69,10 +69,6 @@ import platform
 import sys
 from pathlib import Path
 
-if 'CONDA_PREFIX' in os.environ:
-    sys.path.insert(0, Path(sys.executable).parent.joinpath("Library", "python", "plugins").as_posix())
-    sys.path.insert(0, Path(sys.executable).parent.joinpath("Library", "python").as_posix())
-
 from config import get_instance
 from PyQt5.QtWidgets import QFileDialog
 from qgis.core import *
@@ -80,34 +76,6 @@ from qgis.gui import *
 from qgis.utils import *
 from ui.display import GCS
 from ui.popups import WarningMessager
-
-
-def verify_qgis_path(path: Path) -> bool:
-    return True
-    system = platform.system()
-    if system == 'Windows':
-        return path.joinpath('plugins').exists()
-    elif system == 'Linux' or system == 'Darwin':
-        return path.joinpath('lib', 'qgis', 'plugins').exists()
-    else:
-        raise NotImplementedError
-
-
-def configSetup() -> Path:
-    '''
-    Helper function to set up paths to QGIS lbrary files, and 
-    config file
-    '''
-    with get_instance(Path('gcsConfig.ini')) as config:
-        while not config.qgis_prefix_set or not verify_qgis_path(config.qgis_prefix_path):
-            qgis_path = Path(QFileDialog.getExistingDirectory(
-                None,
-                'Select the Qgis directory',
-                config.qgis_prefix_path.as_posix())).absolute()
-            config.qgis_prefix_path = qgis_path
-            config.qgis_prefix_set = True
-
-    return config.qgis_prefix_path
 
 if __name__ == '__main__':
     logName = dt.datetime.now().strftime('%Y.%m.%d.%H.%M.%S_gcs.log')
@@ -128,10 +96,6 @@ if __name__ == '__main__':
   
     app = QgsApplication([], True)
     
-    prefix_path = configSetup()
-    
-    QgsApplication.setPrefixPath(prefix_path.as_posix())
-
     app.initQgis()
 
     ex = GCS()
