@@ -35,6 +35,9 @@ class Configuration:
         self.__connection_port: int = 9000
         self.__connection_mode: ConnectionMode = ConnectionMode.DRONE
 
+        self.__ground_truth: Tuple[float, float] = (0, 0)
+        self.__ground_truth_set: bool = False
+
     def __create_dict(self):
         return {
             "FilePaths": {
@@ -51,6 +54,11 @@ class Configuration:
                 'addr': self.__connection_addr,
                 'port': self.__connection_port,
                 'mode': self.__connection_mode.value
+            },
+            "GroundTruth": {
+                "x": self.__ground_truth[0],
+                'y': self.__ground_truth[1],
+                'set': self.__ground_truth_set
             }
         }
 
@@ -81,6 +89,9 @@ class Configuration:
         self.__connection_addr = parser['Connection']['addr']
         self.__connection_mode = ConnectionMode(parser['Connection']['mode'])
 
+        self.__ground_truth = (parser['GroundTruth'].getfloat('x'), parser['GroundTruth'].getfloat('y'))
+        self.__ground_truth_set = parser['GroundTruth'].getboolean('set')
+
     def write(self) -> None:
         """Writes the configuration to the file
         """
@@ -88,6 +99,44 @@ class Configuration:
         parser.read_dict(self.__create_dict())
         with open(self.__config_path, 'w', encoding='ascii') as handle:
             parser.write(handle)
+
+    @property
+    def ground_truth(self) -> Tuple[float, float]:
+        """Transmitter ground truth
+
+        Returns:
+            Tuple[float, float]: Ground truth in WGS84 dd.dddd
+        """
+        return self.__ground_truth
+    
+    @ground_truth.setter
+    def ground_truth(self, value: Any) -> None:
+        if not isinstance(value, tuple):
+            raise TypeError
+        if len(value) != 2:
+            raise TypeError
+        if not all([isinstance(val, float) for val in value]):
+            raise TypeError
+        if not -90 <= value[0] <= 90:
+            raise ValueError
+        if not -180 <= value[1] <= 180:
+            raise ValueError
+        self.__ground_truth = value
+
+    @property
+    def ground_truth_set(self) -> bool:
+        """Transmitter ground active
+
+        Returns:
+            bool: _description_
+        """
+        return self.__ground_truth_set
+
+    @ground_truth_set.setter
+    def ground_truth_set(self, value: Any) -> None:
+        if not isinstance(value, bool):
+            raise TypeError
+        self.__ground_truth_set = value
 
     @property
     def connection_port(self) -> int:
