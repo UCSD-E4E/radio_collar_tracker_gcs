@@ -273,6 +273,8 @@ class ConnectionDialog(QWizard):
         self.port = None
         self.comms = None
         self.model = None
+        self.addr = None
+        self.port_num = None
         self.resize(640,480)
         self.button(QWizard.FinishButton).clicked.connect(lambda:self.submit())
 
@@ -282,8 +284,10 @@ class ConnectionDialog(QWizard):
         '''
         try:
             # TODO: GCS should be server, not client
+            self.addr = self.page.addrEntry.text()
+            self.port_num = int(self.page.portEntry.text())
             self.port = RCTTCPClient(
-                addr=self.page.addrEntry.text(), port=int(self.page.portEntry.text()))
+                addr=self.addr, port=self.port_num)
             self.comms = gcsComms(self.port, self)
             self.model = rctCore.MAVModel(self.comms)
             self.model.start()
