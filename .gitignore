@@ -35,3 +35,4 @@ scripts/gcsConfig.ini
 *.xls
 
 scripts/tiles
+data.json
