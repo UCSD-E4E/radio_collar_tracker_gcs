@@ -233,12 +233,15 @@ class MapWidget(QWidget):
         Sets up the heatMap maplayer
         Args:
         '''
-        fileName = QFileDialog.getOpenFileName()
-        print(fileName[0])
+        qfd_retval = QFileDialog.getOpenFileName(caption="Select file to export heatmap to")
+        if qfd_retval is None:
+            return
+        fileName, _ = qfd_retval
+        print(fileName)
         if self.heatMap is not None:
             QgsProject.instance().removeMapLayer(self.heatMap)
         if fileName is not None:
-            self.heatMap = QgsRasterLayer(fileName[0], "heatMap")   
+            self.heatMap = QgsRasterLayer(fileName, "heatMap")   
             
             stats = self.heatMap.dataProvider().bandStatistics(1)
             maxVal = stats.maximumValue
