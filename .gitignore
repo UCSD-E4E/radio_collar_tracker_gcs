@@ -33,3 +33,5 @@ doxygen-doc
 scripts/gcsConfig.ini
 
 *.xls
+
+scripts/tiles
