@@ -7,7 +7,7 @@ channels:
 dependencies:
   - qgis
   - python=3.9
-  - pip=20.0.2
+  - pip
   - scipy
   - pip:
     - utm==0.5.0
