@@ -190,6 +190,11 @@ class GCS(QMainWindow):
         if self._mavModel == None:
             return
 
+        # Validate settings first
+        if not self._mavModel.validate_frequencies():
+            WarningMessager.showWarning("Invalid frequency configuration!")
+            return
+
         if self.__missionStatusBtn.text() == 'Start Recording':
             self.__missionStatusBtn.setText('Stop Recording')
 
@@ -380,8 +385,13 @@ class GCS(QMainWindow):
         '''
         Internal callback to open Connect Settings
         '''
-        connectionDialog = ConnectionDialog(self)
-        connectionDialog.exec_()
+        with get_instance(Path('gcsConfig.ini')) as config:
+            connectionDialog = ConnectionDialog(self,
+                default_ip=config.connection_addr,
+                default_port=config.connection_port)
+            connectionDialog.exec_()
+            config.connection_addr = connectionDialog.addr
+            config.connection_port = connectionDialog.port_num
 
 
         self._rctPort = connectionDialog.port
