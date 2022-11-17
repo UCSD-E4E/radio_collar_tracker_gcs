@@ -44,12 +44,14 @@
 #
 ###############################################################################
 
-from enum import Enum, auto
-import RCTComms.comms as rctComms
+import copy
 import logging
 import threading
+from enum import Enum, auto
+from typing import List
+
 import ping
-import copy
+import RCTComms.comms as rctComms
 
 
 class SDR_INIT_STATES(Enum):
@@ -389,7 +391,7 @@ class MAVModel:
         if not self.__ackVectors.pop(0x09)[1]:
             raise RuntimeError('STOP NACKED')
 
-    def getFrequencies(self, timeout):
+    def getFrequencies(self, timeout) -> List[int]:
         '''
         Retrieves the PRX_frequencies from the payload
         Args:
@@ -406,6 +408,19 @@ class MAVModel:
 
             frequencyPacketEvent.wait(timeout=timeout)
         return self.PP_options['TGT_frequencies']
+
+    def validate_frequencies(self) -> bool:
+        """Validates that the frequency set is valid
+
+        Returns:
+            bool: True if valid, otherwise False
+        """
+        center_frequency = self.getOption("SDR_centerFreq")
+        sampling_frequency = self.getOption("SDR_samplingFreq")
+        for frequency in self.getFrequencies(5):
+            if abs(frequency - center_frequency) > sampling_frequency / 2.:
+                return False
+        return True
 
     def __handleRemoteException(self, packet: rctComms.rctExceptionPacket, addr):
         '''
