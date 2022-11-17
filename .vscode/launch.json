@@ -13,7 +13,8 @@
             "justMyCode": true,
             "cwd": "${workspaceFolder}/scripts",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/scripts;"
+                "PYTHONPATH": "C:\\Users\\nthui.DESKTOP-39AHVR9\\miniconda3\\envs\\rctGCS\\Library\\python\\plugins;C:\\Users\\nthui.DESKTOP-39AHVR9\\miniconda3\\envs\\rctGCS\\Library\\python;",
+                "QGIS_PREFIX_PATH": "C:/Users/nthui.DESKTOP-39AHVR9/miniconda3/envs/rctGCS/Library",
             }
         }
     ]
