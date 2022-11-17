@@ -5,9 +5,10 @@ import os
 import os.path
 import sys
 from threading import Thread
-
+from pathlib import Path
 import qgis.gui
 import requests
+from config import get_instance
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
@@ -668,7 +669,12 @@ class MapOptions(QWidget):
         
         distWidg = QWidget()
         distLay = QHBoxLayout()
-        lbl_dist = QLabel('Distance from Actual')
+        with get_instance(Path('gcsConfig.ini')) as config:
+            if config.ground_truth_set:
+                distance_label_text = 'Distance from Actual'
+            else:
+                distance_label_text = ''
+        lbl_dist = QLabel(distance_label_text)
         self.lbl_dist = QLabel('')
         distLay.addWidget(lbl_dist)
         distLay.addWidget(self.lbl_dist)
@@ -728,8 +734,9 @@ class MapOptions(QWidget):
         '''
         lat1 = coord[0]
         lon1 = coord[1]
-        lat2 = 32.885889
-        lon2 = -117.234028
+        with get_instance(Path('gcsConfig.ini')) as config:
+            lat2, lon2 = config.ground_truth
+            ground_truth_set = config.ground_truth_set
         
         # Center
         #lat2 = 32.88736856384841
@@ -778,10 +785,10 @@ class MapOptions(QWidget):
                 self.writer.writerow({'Distance': str(dist), 'res.x': str(res.x), 'residuals': str(res.fun)})
                 
        
-        
-        d = '%.3f'%(dist)
+        if ground_truth_set:
+            d = '%.3f'%(dist)
 
-        self.lbl_dist.setText(d + '(m.)')
+            self.lbl_dist.setText(d + '(m.)')
         
     def distance(self, lat1, lat2, lon1, lon2): 
         '''
