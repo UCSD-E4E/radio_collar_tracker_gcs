@@ -49,7 +49,7 @@ class GCS(QMainWindow):
         self.targEntries = {}
         self.mapControl = None
         self.mapOptions = None
-        self.mapDisplay = None
+        self.mapDisplay: Optional[WebMap] = None
         self.mainThread = None
         self.testFrame = None
         self.pingSheetCreated = False
@@ -419,7 +419,7 @@ class GCS(QMainWindow):
         self.__btn_connect.clicked.disconnect()
         self.__btn_connect.clicked.connect(self.__handleConnectInput)
 
-    def setMap(self, mapWidget):
+    def setMap(self, mapWidget: WebMap):
         '''
         Function to set the mapDisplay widget
         Args:
