@@ -2,10 +2,12 @@ import configparser
 import json
 import logging
 import queue as q
+from pathlib import Path
 from typing import Dict
 
 import rctCore
 import utm
+from config import get_instance
 from PyQt5.QtWidgets import (QFileDialog, QGridLayout, QLabel, QMainWindow,
                              QPushButton, QScrollArea, QVBoxLayout, QWidget)
 from ui.controls import *
@@ -361,18 +363,11 @@ class GCS(QMainWindow):
             lat2 = ext.yMinimum()
             lon2 = ext.xMaximum()
 
-
-
-            config_path = 'gcsConfig.ini'
-            config = configparser.ConfigParser()
-            config.read(config_path)
-            config['LastCoords'] = {}
-            config['LastCoords']['Lat1'] = str(lat1)
-            config['LastCoords']['Lon1'] = str(lon1)
-            config['LastCoords']['Lat2'] = str(lat2)
-            config['LastCoords']['Lon2'] = str(lon2)
-            with open(config_path, 'w') as configFile:
-                config.write(configFile)
+            with get_instance(Path('gcsConfig.ini')) as config:
+                config.map_extent = (
+                    (lat1, lon1),
+                    (lat2, lon2)
+                )
 
         if self._rctPort is not None:
             self._rctPort.close()
@@ -897,25 +892,20 @@ class MapControl(CollapseFrame):
         lat2 = self.__p2latEntry.text()
         lon2 = self.__p2lonEntry.text()
 
+        if lat1 is None or lat2 is None or lon1 is None or lon2 is None or \
+                lat1 == '' or lon1 == '' or lat2 == '' or lon2 == '':
+            with get_instance(Path('gcsConfig.ini')) as config:
+                nw_extent, se_extent = config.map_extent
 
-
-        if (lat1 == '') or (lon1 == '') or (lat2 == '') or (lon2 == ''):
-            lat1, lon1, lat2, lon2 = self.__coordsFromConf()
-
+            lat1 = str(nw_extent[0])
             self.__p1latEntry.setText(lat1)
+            lon1 = str(nw_extent[1])
             self.__p1lonEntry.setText(lon1)
+            lat2 = str(se_extent[0])
             self.__p2latEntry.setText(lat2)
+            lon2 = str(se_extent[1])
             self.__p2lonEntry.setText(lon2)
 
-        if lat1 is None or lat2 is None or lon1 is None or lon2 is None:
-            lat1 = "90"
-            lat2 = "-90"
-            lon1 = "-180"
-            lon2 = "180"
-            self.__p1latEntry.setText(lat1)
-            self.__p1lonEntry.setText(lon1)
-            self.__p2latEntry.setText(lat2)
-            self.__p2lonEntry.setText(lon2)
         p1lat = float(lat1)
         p1lon = float(lon1)
         p2lat = float(lat2)

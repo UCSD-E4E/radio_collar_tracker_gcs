@@ -1,19 +1,22 @@
+import csv
+import logging
 import math
-import sys
 import os
 import os.path
+import sys
+from threading import Thread
+
+import qgis.gui
 import requests
 from PyQt5.QtCore import *
-from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
-from qgis.core import *    
-import qgis.gui
+from PyQt5.QtWidgets import *
+from qgis.core import *
+from qgis.core import QgsProject, QgsRasterLayer
 from qgis.utils import *
-from qgis.core import QgsProject
-from threading import Thread
-import csv
-from ui.popups import *
 from ui.controls import *
+from ui.popups import *
+
 
 class RectangleMapTool(qgis.gui.QgsMapToolEmitPoint):
     '''
@@ -895,6 +898,7 @@ class WebMap(MapWidget):
         '''
         # Initialize WebMapFrame
         MapWidget.__init__(self, root)
+        self.__log = logging.getLogger('WebMap')
 
         self.loadCached = loadCached
 
@@ -1125,9 +1129,9 @@ class WebMap(MapWidget):
         #load from cached tiles if true, otherwise loads from web    
         if self.loadCached:
             path = QDir().currentPath()
-            urlWithParams = 'type=xyz&url=file:///'+ path+'/tiles/%7Bz%7D/%7Bx%7D/%7By%7D.png'
+            urlWithParams = 'type=xyz&url=file:///'+ path+'/tiles/{z}/{x}/{y}.png'
         else:
-            urlWithParams = 'type=xyz&url=http://a.tile.openstreetmap.org/%7Bz%7D/%7Bx%7D/%7By%7D.png&zmax=19&zmin=0&crs=EPSG3857'    
+            urlWithParams = 'type=xyz&url=http://tile.openstreetmap.org/{z}/{x}/{y}.png&zmax=19&zmin=0'
         self.mapLayer = QgsRasterLayer(urlWithParams, 'OpenStreetMap', 'wms') 
         '''
         if self.precision is None:
@@ -1153,8 +1157,8 @@ class WebMap(MapWidget):
             #QgsProject.instance().addMapLayer(self.precision)
             print('valid mapLayer')
         else:
-            print('invalid mapLayer')
-            raise RuntimeError
+            self.__log.error('Invalid Map Layer: %s', self.mapLayer.error())
+            raise RuntimeError(f'Invalid Map Layer: {self.mapLayer.error()}')
 
 
 
