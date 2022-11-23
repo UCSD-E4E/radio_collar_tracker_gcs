@@ -390,6 +390,8 @@ class GCS(QMainWindow):
                 default_ip=config.connection_addr,
                 default_port=config.connection_port)
             connectionDialog.exec_()
+            if connectionDialog.addr is None:
+                return
             config.connection_addr = connectionDialog.addr
             config.connection_port = connectionDialog.port_num
 
