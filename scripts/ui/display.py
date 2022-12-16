@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (QFileDialog, QGridLayout, QLabel, QMainWindow,
 from ui.controls import *
 from ui.map import *
 from ui.popups import *
-
+from version import __VERSION__
 
 class GCS(QMainWindow):
     '''
@@ -36,6 +36,7 @@ class GCS(QMainWindow):
         '''
         super().__init__()
         self.__log = logging.getLogger('rctGCS.GCS')
+        self.__log.info('Running version %s', __VERSION__)
         self._rctPort = None
         self._mavReceiver = None
         self._mavModel = None
@@ -440,7 +441,7 @@ class GCS(QMainWindow):
         centr_widget = QFrame()
         self.setCentralWidget(centr_widget)
 
-        self.setWindowTitle('RCT GCS')
+        self.setWindowTitle(f'RCT GCS {__VERSION__}')
         frm_sideControl = QScrollArea()
 
         content = QWidget()
