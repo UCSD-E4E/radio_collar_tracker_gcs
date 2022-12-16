@@ -399,7 +399,7 @@ class GCS(QMainWindow):
 
         self._rctPort = connectionDialog.port
         self._mavReceiver = connectionDialog.comms
-        self._mavReceiver.set_disconnect(self.__handleDisconnectInput())
+        self._mavReceiver.set_disconnect(self.__handleDisconnectInput)
         self._mavModel = connectionDialog.model
         if self._mavModel is None:
             return
