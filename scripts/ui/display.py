@@ -988,7 +988,12 @@ class MapControl(CollapseFrame):
         Internal function to load user-specified raster file
         '''
         self.__mapFrame.setParent(None)
-        self.__mapFrame = StaticMap(self.__holder)
-        self.__mapFrame.resize(800, 500)
-        self.__mapOptions.setMap(self.__mapFrame, False)
-        self.__root.setMap(self.__mapFrame)
+        try:
+            self.__mapFrame = StaticMap(self.__holder)
+        except FileNotFoundError as e:
+            print(e)
+            self.__loadWebMap()
+        else:
+            self.__mapFrame.resize(800, 500)
+            self.__mapOptions.setMap(self.__mapFrame, False)
+            self.__root.setMap(self.__mapFrame)
