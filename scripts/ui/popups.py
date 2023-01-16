@@ -1,9 +1,10 @@
 from RCTComms.comms import gcsComms
-from RCTComms.transport import RCTTCPClient
+from RCTComms.transport import RCTTCPClient, RCTTCPServer
 import rctCore
 from PyQt5.QtCore import QRegExp
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QRegExpValidator
+from config import ConnectionMode
 
 class WarningMessager:
 
@@ -271,11 +272,19 @@ class ConnectionDialog(QWizard):
         '''
         self.portVal = int(self.page.portEntry.text())
 
-        if not self.parent.towerMode:
-            self.port = RCTTCPClient(
-                addr=self.page.addrEntry.text(), port=int(self.page.portEntry.text()))
-            self.parent.connectionHandler(self.port, 0)
-            self.parent._transport = self.port
+        if self.parent.config.connection_mode == ConnectionMode.TOWER:
+            self.port = RCTTCPServer(self.portVal, self.parent.connectionHandler)
+            self.port.open()
+        else:
+            try:
+                self.port = RCTTCPClient(
+                    addr=self.page.addrEntry.text(), port=int(self.page.portEntry.text()))
+                self.parent.connectionHandler(self.port, 0)
+            except ConnectionRefusedError:
+                WarningMessager.showWarning("Failure to connect:\nPlease ensure server is running.")
+                self.port.close()
+                return
+        self.parent._transport = self.port
 
 class ConnectionDialogPage(QWizardPage):
     '''
@@ -322,7 +331,7 @@ class ConnectionDialogPage(QWizardPage):
         self.portEntry.setText(str(self.__portEntryVal))
         frm_port.addWidget(self.portEntry)
 
-        if not self.__parent.parent.towerMode:
+        if self.__parent.parent.config.connection_mode == ConnectionMode.DRONE:
             frm_addr = QHBoxLayout()
             frm_addr.addStretch(1)
 

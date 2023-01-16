@@ -58,7 +58,9 @@ import RCTComms.comms
 import RCTComms.transport
 import time
 import math
-from ui.display import towerMode
+from config import ConnectionMode
+import config
+from pathlib import Path
 
 def getIPs():
     '''
@@ -1012,8 +1014,11 @@ if __name__ == '__main__':
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
+    config = config.Configuration(Path('gcsConfig.ini'))
+    config.load()
+
     if args.protocol == 'udp':
-        if towerMode:
+        if config.connection_mode == ConnectionMode.TOWER:
             for i in range(args.clients):
                 port = RCTComms.transport.RCTUDPClient(port=args.port, addr=args.target)
                 sim = droneSim(RCTComms.comms.mavComms(port))
@@ -1022,7 +1027,7 @@ if __name__ == '__main__':
             port = RCTComms.transport.RCTUDPServer(port=args.port)
             sim = droneSim(RCTComms.comms.mavComms(port))
     elif args.protocol == 'tcp':
-        if towerMode:
+        if config.connection_mode == ConnectionMode.TOWER:
             for i in range(args.clients):
                 port = RCTComms.transport.RCTTCPClient(port=args.port, addr=args.target)
                 sim = droneSim(RCTComms.comms.mavComms(port))

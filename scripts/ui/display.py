@@ -4,6 +4,7 @@ import logging
 import queue as q
 from functools import partial
 from pathlib import Path
+import config
 
 import rctCore
 import utm
@@ -15,8 +16,6 @@ from ui.controls import *
 from ui.map import *
 from ui.popups import *
 
-towerMode = False
-
 class GCS(QMainWindow):
     '''
     Ground Control Station GUI
@@ -27,8 +26,6 @@ class GCS(QMainWindow):
     defaultTimeout = 5
 
     defaultPortVal = 9000
-
-    towerMode = towerMode
 
     sig = pyqtSignal()
 
@@ -47,6 +44,7 @@ class GCS(QMainWindow):
         self.systemSettingsWidget = None
         self.__missionStatusText = "Start Recording"
         self.__missionStatusBtn = None
+        self.__runningModeBtn = None
         self.innerFreqFrame = None
         self.freqElements = []
         self.targEntries = {}
@@ -56,14 +54,20 @@ class GCS(QMainWindow):
         self.mainThread = None
         self.testFrame = None
         self.pingSheetCreated = False
+
+        self.config = config.Configuration(Path('gcsConfig.ini'))
+        self.config.load()
+        if self.config.connection_mode == config.ConnectionMode.DRONE:
+            self.__runningModeText = "Switch to Tower Mode"
+        else:
+            self.__runningModeText = "Switch to Drone Mode"
+
         self.__createWidgets()
         for button in self._buttons:
             button.config(state='disabled')
 
         self.queue = q.Queue()
         self.sig.connect(self.execute_inmain, Qt.QueuedConnection)
-        if self.towerMode:
-            self.__startTransport()
 
     def execute_inmain(self):
         while not self.queue.empty():
@@ -87,7 +91,7 @@ class GCS(QMainWindow):
     def __startTransport(self):
         if self._transport is not None:
             self._transport.close()
-        if self.towerMode:
+        if self.config.connection_mode == config.ConnectionMode.TOWER:
             self._transport = RCTTCPServer(self.portVal, self.connectionHandler)
         if self._transport is not None:
             self._transport.open()
@@ -106,6 +110,7 @@ class GCS(QMainWindow):
         self.updateConnectionsLabel()
         self.systemSettingsWidget.connectionMade()
         self.__missionStatusBtn.setEnabled(True)
+        self.__runningModeBtn.setEnabled(False)
         self.__btn_exportAll.setEnabled(True)
         self.__btn_precision.setEnabled(True)
         self.__btn_heatMap.setEnabled(True)
@@ -120,6 +125,7 @@ class GCS(QMainWindow):
         if len(self._mavModels) == 0:
             self.systemSettingsWidget.disconnected()
             self.__missionStatusBtn.setEnabled(False)
+            self.__runningModeBtn.setEnabled(True)
             self.__btn_exportAll.setEnabled(False)
             self.__btn_precision.setEnabled(False)
             self.__btn_heatMap.setEnabled(False)
@@ -252,6 +258,28 @@ class GCS(QMainWindow):
         else:
             self.__missionStatusBtn.setText('Start Recording')
             self._mavModel.stopMission(timeout=self.defaultTimeout)
+
+    def __toggleRunningMode(self):
+        '''
+        Switch between running in drone and tower modes
+        '''
+        if self._mavModel is not None:
+            WarningMessager.showWarning('Cannot toggle running modes once a connection has been made!')
+            return
+
+        if self.config.connection_mode == config.ConnectionMode.DRONE:
+            self.__runningModeBtn.setText('Switch to Drone Mode')
+            self.config.connection_mode = config.ConnectionMode.TOWER
+        else:
+            self.__runningModeBtn.setText('Switch to Tower Mode')
+            self.config.connection_mode = config.ConnectionMode.DRONE
+
+        self.config.write()
+        print('mode is now ' + str(self.config.connection_mode))
+
+        if self._transport is not None:
+            self._transport.close()
+            self._transport = None
 
     def __updateStatus(self):
         '''
@@ -514,6 +542,10 @@ class GCS(QMainWindow):
         self.__missionStatusBtn.setEnabled(False)
         self.__missionStatusBtn.clicked.connect(lambda:self.__startStopMission())
 
+        self.__runningModeBtn = QPushButton(self.__runningModeText)
+        self.__runningModeBtn.setEnabled(True)
+        self.__runningModeBtn.clicked.connect(lambda:self.__toggleRunningMode())
+
         self.__btn_exportAll = QPushButton('Export Info')
         self.__btn_exportAll.setEnabled(False)
         self.__btn_exportAll.clicked.connect(lambda:self.exportAll())
@@ -532,6 +564,7 @@ class GCS(QMainWindow):
         wlay.addWidget(self.systemSettingsWidget)
         wlay.addWidget(self.upgradeDisplay)
         wlay.addWidget(self.__missionStatusBtn)
+        wlay.addWidget(self.__runningModeBtn)
         wlay.addWidget(self.__btn_exportAll)
         wlay.addWidget(self.__btn_precision)
         wlay.addWidget(self.__btn_heatMap)

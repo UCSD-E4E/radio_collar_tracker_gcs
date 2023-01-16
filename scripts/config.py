@@ -78,7 +78,7 @@ class Configuration:
             )
 
         self.__connection_port = parser['Connection'].getint('port')
-        self.__connection_addr = parser['Connection'].getint('addr')
+        self.__connection_addr = parser['Connection'].get('addr')
         self.__connection_mode = ConnectionMode(parser['Connection']['mode'])
 
     def write(self) -> None:

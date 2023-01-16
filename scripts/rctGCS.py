@@ -90,8 +90,9 @@ def configSetup() -> Path:
                 WarningMessager.showWarning("Warning, incorrect file chosen. Map tools may not "
                     "function as expected")
             config.qgis_prefix_path = qgis_path
-   
-    return qgis_path
+            return qgis_path
+        else:
+            return config.qgis_prefix_path
 
 
 if __name__ == '__main__':
@@ -109,13 +110,13 @@ if __name__ == '__main__':
     ch.setLevel(logging.DEBUG)
     ch.setFormatter(formatter)
     logger.addHandler(ch)
-    
-  
+
+
     app = QgsApplication([], True)
-    
+
     prefix_path = configSetup()
-    
-    QgsApplication.setPrefixPath(prefix_path)
+
+    QgsApplication.setPrefixPath(str(prefix_path))
 
     app.initQgis()
 
