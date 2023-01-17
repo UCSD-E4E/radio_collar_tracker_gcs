@@ -184,7 +184,7 @@ class MAVModel:
     __engOptionKeywords = ['GPS_mode',
                            'GPS_baud', 'GPS_device', 'SYS_autostart']
 
-    def __init__(self, receiver: RCTComms.comms.gcsComms):
+    def __init__(self, receiver: rctComms.gcsComms):
         '''
         Creates a new MAVModel
         Args:
@@ -237,25 +237,25 @@ class MAVModel:
         self.__ackVectors = {}
 
         self.__rx.registerCallback(
-            RCTComms.comms.EVENTS.STATUS_HEARTBEAT, self.__processHeartbeat)
+            rctComms.EVENTS.STATUS_HEARTBEAT, self.__processHeartbeat)
         self.__rx.registerCallback(
-            RCTComms.comms.EVENTS.STATUS_EXCEPTION, self.__handleRemoteException)
+            rctComms.EVENTS.STATUS_EXCEPTION, self.__handleRemoteException)
         self.__rx.registerCallback(
-            RCTComms.comms.EVENTS.CONFIG_FREQUENCIES, self.__processFrequencies)
+            rctComms.EVENTS.CONFIG_FREQUENCIES, self.__processFrequencies)
         self.__rx.registerCallback(
-            RCTComms.comms.EVENTS.GENERAL_NO_HEARTBEAT, self.__processNoHeartbeat)
+            rctComms.EVENTS.GENERAL_NO_HEARTBEAT, self.__processNoHeartbeat)
         self.__rx.registerCallback(
-            RCTComms.comms.EVENTS.CONFIG_OPTIONS, self.__processOptions)
+            rctComms.EVENTS.CONFIG_OPTIONS, self.__processOptions)
         self.__rx.registerCallback(
-            RCTComms.comms.EVENTS.COMMAND_ACK, self.__processAck)
+            rctComms.EVENTS.COMMAND_ACK, self.__processAck)
         self.__rx.registerCallback(
-            RCTComms.comms.EVENTS.GENERAL_NO_HEARTBEAT, self.__processNoHeartbeat)
+            rctComms.EVENTS.GENERAL_NO_HEARTBEAT, self.__processNoHeartbeat)
         self.__rx.registerCallback(
-            RCTComms.comms.EVENTS.DATA_PING, self.__processPing)
+            rctComms.EVENTS.DATA_PING, self.__processPing)
         self.__rx.registerCallback(
-            RCTComms.comms.EVENTS.DATA_VEHICLE, self.__processVehicle)
+            rctComms.EVENTS.DATA_VEHICLE, self.__processVehicle)
         self.__rx.registerCallback(
-            RCTComms.comms.EVENTS.DATA_CONE, self.__processCone)
+            rctComms.EVENTS.DATA_CONE, self.__processCone)
 
     def start(self, guiTickCallback=None):
         '''
@@ -269,7 +269,7 @@ class MAVModel:
         self.__rx.start()
         self.__log.info("MAVModel started")
 
-    def __processFrequencies(self, packet: RCTComms.comms.rctFrequenciesPacket, addr: str):
+    def __processFrequencies(self, packet: rctComms.rctFrequenciesPacket, addr: str):
         '''
         Internal callback to handle frequency messages
         Args:
@@ -282,7 +282,7 @@ class MAVModel:
         for callback in self.__callbacks[Events.GetFreqs]:
             callback()
 
-    def __processOptions(self, packet: RCTComms.comms.rctOptionsPacket, addr: str):
+    def __processOptions(self, packet: rctComms.rctOptionsPacket, addr: str):
         '''
         Internal callback to handle option messages
         Args:
@@ -302,7 +302,7 @@ class MAVModel:
         for callback in self.__callbacks[Events.GetOptions]:
             callback()
 
-    def __processHeartbeat(self, packet: RCTComms.comms.rctHeartBeatPacket, addr: str):
+    def __processHeartbeat(self, packet: rctComms.rctHeartBeatPacket, addr: str):
         '''
         Internal callback to handle heartbeat messages
         Args:
@@ -329,7 +329,7 @@ class MAVModel:
         for callback in self.__callbacks[Events.NoHeartbeat]:
             callback()
 
-    def __processUpgradeStatus(self, packet: RCTComms.comms.rctUpgradeStatusPacket, addr: str):
+    def __processUpgradeStatus(self, packet: rctComms.rctUpgradeStatusPacket, addr: str):
         '''
         Internal callback to handle upgrade status messages
         Args:
@@ -370,7 +370,7 @@ class MAVModel:
         event = threading.Event()
         event.clear()
         self.__ackVectors[0x07] = [event, 0]
-        self.__rx.sendPacket(RCTComms.comms.rctSTARTCommand())
+        self.__rx.sendPacket(rctComms.rctSTARTCommand())
         self.__log.info("Sent start command")
         event.wait(timeout=timeout)
         if not self.__ackVectors.pop(0x07)[1]:
@@ -385,7 +385,7 @@ class MAVModel:
         event = threading.Event()
         event.clear()
         self.__ackVectors[0x09] = [event, 0]
-        self.__rx.sendPacket(RCTComms.comms.rctSTOPCommand())
+        self.__rx.sendPacket(rctComms.rctSTOPCommand())
         self.__log.info("Sent stop command")
         event.wait(timeout=timeout)
         if not self.__ackVectors.pop(0x09)[1]:
@@ -403,7 +403,7 @@ class MAVModel:
             self.registerCallback(
                 Events.GetFreqs, frequencyPacketEvent.set)
 
-            self.__rx.sendPacket(RCTComms.comms.rctGETFCommand())
+            self.__rx.sendPacket(rctComms.rctGETFCommand())
             self.__log.info("Sent getF command")
 
             frequencyPacketEvent.wait(timeout=timeout)
@@ -453,7 +453,7 @@ class MAVModel:
 
         event = threading.Event()
         self.__ackVectors[0x03] = [event, 0]
-        self.__rx.sendPacket(RCTComms.comms.rctSETFCommand(freqs))
+        self.__rx.sendPacket(rctComms.rctSETFCommand(freqs))
         self.__log.info("Set setF command")
         event.wait(timeout=timeout)
         if not self.__ackVectors.pop(0x03)[1]:
@@ -509,7 +509,7 @@ class MAVModel:
         self.registerCallback(
             Events.GetOptions, optionPacketEvent.set)
 
-        self.__rx.sendPacket(RCTComms.comms.rctGETOPTCommand(scope))
+        self.__rx.sendPacket(rctComms.rctGETOPTCommand(scope))
         self.__log.info("Sent GETOPT command")
 
         optionPacketEvent.wait(timeout=timeout)
@@ -575,7 +575,7 @@ class MAVModel:
 
         event = threading.Event()
         self.__ackVectors[0x05] = [event, 0]
-        self.__rx.sendPacket(RCTComms.comms.rctSETOPTCommand(
+        self.__rx.sendPacket(rctComms.rctSETOPTCommand(
             scope, **{key: self.PP_options[key] for key in acceptedKeywords}))
         self.__log.info('Sent SETOPT command with scope %d' % scope)
         event.wait(timeout=timeout)
@@ -591,9 +591,9 @@ class MAVModel:
         for i in range(0,numPackets):
             startInd = i*1000
             endInd = startInd + 1000
-            self.__rx.sendPacket(RCTComms.comms.rctUpgradePacket(i+1, numPackets, byteStream[startInd:endInd]))
+            self.__rx.sendPacket(rctComms.rctUpgradePacket(i+1, numPackets, byteStream[startInd:endInd]))
 
-    def __processPing(self, packet: RCTComms.comms.rctPingPacket, addr: str):
+    def __processPing(self, packet: rctComms.rctPingPacket, addr: str):
         '''
         Internal callback to handle ping packets from the payload.
         Args:
@@ -608,7 +608,7 @@ class MAVModel:
             for callback in self.__callbacks[Events.NewEstimate]:
                 callback()
 
-    def __processVehicle(self, packet: RCTComms.comms.rctVehiclePacket, addr: str):
+    def __processVehicle(self, packet: rctComms.rctVehiclePacket, addr: str):
         '''
         Internal callback to handle vehicle position packets from the payload.
         Args:
@@ -620,13 +620,13 @@ class MAVModel:
         for callback in self.__callbacks[Events.VehicleInfo]:
             callback()
 
-    def __processCone(self, packet: RCTComms.comms.rctConePacket, addr: str):
+    def __processCone(self, packet: rctComms.rctConePacket, addr: str):
         coordinate = [packet.lat, packet.lon, packet.alt, packet.power, packet.angle]
         self.state['CONE_track'][packet.timestamp] = coordinate
         for callback in self.__callbacks[Events.ConeInfo]:
             callback()
 
-    def __processAck(self, packet: RCTComms.comms.rctACKCommand, addr: str):
+    def __processAck(self, packet: rctComms.rctACKCommand, addr: str):
         '''
         Internal callback to handle command ACK packets from the payload.
         Args:
