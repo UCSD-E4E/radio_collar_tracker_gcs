@@ -1001,7 +1001,10 @@ class droneSimPack:
         for sim in self.simList:
             sim.stopMissionOnThread()
             sim.stop()
-
+def addClient():
+    '''
+    Connects another client and adds the associated simulator to simList
+    '''
     if args.protocol == 'udp':
         port = RCTComms.transport.RCTUDPClient(port=args.port, addr=args.target)
     elif args.protocol == 'tcp':
