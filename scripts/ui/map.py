@@ -12,8 +12,13 @@ from config import get_instance
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
-from qgis.core import *
-from qgis.core import QgsProject, QgsRasterLayer
+from PyQt5.QtGui import *
+from pathlib import Path
+if 'CONDA_PREFIX' in os.environ:
+    sys.path.insert(0, Path(sys.executable).parent.joinpath("Library", "python", "plugins").as_posix())
+    sys.path.insert(0, Path(sys.executable).parent.joinpath("Library", "python").as_posix())
+from qgis.core import *    
+import qgis.gui
 from qgis.utils import *
 from ui.controls import *
 from ui.popups import *
@@ -179,6 +184,14 @@ class PolygonMapTool(qgis.gui.QgsMapToolEmitPoint):
         qgis.gui.QgsMapTool.deactivate(self)
         self.deactivated.emit()
 
+class VehicleData:
+    '''
+    Information about displaying a vehicle on the map
+    '''
+    def __init__(self):
+        self.ind = 0
+        self.lastLoc = None
+
 class MapWidget(QWidget):
     '''
     Custom Widget that is used to display a map
@@ -197,7 +210,7 @@ class MapWidget(QWidget):
         self.vehiclePath = None
         self.precision = None
         self.cones = None
-        self.lastLoc = None
+        self.vehicleData = {}
         self.pingLayer = None
         self.pingRenderer = None
         self.estimate = None
@@ -209,9 +222,9 @@ class MapWidget(QWidget):
         self.pingMax = 0
         self.coneMin = sys.float_info.max
         self.coneMax = sys.float_info.min
-        self.indPing = 0
-        self.indPing = 0
         self.ind = 0
+        self.indPing = 0
+        self.indPing = 0
         self.indEst = 0
         self.indCone = 0
         self.toolbar = QToolBar()
@@ -389,7 +402,7 @@ class MapWidget(QWidget):
         '''
         self.canvas.setMapTool(self.toolPan)
 
-    def plotVehicle(self, coord):
+    def plotVehicle(self, id, coord):
         '''
         Function to plot the vehicle's current location on the vehicle 
         map layer
@@ -403,18 +416,23 @@ class MapWidget(QWidget):
         if self.vehicle is None:
             return
         else:
-            if self.ind > 0:
+            vData = VehicleData()
+            if id not in self.vehicleData:
+                self.vehicleData[id] = vData
+            else:
+                vData = self.vehicleData[id]
+            if vData.ind > 0:
                 lpr = self.vehiclePath.dataProvider()
-                lin = QgsGeometry.fromPolylineXY([self.lastLoc, point])
+                lin = QgsGeometry.fromPolylineXY([vData.lastLoc, point])
                 lineFeat = QgsFeature()
                 lineFeat.setGeometry(lin)
                 lpr.addFeatures([lineFeat])
                 vpr = self.vehicle.dataProvider()
                 self.vehicle.startEditing()
-                self.vehicle.deleteFeature(self.ind)
+                self.vehicle.deleteFeature(vData.ind)
                 self.vehicle.commitChanges()
             
-            self.lastLoc = point
+            vData.lastLoc = point
             vpr = self.vehicle.dataProvider()
             pnt = QgsGeometry.fromPointXY(point)
             f = QgsFeature()
@@ -422,6 +440,7 @@ class MapWidget(QWidget):
             vpr.addFeatures([f])
             self.vehicle.updateExtents()
             self.ind = self.ind + 1
+            vData.ind = self.ind
     
     def plotCone(self, coord):
         lat = coord[0]
@@ -802,47 +821,55 @@ class MapOptions(QWidget):
             lon1: float value indicating the long value of a point
             lon2: float value indicating the long value of a second point
         '''
-        lon1 = math.radians(lon1) 
-        lon2 = math.radians(lon2) 
-        lat1 = math.radians(lat1) 
-        lat2 = math.radians(lat2) 
-           
-        # Haversine formula  
-        dlon = lon2 - lon1  
-        dlat = lat2 - lat1 
+        lon1 = math.radians(lon1)
+        lon2 = math.radians(lon2)
+        lat1 = math.radians(lat1)
+        lat2 = math.radians(lat2)
+
+        # Haversine formula
+        dlon = lon2 - lon1
+        dlat = lat2 - lat1
         a = math.sin(dlat / 2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2
-      
-        c = 2 * math.asin(math.sqrt(a))  
-         
-        # Radius of earth in kilometers. Use 3956 for miles 
+
+        c = 2 * math.asin(math.sqrt(a))
+
+        # Radius of earth in kilometers. Use 3956 for miles
         r = 6371
-           
+
         return(c * r * 1000)
-    
+
     def exportPing(self):
         '''
         Method to export a MapWidget's pingLayer to a shapefile
         '''
+        if self.mapWidget is None:
+            WarningMessager.showWarning("Load a map before exporting.")
+            return
+
         folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
         file = folder + '/pings.shp'
         options = QgsVectorFileWriter.SaveVectorOptions()
         options.driverName = "ESRI Shapefile"
 
-        QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.pingLayer, 
-                                        file, 
+        QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.pingLayer,
+                                        file,
                                         QgsCoordinateTransformContext(), options)
-        
+
     def exportVehiclePath(self):
         '''
         Method to export a MapWidget's vehiclePath to a shapefile
         '''
+        if self.mapWidget is None:
+            WarningMessager.showWarning("Load a map before exporting.")
+            return
+
         folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
         file = folder + '/vehiclePath.shp'
         options = QgsVectorFileWriter.SaveVectorOptions()
         options.driverName = "ESRI Shapefile"
 
-        QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.vehiclePath, 
-                                        file, 
+        QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.vehiclePath,
+                                        file,
                                         QgsCoordinateTransformContext(), options)
 
 
@@ -850,6 +877,10 @@ class MapOptions(QWidget):
         '''
         Method to export MapWidget's Polygon shape to a shapefile
         '''
+        if self.mapWidget is None:
+            WarningMessager.showWarning("Load a map before exporting.")
+            return
+
         vpr = self.mapWidget.polygonLayer.dataProvider()
         self.generateWaypoints()
         if self.mapWidget.toolPolygon is None:
@@ -873,26 +904,29 @@ class MapOptions(QWidget):
             file = folder + '/polygon.shp'
             options = QgsVectorFileWriter.SaveVectorOptions()
             options.driverName = "ESRI Shapefile"
-            
-            QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.polygonLayer, file, 
+
+            QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.polygonLayer, file,
                                                     QgsCoordinateTransformContext(), options)
 
     def exportCone(self):
         '''
         Method to export a MapWidget's cones to a shapefile
         '''
+        if self.mapWidget is None:
+            WarningMessager.showWarning("Load a map before exporting.")
+            return
         folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
         file = folder + '/cones.shp'
         options = QgsVectorFileWriter.SaveVectorOptions()
         options.driverName = "ESRI Shapefile"
 
-        QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.cones, file, 
-                                                QgsCoordinateTransformContext(), 
+        QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.cones, file,
+                                                QgsCoordinateTransformContext(),
                                                 options)
-           
+
 class WebMap(MapWidget):
     '''
-    Custom MapWidget to facilititate displaying online or offline 
+    Custom MapWidget to facilititate displaying online or offline
     web maps
     '''
     def __init__(self, root, p1lat, p1lon, p2lat, p2lon, loadCached):

@@ -20,6 +20,7 @@
 #
 # DATE      WHO Description
 # -----------------------------------------------------------------------------
+# 08/07/22  HG  Added multiple-client functionality
 # 08/06/20  NH  Fixed reset on init
 # 07/29/20  NH  Added docstrings
 # 05/23/20  NH  Fixed simulator run/stop actions
@@ -41,6 +42,7 @@
 #
 ###############################################################################
 import argparse
+import math
 import threading
 import socket
 import datetime as dt
@@ -53,10 +55,11 @@ from time import sleep
 from ping import rctPing
 import utm
 import json
-from RCTComms.comms import mavComms, rctBinaryPacket
-import RCTComms.comms as rctComms
+import RCTComms.comms
+import RCTComms.transport
 import time
 import math
+import json
 
 def getIPs():
     '''
@@ -88,12 +91,14 @@ class droneSim:
         END = 4
         SPIN = 5
 
-    def __init__(self, port: mavComms):
+    def __init__(self, port: RCTComms.comms.mavComms):
         '''
         Creates a new DroneSim object
         :param port:
         '''
         self.__txThread = None
+        self.__missionThread = None
+        self.__endMissionEvent = None
         self.port = port
         self.__commandMap = {}
         self.__state = {
@@ -183,25 +188,26 @@ class droneSim:
         self.SS_vehicleTarget = np.array(self.SM_TakeoffTarget)
         self.SS_waypointIdx = 0
         self.SS_payloadRunning = False
+        self.SS_heading = 0
 
         # HS - Heartbeat State parameters
         self.HS_run = True
 
         # register command actions here
         self.port.registerCallback(
-            rctComms.EVENTS.COMMAND_GETF, self.__doGetFrequency)
+            RCTComms.comms.EVENTS.COMMAND_GETF, self.__doGetFrequency)
         self.port.registerCallback(
-            rctComms.EVENTS.COMMAND_SETF, self.__doSetFrequency)
+            RCTComms.comms.EVENTS.COMMAND_SETF, self.__doSetFrequency)
         self.port.registerCallback(
-            rctComms.EVENTS.COMMAND_GETOPT, self.__doGetOptions)
+            RCTComms.comms.EVENTS.COMMAND_GETOPT, self.__doGetOptions)
         self.port.registerCallback(
-            rctComms.EVENTS.COMMAND_SETOPT, self.__doSetOptions)
+            RCTComms.comms.EVENTS.COMMAND_SETOPT, self.__doSetOptions)
         self.port.registerCallback(
-            rctComms.EVENTS.COMMAND_START, self.__doStartMission)
+            RCTComms.comms.EVENTS.COMMAND_START, self.__doStartMission)
         self.port.registerCallback(
-            rctComms.EVENTS.COMMAND_STOP, self.__doStopMission)
+            RCTComms.comms.EVENTS.COMMAND_STOP, self.__doStopMission)
         self.port.registerCallback(
-            rctComms.EVENTS.COMMAND_UPGRADE, self.__doUpgrade)
+            RCTComms.comms.EVENTS.COMMAND_UPGRADE, self.__doUpgrade)
 
         # Reset state parameters
         self.reset()
@@ -363,6 +369,7 @@ class droneSim:
         self.SS_vehicleHdg = 0
         self.SS_hdgIndex = 0
         self.SS_payloadRunning = False
+        self.SS_heading = 0
 
         # HS - Heartbeat State parameters
         self.HS_run = True
@@ -463,13 +470,10 @@ class droneSim:
         print("Ping on %d at %3.7f, %3.7f, %3.0f m, measuring %3.3f" %
               (dronePing.freq, dronePing.lat, dronePing.lon, dronePing.alt, dronePing.power))
 
-        conepacket = rctComms.rctConePacket(dronePing.lat, dronePing.lon, dronePing.alt, dronePing.power, hdg)
+        conepacket = RCTComms.comms.rctConePacket(dronePing.lat, dronePing.lon, dronePing.alt, dronePing.power, hdg)
+
+
         self.port.sendCone(conepacket)
-
-
-        #      (dronePing.freq, dronePing.lat, dronePing.lon, dronePing.alt, dronePing.power))
-        #packet = dronePing.toPacket()
-        #self.port.sendPing(packet)
 
     def setSystemState(self, system: str, state):
         '''
@@ -518,23 +522,23 @@ class droneSim:
         '''
         self.PP_options['SDR_samplingFreq'] = samplingFreq
 
-    def __ackCommand(self, command: rctBinaryPacket):
+    def __ackCommand(self, command: RCTComms.comms.rctBinaryPacket):
         '''
         Sends the command acknowledge packet for the given command.
         :param command:
         '''
-        self.port.sendToGCS(rctComms.rctACKCommand(command._pid, 1))
+        self.port.sendToGCS(RCTComms.comms.rctACKCommand(command._pid, 1))
 
-    def __doGetFrequency(self, packet: rctComms.rctGETFCommand, addr: str):
+    def __doGetFrequency(self, packet: RCTComms.comms.rctGETFCommand, addr: str):
         '''
         Callback for the Get Frequency command packet
         :param packet:
         :param addr:
         '''
-        self.port.sendToGCS(rctComms.rctFrequenciesPacket(
+        self.port.sendToGCS(RCTComms.comms.rctFrequenciesPacket(
             self.PP_options['TGT_frequencies']))
 
-    def __doStartMission(self, packet: rctComms.rctSTARTCommand, addr: str):
+    def __doStartMission(self, packet: RCTComms.comms.rctSTARTCommand, addr: str):
         '''
         Callback for the Start Mission command packet
         :param packet:
@@ -543,7 +547,7 @@ class droneSim:
         self.SS_payloadRunning = True
         self.__ackCommand(packet)
 
-    def __doStopMission(self, packet: rctComms.rctSTOPCommand, addr: str):
+    def __doStopMission(self, packet: RCTComms.comms.rctSTOPCommand, addr: str):
         '''
         Callback for the Stop Mission command packet
         :param packet:
@@ -552,7 +556,7 @@ class droneSim:
         self.SS_payloadRunning = False
         self.__ackCommand(packet)
 
-    def __doSetFrequency(self, packet: rctComms.rctSETFCommand, addr: str):
+    def __doSetFrequency(self, packet: RCTComms.comms.rctSETFCommand, addr: str):
         '''
         Callback for the Set Frequency command packet
         :param packet:
@@ -569,7 +573,7 @@ class droneSim:
         self.__ackCommand(packet)
         self.__doGetFrequency(packet, addr)
 
-    def __doGetOptions(self, packet: rctComms.rctGETOPTCommand, addr: str):
+    def __doGetOptions(self, packet: RCTComms.comms.rctGETOPTCommand, addr: str):
         '''
         Callback for the Get Options command packet
         :param packet:
@@ -577,10 +581,10 @@ class droneSim:
         '''
         scope = packet.scope
         print(self.PP_options)
-        packet = rctComms.rctOptionsPacket(scope, **self.PP_options)
+        packet = RCTComms.comms.rctOptionsPacket(scope, **self.PP_options)
         self.port.sendToGCS(packet)
 
-    def __doSetOptions(self, packet: rctComms.rctSETOPTCommand, addr: str):
+    def __doSetOptions(self, packet: RCTComms.comms.rctSETOPTCommand, addr: str):
         '''
         Callback for the Set Options command packet
         :param packet:
@@ -603,7 +607,7 @@ class droneSim:
         heartbeat packet every self.SC_HeartbeatPeriod seconds.
         '''
         while self.HS_run is True:
-            packet = rctComms.rctHeartBeatPacket(self.__state['STS_sysStatus'],
+            packet = RCTComms.comms.rctHeartBeatPacket(self.__state['STS_sysStatus'],
                                                  self.__state['STS_sdrStatus'],
                                                  self.__state['STS_gpsStatus'],
                                                  self.__state['STS_dirStatus'],
@@ -625,8 +629,23 @@ class droneSim:
             self.SS_vehiclePosition[0], self.SS_vehiclePosition[1], self.SS_utmZoneNum, self.SS_utmZone)
         alt = self.SS_vehiclePosition[2]
         hdg = 0
-        packet = rctComms.rctVehiclePacket(lat, lon, alt, hdg)
-        self.port.sendVehicle(packet)# WAS .sendToAll
+        packet = RCTComms.comms.rctVehiclePacket(lat, lon, alt, hdg)
+
+        self.port.sendVehicle(packet)
+
+    def doMissionOnTread(self, returnOnEnd: bool = False):
+        '''
+        Runs the flight mission on a new thread.
+        '''
+        self.__missionThread = threading.Thread(target=lambda:self.doMission(returnOnEnd))
+        self.__endMissionEvent = threading.Event()
+        time.sleep(0.109) # Help threads not run all together
+        self.__missionThread.start()
+
+    def stopMissionOnThread(self):
+        self.__endMissionEvent.set()
+        self.__missionThread.join()
+
 
     def doMission(self, returnOnEnd: bool = False):
         '''
@@ -728,7 +747,13 @@ class droneSim:
                 else:
                     self.SS_velocityVector = np.array([0, 0, 0])
 
-            sleep(self.SM_loopPeriod)
+            if self.__endMissionEvent is not None:
+                if self.__endMissionEvent.wait(self.SM_loopPeriod):
+                    self.SM_missionRun = False
+                    break
+            else:
+                sleep(self.SM_loopPeriod)
+
             ###################
             # Ping Simulation #
             ###################
@@ -841,6 +866,7 @@ class droneSim:
         if Prx < P_n:
            measurement = None
 
+
         return measurement
 
 
@@ -926,6 +952,9 @@ class droneSim:
 
         e['SS_payloadRunning'] = str(self.SS_payloadRunning )
 
+        e['SS_heading'] = str(self.SS_heading )
+
+
 
         e['HS_run'] = str(self.HS_run )
 
@@ -933,17 +962,106 @@ class droneSim:
         with open(settingsFile, 'w') as outfile:
             json.dump(e, outfile)
 
+class droneSimPack:
+    def __init__(self, port: int, addr: str, protocol: str, clients: int):
+        '''
+        Creates a pack of multiple DroneSim object
+        :param port:
+        '''
+        self.simList = []
+        if protocol == 'udp':
+            for i in range(clients):
+                tsport = RCTComms.transport.RCTUDPClient(port=port, addr=addr)
+                sim = droneSim(RCTComms.comms.mavComms(tsport))
+                self.simList.append(sim)
+        elif args.protocol == 'tcp':
+            for i in range(clients):
+                tsport = RCTComms.transport.RCTTCPClient(port=port, addr=addr)
+                sim = droneSim(RCTComms.comms.mavComms(tsport))
+                self.simList.append(sim)
+
+    def start(self):
+        '''
+        Starts all the simulators in the pack
+        '''
+        for sim in self.simList:
+            sim.start()
+
+    def doMission(self, returnOnEnd: bool = False):
+        '''
+        Starts missions for all the simulators in the pack
+        '''
+        for sim in self.simList:
+            sim.doMissionOnTread(returnOnEnd)
+
+    def stop(self):
+        '''
+        Stops all missions and thee similators in the pack
+        '''
+        for sim in self.simList:
+            sim.stopMissionOnThread()
+            sim.stop()
+def addClient():
+    '''
+    Connects another client and adds the associated simulator to simList
+    '''
+    if args.protocol == 'udp':
+        port = RCTComms.transport.RCTUDPClient(port=args.port, addr=args.target)
+    elif args.protocol == 'tcp':
+        port = RCTComms.transport.RCTTCPClient(port=args.port, addr=args.target)
 
 
+def doAll(action:str, args=None):
+    '''
+    Calls the specified action on each simulator in simList
 
+    :param action: the function to be called
+    '''
+    try:
+        for sim in simList:
+            if action == "start":
+                sim.start()
+            elif action == "stop":
+                sim.stop()
+            elif action == "restart":
+                sim.restart()
+            elif action == "gotPing":
+                sim.gotPing(args[0])
+            elif action == "setException":
+                sim.setException(args[0], args[1])
+            elif action == "getFrequencies":
+                sim.getFrequencies()
+            elif action == "transmitPosition":
+                sim.transmitPosition()
+            elif action == "doMission":
+                sim.doMission(args[0])
+            elif action == "calculatePingMeasurement":
+                sim.calculatePingMeasurement()
+            else:
+                print("Error: Select one of the following functions:")
+                print("\'start\', \'stop\', \'restart\', \'gotPing\', ", end='')
+                print("\'setException\', \'getFrequencies\', ", end='')
+                print("\'transmitPosition\', \'doMission\', \'calculatePingMeasurement\'")
+                break
+    except TypeError:
+        print("Error: Ensure you have provided all required arguments in a list.")
+
+def connectionHandler(connection, id):
+    print('Connected {}'.format(id))
+    comms = RCTComms.comms.mavComms(connection)
+    sim = droneSim(comms)
+    simList.append(sim)
+
+simList = []
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Radio Collar Tracker Payload Control Simulator')
     parser.add_argument('--port', type=int, default=9000)
     parser.add_argument('--protocol', type=str,
                         choices=['udp', 'tcp'], required=True)
-    parser.add_argument('--target', type=str, default='255.255.255.255',
-                        help='Target IP Address.  Use 255.255.255.255 for broadcast')
+    parser.add_argument('--target', type=str, default='127.0.0.1',
+                        help='Target IP Address.  Use 255.255.255.255 for broadcast, 127.0.0.1 for local')
+    parser.add_argument('--clients', type=int, default=1)
     args = parser.parse_args()
     logName = dt.datetime.now().strftime('%Y.%m.%d.%H.%M.%S_sim.log')
     logger = logging.getLogger()
@@ -959,14 +1077,38 @@ if __name__ == '__main__':
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
-    # TODO: Drone should be client, not server
-    if args.protocol == 'udp':
-        port = rctTransport.RCTUDPServer(port=args.port)
-    elif args.protocol == 'tcp':
-        port = rctTransport.RCTTCPServer(port=args.port)
+    sim = droneSimPack(args.port, args.target, args.protocol, args.clients);
+    if args.clients == 1:
+        sim = sim.simList[0]; # Just hava a single simulator
 
-    comms = mavComms(port)
-    sim = droneSim(comms)
+    with open('gcsconfig.json') as handle:
+        options = json.load(handle)
+
+    print(options['towerMode'])
+
+    if args.protocol == 'udp':
+        if options['towerMode']:
+            for i in range(args.clients):
+                port = RCTComms.transport.RCTUDPClient(port=args.port, addr=args.target)
+                sim = droneSim(RCTComms.comms.mavComms(port))
+                simList.append(sim)
+        else:
+            port = RCTComms.transport.RCTUDPServer(port=args.port)
+            sim = droneSim(RCTComms.comms.mavComms(port))
+    elif args.protocol == 'tcp':
+        if options['towerMode']:
+            for i in range(args.clients):
+                port = RCTComms.transport.RCTTCPClient(port=args.port, addr=args.target)
+                sim = droneSim(RCTComms.comms.mavComms(port))
+                simList.append(sim)
+        else:
+            connected = False
+            port = RCTComms.transport.RCTTCPServer(args.port, connectionHandler, addr=args.target)
+            port.open()
+            while len(simList) == 0:
+                continue
+            sim = simList[0]
+
     try:
         __IPYTHON__
     except NameError:

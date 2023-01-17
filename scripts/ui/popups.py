@@ -1,5 +1,5 @@
 from RCTComms.comms import gcsComms
-from RCTComms.transport import RCTTCPClient
+from RCTComms.transport import RCTTCPClient, RCTTCPServer
 import rctCore
 from PyQt5.QtCore import QRegExp
 from PyQt5.QtWidgets import *
@@ -259,10 +259,10 @@ class ConnectionDialog(QWizard):
         '''
         Creates new ConnectionDialog widget
         Args:
-            parent: the parent widget of this object
+            portVal: the port value used
         '''
         super(ConnectionDialog, self).__init__()
-        self.__parent = parent
+        self.parent = parent
         self.setWindowTitle('Connect Settings')
         self.page = ConnectionDialogPage(self,
             default_ip=default_ip,
@@ -296,6 +296,20 @@ class ConnectionDialog(QWizard):
             WarningMessager.showWarning("Please specify valid connection settings")
             return
 
+        if self.parent.options['towerMode']:
+            self.port = RCTTCPServer(self.portVal, self.parent.connectionHandler)
+            self.port.open()
+        else:
+            try:
+                self.port = RCTTCPClient(
+                    addr=self.page.addrEntry.text(), port=int(self.page.portEntry.text()))
+                self.parent.connectionHandler(self.port, 0)
+            except ConnectionRefusedError:
+                WarningMessager.showWarning("Failure to connect:\nPlease ensure server is running.")
+                self.port.close()
+                return
+        self.parent._transport = self.port
+
 class ConnectionDialogPage(QWizardPage):
     '''
     Custom DialogPage widget - Allows the user to configure
@@ -309,9 +323,11 @@ class ConnectionDialogPage(QWizardPage):
         '''
         Creates a new AddTargetDialog
         Args:
-            parent: The parent ConnectionDialog widget
+            portVal: The port value used
         '''
-        super(ConnectionDialogPage, self).__init__(parent)
+        super(ConnectionDialogPage, self).__init__()
+        self.__portEntryVal = portVal # default value
+        self.portEntry = None # default value
         self.__parent = parent
         self.__port_entry_val = default_port # default value
         self.portEntry = None # default value
@@ -322,7 +338,6 @@ class ConnectionDialogPage(QWizardPage):
         self.comms = None
         self.model = None
 
-
         self.__createWidget()
 
 
@@ -330,9 +345,10 @@ class ConnectionDialogPage(QWizardPage):
         '''
         Internal function to create widgets
         '''
-        frm_holder = QHBoxLayout()
+        frm_holder = QVBoxLayout()
         frm_holder.addStretch(1)
-        frm_conType = QVBoxLayout()
+        #-----
+        frm_conType = QHBoxLayout()
         frm_conType.addStretch(1)
 
         lbl_conType = QLabel('Connection Type:')
@@ -351,19 +367,24 @@ class ConnectionDialogPage(QWizardPage):
         lbl_port = QLabel('Port')
         frm_port.addWidget(lbl_port)
 
-        lbl_addr = QLabel("IP Addr")
-        frm_port.addWidget(lbl_addr)
-
         self.portEntry = QLineEdit()
         self.portEntry.setText(str(self.__port_entry_val))
         frm_port.addWidget(self.portEntry)
 
-        self.addrEntry = QLineEdit()
-        self.addrEntry.setText(self.__addr_entry_val)
-        frm_port.addWidget(self.addrEntry)
+        if not self.__parent.parent.options['towerMode']:
+            frm_addr = QHBoxLayout()
+            frm_addr.addStretch(1)
 
+            lbl_addr = QLabel('Address')
+            frm_addr.addWidget(lbl_addr)
+            self.addrEntry = QLineEdit()
 
+            self.addrEntry.setText(self.__addr_entry_val)
+            frm_addr.addWidget(self.addrEntry)
 
-        frm_holder.addLayout(frm_conType)
+            frm_holder.addLayout(frm_addr)
+
+        #-----
         frm_holder.addLayout(frm_port)
+        frm_holder.addLayout(frm_conType)
         self.setLayout(frm_holder)

@@ -6,16 +6,26 @@
     "configurations": [
         {
             "name": "RCT GCS",
-            "type": "python",
             "request": "launch",
+            "type": "python",
             "program": "rctGCS.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "cwd": "${workspaceFolder}/scripts",
             "env": {
-                "PYTHONPATH": "C:\\Users\\nthui.DESKTOP-39AHVR9\\miniconda3\\envs\\rctGCS\\Library\\python\\plugins;C:\\Users\\nthui.DESKTOP-39AHVR9\\miniconda3\\envs\\rctGCS\\Library\\python;",
-                "QGIS_PREFIX_PATH": "C:/Users/nthui.DESKTOP-39AHVR9/miniconda3/envs/rctGCS/Library",
+                "PYTHONPATH": "${workspaceFolder}/scripts;"
             }
+        },
+        {
+            "name": "Drone Simulator",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/droneSimulator.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--protocol",
+                "tcp"
+            ]
         }
     ]
 }

@@ -13,4 +13,5 @@ dependencies:
     - utm==0.5.0
     - xlwt
     - appdirs==1.4.4
+    - ipython
     - git+https://github.com/UCSD-E4E/radio_collar_tracker_comms.git@communications_HG

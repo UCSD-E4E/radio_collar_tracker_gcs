@@ -124,7 +124,7 @@ class SystemSettingsControl(CollapseFrame):
         self.widg_targHolder.repaint()
         self.scroll_targHolder.repaint()
         self.frm_targHolder.activate()
-        CollapseFrame.repaint(self)
+        #CollapseFrame.repaint(self) // cases thread problems?
         self.__innerFrame.activate()
 
 
@@ -362,9 +362,13 @@ class SystemSettingsControl(CollapseFrame):
         '''
         Internal function to facilitate users adding target frequencies
         '''
-        cntrFreq = int(self.optionVars['SDR_centerFreq'].text())
-        sampFreq = int(self.optionVars['SDR_samplingFreq'].text())
-        sdrGain = float(self.optionVars['SDR_gain'].text())
+        try:
+            cntrFreq = int(self.optionVars['SDR_centerFreq'].text())
+            sampFreq = int(self.optionVars['SDR_samplingFreq'].text())
+            sdrGain = float(self.optionVars['SDR_gain'].text())
+        except ValueError:
+            WarningMessager.showWarning("Please enter center and sampling frequences and SDR gain settings.")
+            return
 
         if (cntrFreq < 70000000 or cntrFreq > 6000000000):
             WarningMessager.showWarning("Center frequency " + str(cntrFreq) +
@@ -399,8 +403,20 @@ class SystemSettingsControl(CollapseFrame):
         '''
         Helper method to enable system settings buttons once connection is made
         '''
-
+        self.updateGUIOptionVars()
         self.btn_addTarget.setEnabled(True)
         self.btn_clearTargs.setEnabled(True)
         self.btn_submit.setEnabled(True)
         self.btn_advSettings.setEnabled(True)
+        self.__root.statusWidget.updateGUIOptionVars()
+
+    def disconnected(self):
+        '''
+        Helper method to disable system settings buttons once mavModel stops
+        '''
+
+        self.btn_addTarget.setEnabled(False)
+        self.btn_clearTargs.setEnabled(False)
+        self.btn_submit.setEnabled(False)
+        self.btn_advSettings.setEnabled(False)
+        self.__root._systemConnectionTab.updateText("System: No Connection")
