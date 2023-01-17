@@ -1,5 +1,5 @@
 from RCTComms.comms import gcsComms
-from RCTComms.transport import RCTTCPServer
+from RCTComms.transport import RCTTCPClient
 import rctCore
 from PyQt5.QtCore import QRegExp
 from PyQt5.QtWidgets import *
@@ -250,15 +250,16 @@ class ConnectionDialog(QWizard):
     '''
     Custom Dialog widget to facilitate connecting to the drone
     '''
-    def __init__(self, portVal):
+    def __init__(self, portVal, parent):
         '''
         Creates new ConnectionDialog widget
         Args:
             portVal: the port value used
         '''
         super(ConnectionDialog, self).__init__()
+        self.parent = parent
         self.setWindowTitle('Connect Settings')
-        self.page = ConnectionDialogPage(portVal)
+        self.page = ConnectionDialogPage(portVal, self)
         self.portVal = portVal
         self.addPage(self.page)
         self.resize(640,480)
@@ -270,12 +271,18 @@ class ConnectionDialog(QWizard):
         '''
         self.portVal = int(self.page.portEntry.text())
 
+        if not self.parent.towerMode:
+            self.port = RCTTCPClient(
+                addr=self.page.addrEntry.text(), port=int(self.page.portEntry.text()))
+            self.parent.connectionHandler(self.port, 0)
+            self.parent._transport = self.port
+
 class ConnectionDialogPage(QWizardPage):
     '''
     Custom DialogPage widget - Allows the user to configure
     settings to connect to the drone
     '''
-    def __init__(self, portVal):
+    def __init__(self, portVal, parent):
         '''
         Creates a new AddTargetDialog
         Args:
@@ -284,6 +291,7 @@ class ConnectionDialogPage(QWizardPage):
         super(ConnectionDialogPage, self).__init__()
         self.__portEntryVal = portVal # default value
         self.portEntry = None # default value
+        self.__parent = parent
 
         self.__createWidget()
 
@@ -313,6 +321,19 @@ class ConnectionDialogPage(QWizardPage):
         self.portEntry = QLineEdit()
         self.portEntry.setText(str(self.__portEntryVal))
         frm_port.addWidget(self.portEntry)
+
+        if not self.__parent.parent.towerMode:
+            frm_addr = QHBoxLayout()
+            frm_addr.addStretch(1)
+
+            lbl_addr = QLabel('Address')
+            frm_addr.addWidget(lbl_addr)
+            self.addrEntry = QLineEdit()
+
+            self.addrEntry.setText('127.0.0.1')
+            frm_addr.addWidget(self.addrEntry)
+
+            frm_holder.addLayout(frm_addr)
 
         #-----
         frm_holder.addLayout(frm_port)

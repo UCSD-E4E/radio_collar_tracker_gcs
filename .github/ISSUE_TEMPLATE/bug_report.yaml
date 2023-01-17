@@ -1,0 +1,42 @@
+name: Bug Report
+description: File a bug report
+title: "[Bug]: "
+labels: ["bug", "triage"]
+assignees:
+  - ntlhui
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+  - type: input
+    id: commit
+    attributes:
+      label: Commit Hash
+      description: Current short commit hash
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce-steps
+    attributes:
+      label: Steps to Reproduce?
+      description: How can we reproduce this bug?
+      placeholder: Tell us what you did!
+    validations:
+      required: true
+  - type: textarea
+    id: observed-behavior
+    attributes:
+      label: Observed Behavior
+      description: What erroneous behavior did you observe?
+      placeholder: Tell us what you see!
+    validations:
+      required: true
+  - type: textarea
+    id: desired-behavior
+    attributes:
+      label: Desired Behavior
+      description: What behavior did you expect?
+      placeholder: Tell us what you wanted to see!
+    validations:
+      required: true

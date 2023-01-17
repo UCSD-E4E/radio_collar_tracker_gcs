@@ -147,8 +147,6 @@ class Events(Enum):
     NoHeartbeat - Callback when no heartbeat has been received for GC_HeartbeatWatchdogTime seconds
     NewPing - Callback when new ping is received
     NewEstimate - Callback when new estimate is generated
-    NewConnection - Callback when a new client connects to server
-    Disconnected - Callback when no more clients are connected
 
     '''
     Heartbeat = auto(),

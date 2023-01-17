@@ -6,6 +6,10 @@ import requests
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
+from pathlib import Path
+if 'CONDA_PREFIX' in os.environ:
+    sys.path.insert(0, Path(sys.executable).parent.joinpath("Library", "python", "plugins").as_posix())
+    sys.path.insert(0, Path(sys.executable).parent.joinpath("Library", "python").as_posix())
 from qgis.core import *    
 import qgis.gui
 from qgis.utils import *
@@ -658,16 +662,21 @@ class MapOptions(QWidget):
         exportTab = CollapseFrame('Export')
         btn_pingExport = QPushButton('Pings')
         btn_pingExport.clicked.connect(lambda:self.exportPing())
+
         btn_vehiclePathExport = QPushButton('Vehicle Path')
         btn_vehiclePathExport.clicked.connect(lambda:self.exportVehiclePath())
 
         btn_polygonExport = QPushButton('Polygon')
         btn_polygonExport.clicked.connect(lambda:self.exportPolygon())
+
+        btn_coneExport = QPushButton('Cones')
+        btn_coneExport.clicked.connect(lambda:self.exportCone())
         
         lay_export = QVBoxLayout()
         lay_export.addWidget(btn_pingExport)
         lay_export.addWidget(btn_vehiclePathExport)
         lay_export.addWidget(btn_polygonExport)
+        lay_export.addWidget(btn_coneExport)
         exportTab.setContentLayout(lay_export)
         
         lay_mapOptions.addWidget(exportTab)        
@@ -798,47 +807,55 @@ class MapOptions(QWidget):
             lon1: float value indicating the long value of a point
             lon2: float value indicating the long value of a second point
         '''
-        lon1 = math.radians(lon1) 
-        lon2 = math.radians(lon2) 
-        lat1 = math.radians(lat1) 
-        lat2 = math.radians(lat2) 
-           
-        # Haversine formula  
-        dlon = lon2 - lon1  
-        dlat = lat2 - lat1 
+        lon1 = math.radians(lon1)
+        lon2 = math.radians(lon2)
+        lat1 = math.radians(lat1)
+        lat2 = math.radians(lat2)
+
+        # Haversine formula
+        dlon = lon2 - lon1
+        dlat = lat2 - lat1
         a = math.sin(dlat / 2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2
-      
-        c = 2 * math.asin(math.sqrt(a))  
-         
-        # Radius of earth in kilometers. Use 3956 for miles 
+
+        c = 2 * math.asin(math.sqrt(a))
+
+        # Radius of earth in kilometers. Use 3956 for miles
         r = 6371
-           
+
         return(c * r * 1000)
-    
+
     def exportPing(self):
         '''
         Method to export a MapWidget's pingLayer to a shapefile
         '''
+        if self.mapWidget is None:
+            WarningMessager.showWarning("Load a map before exporting.")
+            return
+
         folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
         file = folder + '/pings.shp'
         options = QgsVectorFileWriter.SaveVectorOptions()
         options.driverName = "ESRI Shapefile"
 
-        QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.pingLayer, 
-                                        file, 
+        QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.pingLayer,
+                                        file,
                                         QgsCoordinateTransformContext(), options)
-        
+
     def exportVehiclePath(self):
         '''
         Method to export a MapWidget's vehiclePath to a shapefile
         '''
+        if self.mapWidget is None:
+            WarningMessager.showWarning("Load a map before exporting.")
+            return
+
         folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
         file = folder + '/vehiclePath.shp'
         options = QgsVectorFileWriter.SaveVectorOptions()
         options.driverName = "ESRI Shapefile"
 
-        QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.vehiclePath, 
-                                        file, 
+        QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.vehiclePath,
+                                        file,
                                         QgsCoordinateTransformContext(), options)
 
 
@@ -846,12 +863,17 @@ class MapOptions(QWidget):
         '''
         Method to export MapWidget's Polygon shape to a shapefile
         '''
+        if self.mapWidget is None:
+            WarningMessager.showWarning("Load a map before exporting.")
+            return
+
         vpr = self.mapWidget.polygonLayer.dataProvider()
         self.generateWaypoints()
         if self.mapWidget.toolPolygon is None:
             return
         elif len(self.mapWidget.toolPolygon.vertices) == 0:
-            return
+            WarningMessager.showWarning("Use the polygon tool to choose an area on the map to export", "No specified area to export!")
+            self.mapWidget.polygon()
         else:
             
             pts = self.mapWidget.toolPolygon.vertices
@@ -868,13 +890,29 @@ class MapOptions(QWidget):
             file = folder + '/polygon.shp'
             options = QgsVectorFileWriter.SaveVectorOptions()
             options.driverName = "ESRI Shapefile"
-            
-            QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.polygonLayer, file, 
+
+            QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.polygonLayer, file,
                                                     QgsCoordinateTransformContext(), options)
-           
+
+    def exportCone(self):
+        '''
+        Method to export a MapWidget's cones to a shapefile
+        '''
+        if self.mapWidget is None:
+            WarningMessager.showWarning("Load a map before exporting.")
+            return
+        folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
+        file = folder + '/cones.shp'
+        options = QgsVectorFileWriter.SaveVectorOptions()
+        options.driverName = "ESRI Shapefile"
+
+        QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.cones, file,
+                                                QgsCoordinateTransformContext(),
+                                                options)
+
 class WebMap(MapWidget):
     '''
-    Custom MapWidget to facilititate displaying online or offline 
+    Custom MapWidget to facilititate displaying online or offline
     web maps
     '''
     def __init__(self, root, p1lat, p1lon, p2lat, p2lon, loadCached):
@@ -1200,7 +1238,7 @@ class WebMap(MapWidget):
             print("Rectangle:", r.xMinimum(),
                     r.yMinimum(), r.xMaximum(), r.yMaximum()
                  )
-            '''
+            
             if (r != None):
                 zoomStart = 17
                 tilecount = 0
@@ -1222,7 +1260,7 @@ class WebMap(MapWidget):
                 print("Download Complete")
             else:
                 print("Download Failed")
-            '''
+            
             
     def downloadTile(self, xtile, ytile, zoom):
         '''
@@ -1237,7 +1275,8 @@ class WebMap(MapWidget):
         
         if(not os.path.isfile(download_path)):
             print("downloading %r" % url)
-            source = requests.get(url, headers = {'User-agent': 'Mozilla/5.0'})
+            # requires up to date user agent
+            source = requests.get(url, headers = {'User-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.54 Safari/537.36'})
             cont = source.content
             source.close()
             destination = open(download_path,'wb')

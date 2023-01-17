@@ -4,9 +4,12 @@ from v1.0.  Working branch v1.0a, becomes v2.0 on release
 
 ## Installation on Ubuntu (18.04+) and Windows 10+
 1.  [Install Anaconda 2020.02](https://www.anaconda.com/products/individual)
-2.  Navigate to the `radio_collar_tracker_gcs` project in a python capable terminal
-3.  Run `conda env create -f environment.yml`
-4.  Run `conda activate rctGCS`
+2.  Download this repository and [radio_collar_tracker_comms](https://github.com/UCSD-E4E/radio_collar_tracker_comms/tree/communications_HG)
+3.  Navigate to the `radio_collar_tracker_comms` project in a python capable terminal
+4.  Run `python -m pip install .`
+5.  Navigate to the `radio_collar_tracker_gcs` project in a python capable terminal
+6.  Run `conda env create -f environment.yml`
+7.  Run `conda activate rctGCS`
 
 ## Running `rctGCS`
 -   Windows:

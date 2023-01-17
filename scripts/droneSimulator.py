@@ -42,12 +42,14 @@
 #
 ###############################################################################
 import argparse
+import math
 import threading
 import socket
 import datetime as dt
 from enum import Enum
 import logging
 import sys
+import RCTComms.transport as rctTransport
 import numpy as np
 from time import sleep
 from ping import rctPing
@@ -57,6 +59,7 @@ import RCTComms.comms
 import RCTComms.transport
 import time
 import math
+from ui.display import towerMode
 
 def getIPs():
     '''
@@ -185,6 +188,7 @@ class droneSim:
         self.SS_vehicleTarget = np.array(self.SM_TakeoffTarget)
         self.SS_waypointIdx = 0
         self.SS_payloadRunning = False
+        self.SS_heading = 0
 
         # HS - Heartbeat State parameters
         self.HS_run = True
@@ -365,6 +369,7 @@ class droneSim:
         self.SS_vehicleHdg = 0
         self.SS_hdgIndex = 0
         self.SS_payloadRunning = False
+        self.SS_heading = 0
 
         # HS - Heartbeat State parameters
         self.HS_run = True
@@ -861,6 +866,7 @@ class droneSim:
         if Prx < P_n:
            measurement = None
 
+
         return measurement
 
 
@@ -946,6 +952,9 @@ class droneSim:
 
         e['SS_payloadRunning'] = str(self.SS_payloadRunning )
 
+        e['SS_heading'] = str(self.SS_heading )
+        
+
 
         e['HS_run'] = str(self.HS_run )
 
@@ -993,6 +1002,56 @@ class droneSimPack:
             sim.stopMissionOnThread()
             sim.stop()
 
+    if args.protocol == 'udp':
+        port = RCTComms.transport.RCTUDPClient(port=args.port, addr=args.target)
+    elif args.protocol == 'tcp':
+        port = RCTComms.transport.RCTTCPClient(port=args.port, addr=args.target)
+
+    sim = droneSim(RCTComms.comms.mavComms(port))
+    simList.append(sim)
+
+def doAll(action:str, args=None):
+    '''
+    Calls the specified action on each simulator in simList
+
+    :param action: the function to be called
+    '''
+    try:
+        for sim in simList:
+            if action == "start":
+                sim.start()
+            elif action == "stop":
+                sim.stop()
+            elif action == "restart":
+                sim.restart()
+            elif action == "gotPing":
+                sim.gotPing(args[0])
+            elif action == "setException":
+                sim.setException(args[0], args[1])
+            elif action == "getFrequencies":
+                sim.getFrequencies()
+            elif action == "transmitPosition":
+                sim.transmitPosition()
+            elif action == "doMission":
+                sim.doMission(args[0])
+            elif action == "calculatePingMeasurement":
+                sim.calculatePingMeasurement()
+            else:
+                print("Error: Select one of the following functions:")
+                print("\'start\', \'stop\', \'restart\', \'gotPing\', ", end='')
+                print("\'setException\', \'getFrequencies\', ", end='')
+                print("\'transmitPosition\', \'doMission\', \'calculatePingMeasurement\'")
+                break
+    except TypeError:
+        print("Error: Ensure you have provided all required arguments in a list.")
+
+def connectionHandler(connection, id):
+    print('Connected {}'.format(id))
+    comms = RCTComms.comms.mavComms(connection)
+    sim = droneSim(comms)
+    simList.append(sim)
+
+simList = []
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Radio Collar Tracker Payload Control Simulator')
@@ -1021,6 +1080,29 @@ if __name__ == '__main__':
     
     if args.clients == 1:
         sim = sim.simList[0]; # Just hava a single simulator
+
+    if args.protocol == 'udp':
+        if towerMode:
+            for i in range(args.clients):
+                port = RCTComms.transport.RCTUDPClient(port=args.port, addr=args.target)
+                sim = droneSim(RCTComms.comms.mavComms(port))
+                simList.append(sim)
+        else:
+            port = RCTComms.transport.RCTUDPServer(port=args.port)
+            sim = droneSim(RCTComms.comms.mavComms(port))
+    elif args.protocol == 'tcp':
+        if towerMode:
+            for i in range(args.clients):
+                port = RCTComms.transport.RCTTCPClient(port=args.port, addr=args.target)
+                sim = droneSim(RCTComms.comms.mavComms(port))
+                simList.append(sim)
+        else:
+            connected = False
+            port = RCTComms.transport.RCTTCPServer(args.port, connectionHandler, addr=args.target)
+            port.open()
+            while len(simList) == 0:
+                continue
+            sim = simList[0]
 
     try:
         __IPYTHON__
