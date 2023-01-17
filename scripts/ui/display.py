@@ -42,8 +42,6 @@ class GCS(QMainWindow):
         '''
         super().__init__()
         self.__log = logging.getLogger('rctGCS.GCS')
-        with open('gcsconfig.json') as handle:
-            self.options = json.load(handle)
         self.portVal = self.defaultPortVal
         self._transport = None
         self._mavModels = {}
