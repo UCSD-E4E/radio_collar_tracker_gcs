@@ -124,7 +124,7 @@ class SystemSettingsControl(CollapseFrame):
         self.widg_targHolder.repaint()
         self.scroll_targHolder.repaint()
         self.frm_targHolder.activate()
-        CollapseFrame.repaint(self)
+        #CollapseFrame.repaint(self) // cases thread problems?
         self.__innerFrame.activate()
 
 
@@ -403,7 +403,7 @@ class SystemSettingsControl(CollapseFrame):
         '''
         Helper method to enable system settings buttons once connection is made
         '''
-
+        self.updateGUIOptionVars()
         self.btn_addTarget.setEnabled(True)
         self.btn_clearTargs.setEnabled(True)
         self.btn_submit.setEnabled(True)
