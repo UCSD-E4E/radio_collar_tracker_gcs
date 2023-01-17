@@ -42,6 +42,7 @@
 #
 ###############################################################################
 import argparse
+import math
 import threading
 import socket
 import datetime as dt
@@ -98,6 +99,8 @@ class droneSim:
         :param port:
         '''
         self.__txThread = None
+        self.__missionThread = None
+        self.__endMissionEvent = None
         self.port = port
         self.__commandMap = {}
         self.__state = {
@@ -187,6 +190,7 @@ class droneSim:
         self.SS_vehicleTarget = np.array(self.SM_TakeoffTarget)
         self.SS_waypointIdx = 0
         self.SS_payloadRunning = False
+        self.SS_heading = 0
 
         # HS - Heartbeat State parameters
         self.HS_run = True
@@ -367,6 +371,7 @@ class droneSim:
         self.SS_vehicleHdg = 0
         self.SS_hdgIndex = 0
         self.SS_payloadRunning = False
+        self.SS_heading = 0
 
         # HS - Heartbeat State parameters
         self.HS_run = True
@@ -630,6 +635,20 @@ class droneSim:
 
         self.port.sendVehicle(packet)
 
+    def doMissionOnTread(self, returnOnEnd: bool = False):
+        '''
+        Runs the flight mission on a new thread.
+        '''
+        self.__missionThread = threading.Thread(target=lambda:self.doMission(returnOnEnd))
+        self.__endMissionEvent = threading.Event()
+        time.sleep(0.109) # Help threads not run all together
+        self.__missionThread.start()
+
+    def stopMissionOnThread(self):
+        self.__endMissionEvent.set()
+        self.__missionThread.join()
+
+
     def doMission(self, returnOnEnd: bool = False):
         '''
         Runs the flight mission.  This function simulates flying the mission
@@ -730,7 +749,13 @@ class droneSim:
                 else:
                     self.SS_velocityVector = np.array([0, 0, 0])
 
-            sleep(self.SM_loopPeriod)
+            if self.__endMissionEvent is not None:
+                if self.__endMissionEvent.wait(self.SM_loopPeriod):
+                    self.SM_missionRun = False
+                    break
+            else:
+                sleep(self.SM_loopPeriod)
+
             ###################
             # Ping Simulation #
             ###################
@@ -843,6 +868,7 @@ class droneSim:
         if Prx < P_n:
            measurement = None
 
+
         return measurement
 
 
@@ -928,6 +954,9 @@ class droneSim:
 
         e['SS_payloadRunning'] = str(self.SS_payloadRunning )
 
+        e['SS_heading'] = str(self.SS_heading )
+
+
 
         e['HS_run'] = str(self.HS_run )
 
@@ -935,18 +964,54 @@ class droneSim:
         with open(settingsFile, 'w') as outfile:
             json.dump(e, outfile)
 
+class droneSimPack:
+    def __init__(self, port: int, addr: str, protocol: str, clients: int):
+        '''
+        Creates a pack of multiple DroneSim object
+        :param port:
+        '''
+        self.simList = []
+        if protocol == 'udp':
+            for i in range(clients):
+                tsport = RCTComms.transport.RCTUDPClient(port=port, addr=addr)
+                sim = droneSim(RCTComms.comms.mavComms(tsport))
+                self.simList.append(sim)
+        elif args.protocol == 'tcp':
+            for i in range(clients):
+                tsport = RCTComms.transport.RCTTCPClient(port=port, addr=addr)
+                sim = droneSim(RCTComms.comms.mavComms(tsport))
+                self.simList.append(sim)
+
+    def start(self):
+        '''
+        Starts all the simulators in the pack
+        '''
+        for sim in self.simList:
+            sim.start()
+
+    def doMission(self, returnOnEnd: bool = False):
+        '''
+        Starts missions for all the simulators in the pack
+        '''
+        for sim in self.simList:
+            sim.doMissionOnTread(returnOnEnd)
+
+    def stop(self):
+        '''
+        Stops all missions and thee similators in the pack
+        '''
+        for sim in self.simList:
+            sim.stopMissionOnThread()
+            sim.stop()
 def addClient():
     '''
     Connects another client and adds the associated simulator to simList
     '''
-
     if args.protocol == 'udp':
         port = RCTComms.transport.RCTUDPClient(port=args.port, addr=args.target)
     elif args.protocol == 'tcp':
         port = RCTComms.transport.RCTTCPClient(port=args.port, addr=args.target)
 
-    sim = droneSim(RCTComms.comms.mavComms(port))
-    simList.append(sim)
 
 def doAll(action:str, args=None):
     '''
@@ -1014,6 +1079,9 @@ if __name__ == '__main__':
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
+    sim = droneSimPack(args.port, args.target, args.protocol, args.clients);
+    if args.clients == 1:
+        sim = sim.simList[0]; # Just hava a single simulator
     config = config.Configuration(Path('gcsConfig.ini'))
     config.load()
 
@@ -1043,5 +1111,4 @@ if __name__ == '__main__':
     try:
         __IPYTHON__
     except NameError:
-        for sim in simList:
-            sim.start()
+        sim.start()
