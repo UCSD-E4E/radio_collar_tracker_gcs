@@ -152,6 +152,35 @@ class GCS(QMainWindow):
             label = "System: {} Connections".format(numConnections)
         self._systemConnectionTab.updateText(label)
 
+    def __changeModel(self, id):
+        '''
+        Changing the selected _mavModel
+        '''
+        self._mavModel = self._mavModels[id]
+        self.systemSettingsWidget.connectionMade()
+        
+    def __changeModelByIndex(self, index):
+        '''
+        Changing the selected _mavModel by index
+        '''
+        if index < 0 or index > len(self._mavModels):
+            return
+        try:
+            self.__changeModel(list(self._mavModels.keys())[index])
+        except:
+            print('Failed to change Model to {}'.format(index))
+            self.__useDefaultModel()
+         
+    def __useDefaultModel(self):
+        '''
+        Using the first model as the default if possible
+        '''
+        try:        
+            if len(self._mavModels) > 0:
+                self.__changeModel(list(self._mavModels.keys())[0])
+        except:
+            self._mavModel = None
+
     def mainloop(self, n=0):
         '''
         Main Application Loop
