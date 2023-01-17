@@ -68,9 +68,6 @@ class GCS(QMainWindow):
 
         self.queue = q.Queue()
         self.sig.connect(self.execute_inmain, Qt.QueuedConnection)
-        self.towerMode = towerMode
-        if self.towerMode:
-            self.__startTransport()
 
     def execute_inmain(self):
         while not self.queue.empty():
