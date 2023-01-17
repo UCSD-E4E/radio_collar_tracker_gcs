@@ -22,16 +22,12 @@ class GCS(QMainWindow):
 
     defaultPortVal = 9000
 
-    f = open('gcsconfig.json')
-    options = json.load(f)
-    f.close()
-
     sig = pyqtSignal()
 
     connectSignal = pyqtSignal(RCTAbstractTransport, int)
-    
+
     disconnectSignal = pyqtSignal(int)
-    
+
     mavEventSignal = pyqtSignal(rctCore.Events, int)
 
     def __init__(self):
@@ -69,6 +65,9 @@ class GCS(QMainWindow):
 
         self.queue = q.Queue()
         self.sig.connect(self.execute_inmain, Qt.QueuedConnection)
+        self.towerMode = towerMode
+        if self.towerMode:
+            self.__startTransport()
 
     def execute_inmain(self):
         while not self.queue.empty():
@@ -91,22 +90,21 @@ class GCS(QMainWindow):
 
     def __registerModelCallbacks(self, id):
         mavModel = self._mavModels[id]
-        eventTypes = [rctCore.Events.Heartbeat, rctCore.Events.Exception, 
-        rctCore.Events.VehicleInfo, rctCore.Events.NewPing, 
+        eventTypes = [rctCore.Events.Heartbeat, rctCore.Events.Exception,
+        rctCore.Events.VehicleInfo, rctCore.Events.NewPing,
         rctCore.Events.NewEstimate, rctCore.Events.ConeInfo]
         for eventType in eventTypes:
-            mavModel.registerCallback(eventType, 
+            mavModel.registerCallback(eventType,
             partial(self.mavEventSignal.emit, eventType, id))
 
     def __startServer(self):
         if self._server is not None:
             self._server.close()
         self.connectSignal.connect(self.__connectionHandler)
-        self.disconnectSignal.connect(self.__disconnectHandler) 
-        self.mavEventSignal.connect(self.__mavEventHandler)      
+        self.disconnectSignal.connect(self.__disconnectHandler)
+        self.mavEventSignal.connect(self.__mavEventHandler)
         self._server = RCTTCPServer(self.portVal, self.connectSignal.emit)
         self._server.open()
-        
     def __startTransport(self):
         if self._transport is not None:
             self._transport.close()
@@ -183,7 +181,7 @@ class GCS(QMainWindow):
         '''
         Using the first model as the default if possible
         '''
-        try:        
+        try:
             if len(self._mavModels) > 0:
                 self.__changeModel(list(self._mavModels.keys())[0])
         except:
@@ -241,7 +239,7 @@ class GCS(QMainWindow):
 
             if self.mapOptions is not None:
                 self.mapOptions.estDistance(coord, stale, res)
-    
+
 
     def __handleNewPing(self, id):
         '''
@@ -1049,9 +1047,9 @@ class MapControl(CollapseFrame):
         p1lon = float(lon1)
         p2lat = float(lat2)
         p2lon = float(lon2)
-        
+
         return [p1lat, p1lon, p2lat, p2lon]
-    
+
     def __loadWebMap(self):
         '''
         Internal function to load map from web

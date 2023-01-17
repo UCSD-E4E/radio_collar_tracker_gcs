@@ -42,6 +42,7 @@
 #
 ###############################################################################
 import argparse
+import math
 import threading
 import socket
 import datetime as dt
@@ -187,6 +188,7 @@ class droneSim:
         self.SS_vehicleTarget = np.array(self.SM_TakeoffTarget)
         self.SS_waypointIdx = 0
         self.SS_payloadRunning = False
+        self.SS_heading = 0
 
         # HS - Heartbeat State parameters
         self.HS_run = True
@@ -367,6 +369,7 @@ class droneSim:
         self.SS_vehicleHdg = 0
         self.SS_hdgIndex = 0
         self.SS_payloadRunning = False
+        self.SS_heading = 0
 
         # HS - Heartbeat State parameters
         self.HS_run = True
@@ -863,6 +866,7 @@ class droneSim:
         if Prx < P_n:
            measurement = None
 
+
         return measurement
 
 
@@ -948,6 +952,9 @@ class droneSim:
 
         e['SS_payloadRunning'] = str(self.SS_payloadRunning )
 
+        e['SS_heading'] = str(self.SS_heading )
+        
+
 
         e['HS_run'] = str(self.HS_run )
 
@@ -994,7 +1001,14 @@ class droneSimPack:
         for sim in self.simList:
             sim.stopMissionOnThread()
             sim.stop()
-
+def addClient():
+    '''
+    Connects another client and adds the associated simulator to simList
+    '''
+    if args.protocol == 'udp':
+        port = RCTComms.transport.RCTUDPClient(port=args.port, addr=args.target)
+    elif args.protocol == 'tcp':
+        port = RCTComms.transport.RCTTCPClient(port=args.port, addr=args.target)
 
 
 def doAll(action:str, args=None):
