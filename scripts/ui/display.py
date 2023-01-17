@@ -22,6 +22,7 @@ class GCS(QMainWindow):
 
     defaultPortVal = 9000
 
+
     sig = pyqtSignal()
 
     connectSignal = pyqtSignal(RCTAbstractTransport, int)
@@ -36,6 +37,8 @@ class GCS(QMainWindow):
         '''
         super().__init__()
         self.__log = logging.getLogger('rctGCS.GCS')
+        with open('gcsconfig.json') as handle:
+            self.options = json.load(handle)
         self.portVal = self.defaultPortVal
         self._transport = None
         self._mavModels = {}
