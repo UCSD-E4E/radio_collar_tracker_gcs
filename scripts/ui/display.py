@@ -108,7 +108,7 @@ class GCS(QMainWindow):
     def __startTransport(self):
         if self._transport is not None:
             self._transport.close()
-        if GCS.options['towerMode']:
+        if self.options['towerMode']:
             self._transport = RCTTCPServer(self.portVal, self.connectionHandler)
         if self._transport is not None:
             self._transport.open()
