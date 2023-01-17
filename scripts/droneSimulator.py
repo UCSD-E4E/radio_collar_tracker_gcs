@@ -641,7 +641,7 @@ class droneSim:
         self.__endMissionEvent = threading.Event()
         time.sleep(0.109) # Help threads not run all together
         self.__missionThread.start()
-        
+
     def stopMissionOnThread(self):
         self.__endMissionEvent.set()
         self.__missionThread.join()
@@ -953,7 +953,7 @@ class droneSim:
         e['SS_payloadRunning'] = str(self.SS_payloadRunning )
 
         e['SS_heading'] = str(self.SS_heading )
-        
+
 
 
         e['HS_run'] = str(self.HS_run )
@@ -979,21 +979,21 @@ class droneSimPack:
                 tsport = RCTComms.transport.RCTTCPClient(port=port, addr=addr)
                 sim = droneSim(RCTComms.comms.mavComms(tsport))
                 self.simList.append(sim)
-                
+
     def start(self):
         '''
         Starts all the simulators in the pack
         '''
         for sim in self.simList:
             sim.start()
-            
-    def doMission(self, returnOnEnd: bool = False):  
+
+    def doMission(self, returnOnEnd: bool = False):
         '''
         Starts missions for all the simulators in the pack
         '''
         for sim in self.simList:
             sim.doMissionOnTread(returnOnEnd)
-        
+
     def stop(self):
         '''
         Stops all missions and thee similators in the pack
@@ -1076,13 +1076,13 @@ if __name__ == '__main__':
     ch.setLevel(logging.DEBUG)
     ch.setFormatter(formatter)
     logger.addHandler(ch)
-    
+
     sim = droneSimPack(args.port, args.target, args.protocol, args.clients);
     if args.clients == 1:
         sim = sim.simList[0]; # Just hava a single simulator
 
-    f = open('gcsconfig.json')
-    options = json.load(f)
+    with open('gcsconfig.json') as handle:
+        options = json.load(handle)
 
     print(options['towerMode'])
 
