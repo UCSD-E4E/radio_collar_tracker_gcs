@@ -179,6 +179,14 @@ class PolygonMapTool(qgis.gui.QgsMapToolEmitPoint):
         qgis.gui.QgsMapTool.deactivate(self)
         self.deactivated.emit()
 
+class VehicleData:
+    '''
+    Information about displaying a vehicle on the map
+    '''
+    def __init__(self):
+        self.ind = 0
+        self.lastLoc = None
+
 class MapWidget(QWidget):
     '''
     Custom Widget that is used to display a map
@@ -197,7 +205,7 @@ class MapWidget(QWidget):
         self.vehiclePath = None
         self.precision = None
         self.cones = None
-        self.lastLoc = None
+        self.vehicleData = {}
         self.pingLayer = None
         self.pingRenderer = None
         self.estimate = None
@@ -209,9 +217,9 @@ class MapWidget(QWidget):
         self.pingMax = 0
         self.coneMin = sys.float_info.max
         self.coneMax = sys.float_info.min
-        self.indPing = 0
-        self.indPing = 0
         self.ind = 0
+        self.indPing = 0
+        self.indPing = 0
         self.indEst = 0
         self.indCone = 0
         self.toolbar = QToolBar()
@@ -386,7 +394,7 @@ class MapWidget(QWidget):
         '''
         self.canvas.setMapTool(self.toolPan)
 
-    def plotVehicle(self, coord):
+    def plotVehicle(self, id, coord):
         '''
         Function to plot the vehicle's current location on the vehicle 
         map layer
@@ -400,18 +408,23 @@ class MapWidget(QWidget):
         if self.vehicle is None:
             return
         else:
-            if self.ind > 0:
+            vData = VehicleData()
+            if id not in self.vehicleData:
+                self.vehicleData[id] = vData
+            else:
+                vData = self.vehicleData[id]
+            if vData.ind > 0:
                 lpr = self.vehiclePath.dataProvider()
-                lin = QgsGeometry.fromPolylineXY([self.lastLoc, point])
+                lin = QgsGeometry.fromPolylineXY([vData.lastLoc, point])
                 lineFeat = QgsFeature()
                 lineFeat.setGeometry(lin)
                 lpr.addFeatures([lineFeat])
                 vpr = self.vehicle.dataProvider()
                 self.vehicle.startEditing()
-                self.vehicle.deleteFeature(self.ind)
+                self.vehicle.deleteFeature(vData.ind)
                 self.vehicle.commitChanges()
             
-            self.lastLoc = point
+            vData.lastLoc = point
             vpr = self.vehicle.dataProvider()
             pnt = QgsGeometry.fromPointXY(point)
             f = QgsFeature()
@@ -419,6 +432,7 @@ class MapWidget(QWidget):
             vpr.addFeatures([f])
             self.vehicle.updateExtents()
             self.ind = self.ind + 1
+            vData.ind = self.ind
     
     def plotCone(self, coord):
         lat = coord[0]

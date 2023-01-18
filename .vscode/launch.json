@@ -5,6 +5,18 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "RCT GCS",
+            "request": "launch",
+            "type": "python",
+            "program": "rctGCS.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceFolder}/scripts",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/scripts;"
+            }
+        },
+        {
             "name": "Drone Simulator",
             "type": "python",
             "request": "launch",
