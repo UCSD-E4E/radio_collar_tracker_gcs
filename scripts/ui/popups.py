@@ -4,6 +4,7 @@ import rctCore
 from PyQt5.QtCore import QRegExp
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QRegExpValidator
+from config import ConnectionMode
 
 class WarningMessager:
 
@@ -271,7 +272,7 @@ class ConnectionDialog(QWizard):
         '''
         self.portVal = int(self.page.portEntry.text())
 
-        if self.parent.options['towerMode']:
+        if self.parent.config.connection_mode == ConnectionMode.TOWER:
             self.port = RCTTCPServer(self.portVal, self.parent.connectionHandler)
             self.port.open()
         else:
@@ -330,7 +331,7 @@ class ConnectionDialogPage(QWizardPage):
         self.portEntry.setText(str(self.__portEntryVal))
         frm_port.addWidget(self.portEntry)
 
-        if not self.__parent.parent.options['towerMode']:
+        if self.__parent.parent.config.connection_mode == ConnectionMode.DRONE:
             frm_addr = QHBoxLayout()
             frm_addr.addStretch(1)
 

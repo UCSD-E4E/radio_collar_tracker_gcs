@@ -1,11 +1,17 @@
-import utm
-import logging
-import rctCore
-from PyQt5.QtWidgets import QGridLayout, QLabel, QPushButton, QVBoxLayout, QWidget, QFileDialog, QMainWindow, QScrollArea
-import queue as q
 import configparser
 import json
-from ui.popups import *
+import logging
+import queue as q
+from functools import partial
+from pathlib import Path
+import config
+
+import rctCore
+import utm
+from config import get_instance
+from PyQt5.QtWidgets import (QFileDialog, QGridLayout, QLabel, QMainWindow,
+                             QPushButton, QScrollArea, QVBoxLayout, QWidget)
+from RCTComms.transport import RCTTCPServer
 from ui.controls import *
 from ui.map import *
 from functools import partial
@@ -22,7 +28,6 @@ class GCS(QMainWindow):
 
     defaultPortVal = 9000
 
-
     sig = pyqtSignal()
 
     connectSignal = pyqtSignal(RCTAbstractTransport, int)
@@ -37,8 +42,6 @@ class GCS(QMainWindow):
         '''
         super().__init__()
         self.__log = logging.getLogger('rctGCS.GCS')
-        with open('gcsconfig.json') as handle:
-            self.options = json.load(handle)
         self.portVal = self.defaultPortVal
         self._transport = None
         self._mavModels = {}
@@ -48,11 +51,6 @@ class GCS(QMainWindow):
         self.systemSettingsWidget = None
         self.__missionStatusText = "Start Recording"
         self.__missionStatusBtn = None
-        if self.options["towerMode"]:
-            self.__runningModeText = "Switch to Tower Mode"
-        else:
-            self.__runningModeText = "Switch to Drone Mode"
-        self.__runningModeBtn = None
         self.innerFreqFrame = None
         self.freqElements = []
         self.targEntries = {}
@@ -62,6 +60,14 @@ class GCS(QMainWindow):
         self.mainThread = None
         self.testFrame = None
         self.pingSheetCreated = False
+
+        self.config = config.Configuration(Path('gcsConfig.ini'))
+        self.config.load()
+        if self.config.connection_mode == config.ConnectionMode.DRONE:
+            self.__runningModeText = "Switch to Tower Mode"
+        else:
+            self.__runningModeText = "Switch to Drone Mode"
+
         self.__createWidgets()
         for button in self._buttons:
             button.config(state='disabled')
@@ -108,7 +114,7 @@ class GCS(QMainWindow):
     def __startTransport(self):
         if self._transport is not None:
             self._transport.close()
-        if self.options['towerMode']:
+        if self.config.connection_mode == config.ConnectionMode.TOWER:
             self._transport = RCTTCPServer(self.portVal, self.connectionHandler)
         if self._transport is not None:
             self._transport.open()
@@ -310,30 +316,6 @@ class GCS(QMainWindow):
             self.__missionStatusBtn.setText('Start Recording')
             self._mavModel.stopMission(timeout=self.defaultTimeout)
 
-    def __toggleRunningMode(self):
-        '''
-        Switch between running in drone and tower modes
-        '''
-        if self._mavModel is not None:
-            WarningMessager.showWarning('Cannot toggle running modes once a connection has been made!')
-            return
-
-        if self.__runningModeBtn.text() == 'Switch to Tower Mode':
-            self.__runningModeBtn.setText('Switch to Drone Mode')
-            GCS.options['towerMode'] = True
-        else:
-            self.__runningModeBtn.setText('Switch to Tower Mode')
-            GCS.options['towerMode'] = False
-
-        f = open('gcsconfig.json', 'w')
-        json.dump(GCS.options, f)
-        f.close()
-        print('towerMode is now ' + str(GCS.options['towerMode']))
-
-        if self._transport is not None:
-            self._transport.close()
-            self._transport = None
-
     def __updateStatus(self):
         '''
         Internal callback for status variable update
@@ -500,17 +482,11 @@ class GCS(QMainWindow):
             lon2 = ext.xMaximum()
 
 
-
-            config_path = 'gcsConfig.ini'
-            config = configparser.ConfigParser()
-            config.read(config_path)
-            config['LastCoords'] = {}
-            config['LastCoords']['Lat1'] = str(lat1)
-            config['LastCoords']['Lon1'] = str(lon1)
-            config['LastCoords']['Lat2'] = str(lat2)
-            config['LastCoords']['Lon2'] = str(lon2)
-            with open(config_path, 'w') as configFile:
-                config.write(configFile)
+            with get_instance(Path('gcsConfig.ini')) as config:
+                config.map_extent = (
+                    (lat1, lon1),
+                    (lat2, lon2)
+                )
 
         for id in self._mavModels:
             mavModel = self._mavModels[id]
@@ -1026,23 +1002,21 @@ class MapControl(CollapseFrame):
 
 
 
-        if (lat1 == '') or (lon1 == '') or (lat2 == '') or (lon2 == ''):
-            lat1, lon1, lat2, lon2 = self.__coordsFromConf()
+        if lat1 is None or lat2 is None or lon1 is None or lon2 is None or \
+                lat1 == '' or lon1 == '' or lat2 == '' or lon2 == '':
+            with get_instance(Path('gcsConfig.ini')) as config:
+                nw_extent, se_extent = config.map_extent
 
+            lat1 = str(nw_extent[0])
             self.__p1latEntry.setText(lat1)
+            lon1 = str(nw_extent[1])
             self.__p1lonEntry.setText(lon1)
+            lat2 = str(se_extent[0])
             self.__p2latEntry.setText(lat2)
+            lon2 = str(se_extent[1])
             self.__p2lonEntry.setText(lon2)
 
-        if lat1 is None or lat2 is None or lon1 is None or lon2 is None:
-            lat1 = "90"
-            lat2 = "-90"
-            lon1 = "-180"
-            lon2 = "180"
-            self.__p1latEntry.setText(lat1)
-            self.__p1lonEntry.setText(lon1)
-            self.__p2latEntry.setText(lat2)
-            self.__p2lonEntry.setText(lon2)
+
         p1lat = float(lat1)
         p1lon = float(lon1)
         p2lat = float(lat2)
