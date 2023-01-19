@@ -383,21 +383,96 @@ class ConfigDialogPage(QWizardPage):
 
         btn_TCP = QCheckBox('TCP')
         frm_conType.addWidget(btn_TCP)
-        #-----
+        #----- Prefix Path
         frm_prefix_path = QHBoxLayout()
         frm_prefix_path.addStretch(1)
 
         lbl_prefix_path = QLabel('QGis Prefix Path')
-        frm_prefix_path.addWidget(lbl_port)
+        frm_prefix_path.addWidget(lbl_prefix_path)
 
-        self.prefix_path = QLineEdit()
-        self.prefix_path.setText(str(self.config.__qgis_prefix_path)) # TODO: make self.config
-        frm_prefix_path.addWidget(self.prefix_path)
+        prefix_path = QLineEdit()
+        prefix_path.setText(str(self.config.__qgis_prefix_path)) # TODO: make self.config
+        frm_prefix_path.addWidget(prefix_path)
+        #----- Prefix Set
+        frm_prefix_set = QHBoxLayout()
+        frm_prefix_set.addStretch(1)
+
+        lbl_prefix_set = QLabel('QGis Prefix Set')
+        frm_prefix_path.addWidget(lbl_prefix_set)
+
+        prefix_set = QLineEdit()
+        prefix_set.setText(str(self.config.__qgis_prefix_set)) # TODO: make self.config
+        frm_prefix_set.addWidget(prefix_set)
+        #----- Lat 1
+        frm_lat_1 = QHBoxLayout()
+        frm_lat_1.addStretch(1)
+
+        lbl_lat_1 = QLabel('Lat 1')
+        frm_lat_1.addWidget(lbl_lat_1)
+
+        lat_1 = QLineEdit()
+        lat_1.setText(str(self.config.__map_extent_nw[0])) # TODO: make self.config
+        frm_lat_1.addWidget(lat_1)
+        #----- Lat 2
+        frm_lat_2 = QHBoxLayout()
+        frm_lat_2.addStretch(1)
+
+        lbl_lat_2 = QLabel('Lat 2')
+        frm_lat_2.addWidget(lbl_lat_2)
+
+        lat_2 = QLineEdit()
+        lat_2.setText(str(self.config.__map_extent_se[0])) # TODO: make self.config
+        frm_lat_2.addWidget(lat_2)
+        #----- Lon 1
+        frm_lon_1 = QHBoxLayout()
+        frm_lon_1.addStretch(1)
+
+        lbl_lon_1 = QLabel('Lon 1')
+        frm_lon_1.addWidget(lbl_lon_1)
+
+        lon_1 = QLineEdit()
+        lon_1.setText(str(self.config.__map_extent_nw[1])) # TODO: make self.config
+        frm_lon_1.addWidget(lon_1)
+        #----- Lon 2
+        frm_lon_2 = QHBoxLayout()
+        frm_lon_2.addStretch(1)
+
+        lbl_lon_2 = QLabel('Lon 2')
+        frm_lon_2.addWidget(lbl_lon_2)
+
+        lon_2 = QLineEdit()
+        lon_2.setText(str(self.config.__map_extent_se[1])) # TODO: make self.config
+        frm_lon_2.addWidget(lon_2)
+        #----- Addr
+        frm_addr = QHBoxLayout()
+        frm_addr.addStretch(1)
+
+        lbl_addr = QLabel('Addr')
+        frm_addr.addWidget(lbl_addr)
+
+        addr = QLineEdit()
+        addr.setText(str(self.config.__connection_addr)) # TODO: make self.config
+        frm_addr.addWidget(addr)
+        #----- Port
+        frm_port = QHBoxLayout()
+        frm_port.addStretch(1)
+
+        lbl_port = QLabel('Port')
+        frm_port.addWidget(lbl_port)
 
         self.portEntry = QLineEdit()
         self.portEntry.setText(str(self.__portEntryVal))
         frm_port.addWidget(self.portEntry)
+        #----- Mode
+        frm_mode = QHBoxLayout()
+        frm_mode.addStretch(1)
 
+        lbl_mode = QLabel('Mode')
+        frm_mode.addWidget(lbl_mode)
+
+        mode = QLineEdit()
+        mode.setText(str(self.config.__connection_mode)) # TODO: make self.config
+        frm_mode.addWidget(mode)
 
         #-----
         frm_holder.addLayout(frm_port)
