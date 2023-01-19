@@ -577,6 +577,22 @@ class GCS(QMainWindow):
         self.upgradeDisplay = UpgradeDisplay(content, self)
         self.upgradeDisplay.resize(self.SBWidth, 400)
 
+        # CONFIG TAB
+        self._configTab = CollapseFrame(title='Configuration Settings')
+        self._configTab.resize(self.SBWidth, 400)
+        lay_sys = QVBoxLayout()
+        btn_config = QPushButton("Edit Configuration Settings")
+        btn_config.resize(self.SBWidth, 100)
+        btn_config.clicked.connect(lambda:self.__handleConnectInput()) # TODO
+        self.model_select = QComboBox()
+        self.model_select.resize(self.SBWidth, 100)
+        #self.model_select.currentIndexChanged.connect(self.__changeModelByIndex)
+        self.model_select.hide()
+        lay_sys.addWidget(btn_setup)
+        lay_sys.addWidget(self.model_select)
+
+        self._systemConnectionTab.setContentLayout(lay_sys)
+
 
         # START PAYLOAD RECORDING
         self.__missionStatusBtn = QPushButton(self.__missionStatusText)
@@ -604,6 +620,7 @@ class GCS(QMainWindow):
         wlay.addWidget(self.mapControl)
         wlay.addWidget(self.systemSettingsWidget)
         wlay.addWidget(self.upgradeDisplay)
+        wlay.addWidget(self._configTab)
         wlay.addWidget(self.__missionStatusBtn)
         wlay.addWidget(self.__runningModeBtn)
         wlay.addWidget(self.__btn_exportAll)

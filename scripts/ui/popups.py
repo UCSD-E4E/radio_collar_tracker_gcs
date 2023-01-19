@@ -348,3 +348,58 @@ class ConnectionDialogPage(QWizardPage):
         frm_holder.addLayout(frm_port)
         frm_holder.addLayout(frm_conType)
         self.setLayout(frm_holder)
+
+class ConfigDialogPage(QWizardPage):
+    '''
+    Custom DialogPage widget - Allows the user to configure
+    settings to connect to the drone
+    '''
+    def __init__(self, portVal, parent):
+        '''
+        Creates a new AddTargetDialog
+        Args:
+            portVal: The port value used
+        '''
+        super(ConnectionDialogPage, self).__init__()
+        self.__portEntryVal = portVal # default value
+        self.portEntry = None # default value
+        self.__parent = parent
+
+        self.__createWidget()
+
+
+    def __createWidget(self):
+        '''
+        Internal function to create widgets
+        '''
+        frm_holder = QVBoxLayout()
+        frm_holder.addStretch(1)
+        #-----
+        frm_conType = QHBoxLayout()
+        frm_conType.addStretch(1)
+
+        lbl_conType = QLabel('Connection Type:')
+        frm_conType.addWidget(lbl_conType)
+
+        btn_TCP = QCheckBox('TCP')
+        frm_conType.addWidget(btn_TCP)
+        #-----
+        frm_prefix_path = QHBoxLayout()
+        frm_prefix_path.addStretch(1)
+
+        lbl_prefix_path = QLabel('QGis Prefix Path')
+        frm_prefix_path.addWidget(lbl_port)
+
+        self.prefix_path = QLineEdit()
+        self.prefix_path.setText(str(self.config.__qgis_prefix_path)) # TODO: make self.config
+        frm_prefix_path.addWidget(self.prefix_path)
+
+        self.portEntry = QLineEdit()
+        self.portEntry.setText(str(self.__portEntryVal))
+        frm_port.addWidget(self.portEntry)
+
+
+        #-----
+        frm_holder.addLayout(frm_port)
+        frm_holder.addLayout(frm_conType)
+        self.setLayout(frm_holder)
