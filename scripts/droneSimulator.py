@@ -639,7 +639,7 @@ class droneSim:
         '''
         Runs the flight mission on a new thread.
         '''
-        self.__missionThread = threading.Thread(target=lambda:self.doMission(returnOnEnd))
+        self.__missionThread = threading.Thread(target=self.doMission, args=(returnOnEnd,))
         self.__endMissionEvent = threading.Event()
         time.sleep(0.109) # Help threads not run all together
         self.__missionThread.start()
