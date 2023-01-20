@@ -541,7 +541,7 @@ class GCS(QMainWindow):
         lay_sys = QVBoxLayout()
         btn_setup = QPushButton("Connection Settings")
         btn_setup.resize(self.SBWidth, 100)
-        btn_setup.clicked.connect(lambda:self.__handleConnectInput())
+        btn_setup.clicked.connect(self.__handleConnectInput)
         self.model_select = QComboBox()
         self.model_select.resize(self.SBWidth, 100)
         self.model_select.currentIndexChanged.connect(self.__changeModelByIndex)
@@ -576,11 +576,11 @@ class GCS(QMainWindow):
         # START PAYLOAD RECORDING
         self.__missionStatusBtn = QPushButton(self.__missionStatusText)
         self.__missionStatusBtn.setEnabled(False)
-        self.__missionStatusBtn.clicked.connect(lambda:self.__startStopMission())
+        self.__missionStatusBtn.clicked.connect(self.__startStopMission)
 
         self.__btn_exportAll = QPushButton('Export Info')
         self.__btn_exportAll.setEnabled(False)
-        self.__btn_exportAll.clicked.connect(lambda:self.exportAll())
+        self.__btn_exportAll.clicked.connect(self.exportAll)
 
         self.__btn_precision = QPushButton('Do Precision')
         self.__btn_precision.setEnabled(False)
@@ -588,7 +588,7 @@ class GCS(QMainWindow):
 
         self.__btn_heatMap = QPushButton('Display Heatmap')
         self.__btn_heatMap.setEnabled(False)
-        self.__btn_heatMap.clicked.connect(lambda:self.mapDisplay.setupHeatMap())
+        self.__btn_heatMap.clicked.connect(self.mapDisplay.setupHeatMap)
 
         wlay.addWidget(self._systemConnectionTab)
         wlay.addWidget(self.statusWidget)
@@ -648,11 +648,11 @@ class UpgradeDisplay(CollapseFrame):
         self.__innerFrame.addWidget(self.filename, 1, 1)
 
         browse_file_btn = QPushButton('Browse for Upgrade File')
-        browse_file_btn.clicked.connect(lambda:self.fileDialogue())
+        browse_file_btn.clicked.connect(self.fileDialogue)
         self.__innerFrame.addWidget(browse_file_btn, 2, 0)
 
         upgrade_btn = QPushButton('Upgrade')
-        upgrade_btn.clicked.connect(lambda:self.sendUpgradeFile())
+        upgrade_btn.clicked.connect(self.sendUpgradeFile)
         self.__innerFrame.addWidget(upgrade_btn, 3, 0)
 
 
@@ -953,11 +953,11 @@ class MapControl(CollapseFrame):
 
 
         btn_loadWebMap = QPushButton('Load from Web')
-        btn_loadWebMap.clicked.connect(lambda:self.__loadWebMap())
+        btn_loadWebMap.clicked.connect(self.__loadWebMap)
         lay_loadWebMap.addWidget(btn_loadWebMap, 3, 1, 1, 2)
 
         btn_loadCachedMap = QPushButton('Load from Cache')
-        btn_loadCachedMap.clicked.connect(lambda:self.__loadCachedMap())
+        btn_loadCachedMap.clicked.connect(self.__loadCachedMap)
         lay_loadWebMap.addWidget(btn_loadCachedMap, 4, 1, 1, 2)
 
         controlPanel.addWidget(frm_loadWebMap)
