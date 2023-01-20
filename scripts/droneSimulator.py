@@ -635,7 +635,7 @@ class droneSim:
 
         self.port.sendVehicle(packet)
 
-    def doMissionOnTread(self, returnOnEnd: bool = False):
+    def doMissionOnThread(self, returnOnEnd: bool = False):
         '''
         Runs the flight mission on a new thread.
         '''
@@ -994,7 +994,7 @@ class droneSimPack:
         Starts missions for all the simulators in the pack
         '''
         for sim in self.simList:
-            sim.doMissionOnTread(returnOnEnd)
+            sim.doMissionOnThread(returnOnEnd)
 
     def stop(self):
         '''

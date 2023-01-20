@@ -63,10 +63,6 @@ class GCS(QMainWindow):
 
         self.config = config.Configuration(Path('gcsConfig.ini'))
         self.config.load()
-        if self.config.connection_mode == config.ConnectionMode.DRONE:
-            self.__runningModeText = "Switch to Tower Mode"
-        else:
-            self.__runningModeText = "Switch to Drone Mode"
 
         self.__createWidgets()
         for button in self._buttons:
@@ -103,23 +99,21 @@ class GCS(QMainWindow):
             mavModel.registerCallback(eventType,
             partial(self.mavEventSignal.emit, eventType, id))
 
-    def __startServer(self):
-        if self._server is not None:
-            self._server.close()
-        self.connectSignal.connect(self.__connectionHandler)
-        self.disconnectSignal.connect(self.__disconnectHandler)
-        self.mavEventSignal.connect(self.__mavEventHandler)
-        self._server = RCTTCPServer(self.portVal, self.connectSignal.emit)
-        self._server.open()
     def __startTransport(self):
-        if self._transport is not None:
+        if self._transport is not None and self._transport.isOpen():
             self._transport.close()
+        self.mavEventSignal.connect(self.__mavEventHandler)
         if self.config.connection_mode == config.ConnectionMode.TOWER:
             self._transport = RCTTCPServer(self.portVal, self.connectionHandler)
-        if self._transport is not None:
             self._transport.open()
         else:
-            print("Transport could not be started")
+            try:
+                self._transport = RCTTCPClient(addr=self.addrVal, port=self.portVal)
+                self.connectionHandler(self._transport, 0)
+            except ConnectionRefusedError:
+                WarningMessager.showWarning("Failure to connect:\nPlease ensure server is running.")
+                self._transport.close()
+                return
 
     def connectionHandler(self, connection, id):
         comms = gcsComms(connection, partial(self.__disconnectHandler, id))
@@ -133,7 +127,6 @@ class GCS(QMainWindow):
         self.updateConnectionsLabel()
         self.systemSettingsWidget.connectionMade()
         self.__missionStatusBtn.setEnabled(True)
-        self.__runningModeBtn.setEnabled(False)
         self.__btn_exportAll.setEnabled(True)
         self.__btn_precision.setEnabled(True)
         self.__btn_heatMap.setEnabled(True)
@@ -148,7 +141,6 @@ class GCS(QMainWindow):
         if len(self._mavModels) == 0:
             self.systemSettingsWidget.disconnected()
             self.__missionStatusBtn.setEnabled(False)
-            self.__runningModeBtn.setEnabled(True)
             self.__btn_exportAll.setEnabled(False)
             self.__btn_precision.setEnabled(False)
             self.__btn_heatMap.setEnabled(False)
@@ -493,7 +485,7 @@ class GCS(QMainWindow):
             mavModel.stop()
         self._mavModels = {}
         self._mavModel = None
-        if self._transport is not None:
+        if self._transport is not None and self._transport.isOpen():
             self._transport.close()
         self._transport = None
         super().closeEvent(event)
@@ -505,10 +497,13 @@ class GCS(QMainWindow):
         connectionDialog = ConnectionDialog(self.portVal, self)
         connectionDialog.exec_()
 
-        if connectionDialog.portVal is None or connectionDialog.portVal == self.portVal:
+        if connectionDialog.portVal is None or \
+            (connectionDialog.portVal == self.portVal and len(self._mavModels) > 1):
             return
 
-        self._portVal = connectionDialog.portVal
+        self.portVal = connectionDialog.portVal
+        if self.config.connection_mode == ConnectionMode.DRONE:
+            self.addrVal = connectionDialog.addrVal
         self.__startTransport()
 
     def setMap(self, mapWidget):
@@ -583,10 +578,6 @@ class GCS(QMainWindow):
         self.__missionStatusBtn.setEnabled(False)
         self.__missionStatusBtn.clicked.connect(lambda:self.__startStopMission())
 
-        self.__runningModeBtn = QPushButton(self.__runningModeText)
-        self.__runningModeBtn.setEnabled(True)
-        self.__runningModeBtn.clicked.connect(lambda:self.__toggleRunningMode())
-
         self.__btn_exportAll = QPushButton('Export Info')
         self.__btn_exportAll.setEnabled(False)
         self.__btn_exportAll.clicked.connect(lambda:self.exportAll())
@@ -605,7 +596,6 @@ class GCS(QMainWindow):
         wlay.addWidget(self.systemSettingsWidget)
         wlay.addWidget(self.upgradeDisplay)
         wlay.addWidget(self.__missionStatusBtn)
-        wlay.addWidget(self.__runningModeBtn)
         wlay.addWidget(self.__btn_exportAll)
         wlay.addWidget(self.__btn_precision)
         wlay.addWidget(self.__btn_heatMap)
