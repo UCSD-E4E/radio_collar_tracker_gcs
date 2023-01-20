@@ -511,6 +511,13 @@ class GCS(QMainWindow):
         self._portVal = connectionDialog.portVal
         self.__startTransport()
 
+    def __handleConfigInput(self):
+        '''
+        Internal callback to connect GCS to drone
+        '''
+        connectionDialog = ConfigDialog(self)
+        connectionDialog.exec_()
+
     def setMap(self, mapWidget):
         '''
         Function to set the mapDisplay widget
@@ -580,18 +587,17 @@ class GCS(QMainWindow):
         # CONFIG TAB
         self._configTab = CollapseFrame(title='Configuration Settings')
         self._configTab.resize(self.SBWidth, 400)
-        lay_sys = QVBoxLayout()
+        lay_config = QVBoxLayout()
         btn_config = QPushButton("Edit Configuration Settings")
         btn_config.resize(self.SBWidth, 100)
-        btn_config.clicked.connect(lambda:self.__handleConnectInput()) # TODO
-        self.model_select = QComboBox()
-        self.model_select.resize(self.SBWidth, 100)
-        #self.model_select.currentIndexChanged.connect(self.__changeModelByIndex)
-        self.model_select.hide()
-        lay_sys.addWidget(btn_setup)
-        lay_sys.addWidget(self.model_select)
+        btn_config.clicked.connect(lambda:self.__handleConfigInput())
+        self.config_select = QComboBox()
+        self.config_select.resize(self.SBWidth, 100)
+        self.config_select.hide()
+        lay_config.addWidget(btn_config)
+        lay_config.addWidget(self.config_select)
 
-        self._systemConnectionTab.setContentLayout(lay_sys)
+        self._configTab.setContentLayout(lay_config)
 
 
         # START PAYLOAD RECORDING

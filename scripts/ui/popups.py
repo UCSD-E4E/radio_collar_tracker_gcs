@@ -5,6 +5,8 @@ from PyQt5.QtCore import QRegExp
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QRegExpValidator
 from config import ConnectionMode
+import config
+from pathlib import Path
 
 class WarningMessager:
 
@@ -349,20 +351,51 @@ class ConnectionDialogPage(QWizardPage):
         frm_holder.addLayout(frm_conType)
         self.setLayout(frm_holder)
 
+class ConfigDialog(QWizard):
+    '''
+    Custom Dialog widget to facilitate changing configuration settings
+    '''
+    def __init__(self, parent):
+        '''
+        Creates new ConnectionDialog widget
+        Args:
+            portVal: the port value used
+        '''
+        super(ConfigDialog, self).__init__()
+
+        self.config = config.Configuration(Path('gcsConfig.ini'))
+        self.config.load()
+
+        self.parent = parent
+        self.setWindowTitle('Edit Configuration Settings')
+        self.page = ConfigDialogPage(self)
+        self.addPage(self.page)
+        self.resize(640,480)
+        self.button(QWizard.FinishButton).clicked.connect(lambda:self.submit())
+
+    def submit(self):
+        '''
+        Internal Function to submit user inputted configuration settings and
+        close GCS UI
+        '''
+        print("submitted") # temp
+        # write to gcsConfig.ini
+        # close window
+
 class ConfigDialogPage(QWizardPage):
     '''
     Custom DialogPage widget - Allows the user to configure
     settings to connect to the drone
     '''
-    def __init__(self, portVal, parent):
+    def __init__(self, parent):
         '''
         Creates a new AddTargetDialog
         Args:
             portVal: The port value used
         '''
-        super(ConnectionDialogPage, self).__init__()
-        self.__portEntryVal = portVal # default value
-        self.portEntry = None # default value
+        super(ConfigDialogPage, self).__init__()
+        '''self.__portEntryVal = portVal # default value
+        self.portEntry = None # default value'''
         self.__parent = parent
 
         self.__createWidget()
@@ -374,7 +407,7 @@ class ConfigDialogPage(QWizardPage):
         '''
         frm_holder = QVBoxLayout()
         frm_holder.addStretch(1)
-        #-----
+        '''#-----
         frm_conType = QHBoxLayout()
         frm_conType.addStretch(1)
 
@@ -382,7 +415,7 @@ class ConfigDialogPage(QWizardPage):
         frm_conType.addWidget(lbl_conType)
 
         btn_TCP = QCheckBox('TCP')
-        frm_conType.addWidget(btn_TCP)
+        frm_conType.addWidget(btn_TCP)'''
         #----- Prefix Path
         frm_prefix_path = QHBoxLayout()
         frm_prefix_path.addStretch(1)
@@ -391,17 +424,17 @@ class ConfigDialogPage(QWizardPage):
         frm_prefix_path.addWidget(lbl_prefix_path)
 
         prefix_path = QLineEdit()
-        prefix_path.setText(str(self.config.__qgis_prefix_path)) # TODO: make self.config
+        prefix_path.setText(str(self.__parent.config.qgis_prefix_path)) # TODO: make self.config
         frm_prefix_path.addWidget(prefix_path)
         #----- Prefix Set
         frm_prefix_set = QHBoxLayout()
         frm_prefix_set.addStretch(1)
 
         lbl_prefix_set = QLabel('QGis Prefix Set')
-        frm_prefix_path.addWidget(lbl_prefix_set)
+        frm_prefix_set.addWidget(lbl_prefix_set)
 
         prefix_set = QLineEdit()
-        prefix_set.setText(str(self.config.__qgis_prefix_set)) # TODO: make self.config
+        prefix_set.setText(str(self.__parent.config.qgis_prefix_set)) # TODO: make self.config
         frm_prefix_set.addWidget(prefix_set)
         #----- Lat 1
         frm_lat_1 = QHBoxLayout()
@@ -411,7 +444,7 @@ class ConfigDialogPage(QWizardPage):
         frm_lat_1.addWidget(lbl_lat_1)
 
         lat_1 = QLineEdit()
-        lat_1.setText(str(self.config.__map_extent_nw[0])) # TODO: make self.config
+        lat_1.setText(str(self.__parent.config.map_extent[0][0])) # TODO: make self.config
         frm_lat_1.addWidget(lat_1)
         #----- Lat 2
         frm_lat_2 = QHBoxLayout()
@@ -421,7 +454,7 @@ class ConfigDialogPage(QWizardPage):
         frm_lat_2.addWidget(lbl_lat_2)
 
         lat_2 = QLineEdit()
-        lat_2.setText(str(self.config.__map_extent_se[0])) # TODO: make self.config
+        lat_2.setText(str(self.__parent.config.map_extent[1][0])) # TODO: make self.config
         frm_lat_2.addWidget(lat_2)
         #----- Lon 1
         frm_lon_1 = QHBoxLayout()
@@ -431,7 +464,7 @@ class ConfigDialogPage(QWizardPage):
         frm_lon_1.addWidget(lbl_lon_1)
 
         lon_1 = QLineEdit()
-        lon_1.setText(str(self.config.__map_extent_nw[1])) # TODO: make self.config
+        lon_1.setText(str(self.__parent.config.map_extent[0][1])) # TODO: make self.config
         frm_lon_1.addWidget(lon_1)
         #----- Lon 2
         frm_lon_2 = QHBoxLayout()
@@ -441,7 +474,7 @@ class ConfigDialogPage(QWizardPage):
         frm_lon_2.addWidget(lbl_lon_2)
 
         lon_2 = QLineEdit()
-        lon_2.setText(str(self.config.__map_extent_se[1])) # TODO: make self.config
+        lon_2.setText(str(self.__parent.config.map_extent[1][1])) # TODO: make self.config
         frm_lon_2.addWidget(lon_2)
         #----- Addr
         frm_addr = QHBoxLayout()
@@ -451,7 +484,7 @@ class ConfigDialogPage(QWizardPage):
         frm_addr.addWidget(lbl_addr)
 
         addr = QLineEdit()
-        addr.setText(str(self.config.__connection_addr)) # TODO: make self.config
+        addr.setText(str(self.__parent.config.connection_addr)) # TODO: make self.config
         frm_addr.addWidget(addr)
         #----- Port
         frm_port = QHBoxLayout()
@@ -461,7 +494,7 @@ class ConfigDialogPage(QWizardPage):
         frm_port.addWidget(lbl_port)
 
         self.portEntry = QLineEdit()
-        self.portEntry.setText(str(self.__portEntryVal))
+        self.portEntry.setText(str(self.__parent.config.connection_port))
         frm_port.addWidget(self.portEntry)
         #----- Mode
         frm_mode = QHBoxLayout()
@@ -471,10 +504,18 @@ class ConfigDialogPage(QWizardPage):
         frm_mode.addWidget(lbl_mode)
 
         mode = QLineEdit()
-        mode.setText(str(self.config.__connection_mode)) # TODO: make self.config
+        mode.setText(str(self.__parent.config.connection_mode)) # TODO: make self.config
         frm_mode.addWidget(mode)
 
         #-----
+        frm_holder.addLayout(frm_prefix_path)
+        frm_holder.addLayout(frm_prefix_set)
+        frm_holder.addLayout(frm_lat_1)
+        frm_holder.addLayout(frm_lat_2)
+        frm_holder.addLayout(frm_lon_1)
+        frm_holder.addLayout(frm_lon_2)
+        frm_holder.addLayout(frm_addr)
         frm_holder.addLayout(frm_port)
-        frm_holder.addLayout(frm_conType)
+        frm_holder.addLayout(frm_mode)
+
         self.setLayout(frm_holder)
