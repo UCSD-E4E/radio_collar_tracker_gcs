@@ -42,26 +42,26 @@
 #
 ###############################################################################
 import argparse
-import math
-import threading
-import socket
 import datetime as dt
-from enum import Enum
-import logging
-import sys
-import RCTComms.transport as rctTransport
-import numpy as np
-from time import sleep
-from ping import rctPing
-import utm
 import json
+import logging
+import math
+import socket
+import sys
+import threading
+import time
+from pathlib import Path
+from time import sleep
+from typing import List
+
+import config
+import numpy as np
 import RCTComms.comms
 import RCTComms.transport
-import time
-import math
+import utm
 from config import ConnectionMode
-import config
-from pathlib import Path
+from ping import rctPing
+
 
 def getIPs():
     '''
@@ -970,7 +970,7 @@ class droneSimPack:
         Creates a pack of multiple DroneSim object
         :param port:
         '''
-        self.simList = []
+        self.simList: List[droneSim] = []
         if protocol == 'udp':
             for i in range(clients):
                 tsport = RCTComms.transport.RCTUDPClient(port=port, addr=addr)
