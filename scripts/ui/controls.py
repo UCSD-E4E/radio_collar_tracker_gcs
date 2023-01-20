@@ -226,21 +226,21 @@ class SystemSettingsControl(CollapseFrame):
         self.__innerFrame.addWidget(self.optionVars['SDR_gain'], 3, 1)
 
         self.btn_addTarget = QPushButton('Add Target')
-        self.btn_addTarget.clicked.connect(lambda:self.addTarget())
+        self.btn_addTarget.clicked.connect(self.addTarget)
         self.btn_addTarget.setEnabled(False)
         self.__innerFrame.addWidget(self.btn_addTarget, 0, 0, 1, 2)
         self.btn_clearTargs = QPushButton('Clear Targets')
-        self.btn_clearTargs.clicked.connect(lambda:self.clearTargets())
+        self.btn_clearTargs.clicked.connect(self.clearTargets)
         self.btn_clearTargs.setEnabled(False)
         self.__innerFrame.addWidget(self.btn_clearTargs, 5, 0)
 
         self.btn_submit = QPushButton('Update')
-        self.btn_submit.clicked.connect(lambda:self._updateButtonCallback())
+        self.btn_submit.clicked.connect(self._updateButtonCallback)
         self.btn_submit.setEnabled(False)
         self.__innerFrame.addWidget(self.btn_submit, 5, 1)
 
         self.btn_advSettings = QPushButton('Expert & Debug Configuration')
-        self.btn_advSettings.clicked.connect(lambda:self.__advancedSettings())
+        self.btn_advSettings.clicked.connect(self.__advancedSettings)
         self.btn_advSettings.setEnabled(False)
         self.__innerFrame.addWidget(self.btn_advSettings, 6, 0, 1, 2)
 
