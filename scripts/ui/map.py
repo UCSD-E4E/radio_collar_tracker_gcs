@@ -1088,7 +1088,7 @@ class WebMap(MapWidget):
         pingRenderer = QgsGraduatedSymbolRenderer('Amp', ranges)
         
         
-        style = QgsStyle().defaultStyle()
+        style = QgsStyle.defaultStyle()
         defaultColorRampNames = style.colorRampNames()
         ramp = style.colorRamp(defaultColorRampNames[22])
         pingRenderer.setSourceColorRamp(ramp)
