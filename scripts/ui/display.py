@@ -584,11 +584,11 @@ class GCS(QMainWindow):
 
         self.__btn_precision = QPushButton('Do Precision')
         self.__btn_precision.setEnabled(False)
-        self.__btn_precision.clicked.connect(lambda:self._mavModel.EST_mgr.doPrecisions(173500000))
+        self.__btn_precision.clicked.connect(self.__do_precision)
 
         self.__btn_heatMap = QPushButton('Display Heatmap')
         self.__btn_heatMap.setEnabled(False)
-        self.__btn_heatMap.clicked.connect(self.mapDisplay.setupHeatMap)
+        self.__btn_heatMap.clicked.connect(self.__do_display_heatmap)
 
         wlay.addWidget(self._systemConnectionTab)
         wlay.addWidget(self.statusWidget)
@@ -608,6 +608,16 @@ class GCS(QMainWindow):
         centr_widget.setLayout(holder)
         self.resize(1800, 1100)
         self.show()
+    
+    def __do_display_heatmap(self):
+        if self.mapDisplay:
+            self.mapDisplay.setupHeatMap
+        else:
+            raise RuntimeError('No map loaded')
+    
+    def __do_precision(self):
+        # todo: add modular frequencies
+        self._mavModel.EST_mgr.doPrecisions(173500000)
 
 class UpgradeDisplay(CollapseFrame):
     '''
