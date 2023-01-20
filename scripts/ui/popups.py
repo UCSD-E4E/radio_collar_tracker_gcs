@@ -262,6 +262,7 @@ class ConnectionDialog(QWizard):
         self.setWindowTitle('Connect Settings')
         self.page = ConnectionDialogPage(portVal, self)
         self.portVal = portVal
+        self.addrVal = None
         self.addPage(self.page)
         self.resize(640,480)
         self.button(QWizard.FinishButton).clicked.connect(lambda:self.submit())
@@ -271,20 +272,8 @@ class ConnectionDialog(QWizard):
         Internal Function to submit user inputted connection settings
         '''
         self.portVal = int(self.page.portEntry.text())
-
-        if self.parent.config.connection_mode == ConnectionMode.TOWER:
-            self.port = RCTTCPServer(self.portVal, self.parent.connectionHandler)
-            self.port.open()
-        else:
-            try:
-                self.port = RCTTCPClient(
-                    addr=self.page.addrEntry.text(), port=int(self.page.portEntry.text()))
-                self.parent.connectionHandler(self.port, 0)
-            except ConnectionRefusedError:
-                WarningMessager.showWarning("Failure to connect:\nPlease ensure server is running.")
-                self.port.close()
-                return
-        self.parent._transport = self.port
+        if self.parent.config.connection_mode == ConnectionMode.DRONE:
+            self.addrVal = self.page.addrEntry.text()
 
 class ConnectionDialogPage(QWizardPage):
     '''

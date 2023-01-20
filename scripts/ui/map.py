@@ -1330,24 +1330,29 @@ class StaticMap(MapWidget):
         '''
         if(self.fileName == None):
             return
-        
+
+        self.mapLayer = QgsRasterLayer(self.fileName[0], "SRTM layer name")
+        if not self.mapLayer.crs().isValid():
+            raise FileNotFoundError("Invalid file, loading from web...")
+        print(self.mapLayer.crs())
+
         if self.estimate is None:
             uri = "Point?crs=epsg:4326"
-            
+
             self.estimate = QgsVectorLayer(uri, 'Estimate', "memory")
-            
+
             symbol = QgsMarkerSymbol.createSimple({'name': 'diamond', 'color': 'blue'})
             self.estimate.renderer().setSymbol(symbol)
-            
-            
+
+
             self.estimate.setAutoRefreshInterval(500)
             self.estimate.setAutoRefreshEnabled(True)
-            
-            
+
+
         if self.vehicle is None:
             uri = "Point?crs=epsg:4326"
             uriLine = "Linestring?crs=epsg:4326"
-            
+
             self.vehicle = QgsVectorLayer(uri, 'Vehicle', "memory")
             self.vehiclePath = QgsVectorLayer(uriLine, 'VehiclePath', "memory")
 
@@ -1417,12 +1422,7 @@ class StaticMap(MapWidget):
             self.pingLayer.setAutoRefreshInterval(500)
             self.pingLayer.setAutoRefreshEnabled(True)
 
-        self.mapLayer = QgsRasterLayer(self.fileName[0], "SRTM layer name")
-        print(self.mapLayer.crs())
-
-
-        
-        if self.mapLayer.isValid():   
+        if self.mapLayer.isValid():
             QgsProject.instance().addMapLayer(self.mapLayer)
             QgsProject.instance().addMapLayer(self.estimate)
             QgsProject.instance().addMapLayer(self.vehicle)
