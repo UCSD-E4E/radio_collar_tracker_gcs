@@ -168,7 +168,7 @@ class Configuration:
 
             if not isinstance(coordinate[1], float):
                 raise TypeError
-            if not -180 <= coordinate[1] < 180:
+            if not -180 <= coordinate[1] <= 180:
                 raise ValueError
         self.__map_extent_nw = value[0]
         self.__map_extent_se = value[1]

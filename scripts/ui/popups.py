@@ -378,9 +378,23 @@ class ConfigDialog(QWizard):
         Internal Function to submit user inputted configuration settings and
         close GCS UI
         '''
-        print("submitted") # temp
-        # write to gcsConfig.ini
-        # close window
+        self.config.qgis_prefix_path = Path(self.page.prefix_path.text())
+        if self.page.prefix_set_true.isChecked():
+            self.config.qgis_prefix_set = True
+        else:
+            self.config.qgis_prefix_set = False
+        self.config.map_extent = (
+            (float(self.page.lat_1.text()), float(self.page.lon_1.text())),
+            (float(self.page.lat_2.text()), float(self.page.lon_2.text())) )
+        self.config.connection_addr = self.page.addr.text()
+        self.config.connection_port = int(self.page.portVal.text())
+        if self.page.drone_mode.isChecked():
+            self.config.connection_mode = ConnectionMode.DRONE
+        else:
+            self.config.connection_mode = ConnectionMode.TOWER
+        self.config.write()
+
+        self.parent.close()
 
 class ConfigDialogPage(QWizardPage):
     '''
@@ -407,15 +421,7 @@ class ConfigDialogPage(QWizardPage):
         '''
         frm_holder = QVBoxLayout()
         frm_holder.addStretch(1)
-        '''#-----
-        frm_conType = QHBoxLayout()
-        frm_conType.addStretch(1)
 
-        lbl_conType = QLabel('Connection Type:')
-        frm_conType.addWidget(lbl_conType)
-
-        btn_TCP = QCheckBox('TCP')
-        frm_conType.addWidget(btn_TCP)'''
         #----- Prefix Path
         frm_prefix_path = QHBoxLayout()
         frm_prefix_path.addStretch(1)
@@ -423,9 +429,9 @@ class ConfigDialogPage(QWizardPage):
         lbl_prefix_path = QLabel('QGis Prefix Path')
         frm_prefix_path.addWidget(lbl_prefix_path)
 
-        prefix_path = QLineEdit()
-        prefix_path.setText(str(self.__parent.config.qgis_prefix_path)) # TODO: make self.config
-        frm_prefix_path.addWidget(prefix_path)
+        self.prefix_path = QLineEdit()
+        self.prefix_path.setText(str(self.__parent.config.qgis_prefix_path))
+        frm_prefix_path.addWidget(self.prefix_path, 15)
         #----- Prefix Set
         frm_prefix_set = QHBoxLayout()
         frm_prefix_set.addStretch(1)
@@ -433,9 +439,19 @@ class ConfigDialogPage(QWizardPage):
         lbl_prefix_set = QLabel('QGis Prefix Set')
         frm_prefix_set.addWidget(lbl_prefix_set)
 
-        prefix_set = QLineEdit()
-        prefix_set.setText(str(self.__parent.config.qgis_prefix_set)) # TODO: make self.config
-        frm_prefix_set.addWidget(prefix_set)
+        self.prefix_set_true = QRadioButton('True')
+        self.prefix_set_false = QRadioButton('False')
+        if self.__parent.config.qgis_prefix_set:
+            self.prefix_set_true.setChecked(True)
+        else:
+            self.prefix_set_false.setChecked(True)
+        prefix_set = QButtonGroup(parent=frm_prefix_set)
+        prefix_set.setExclusive(True)
+        prefix_set.addButton(self.prefix_set_true)
+        prefix_set.addButton(self.prefix_set_false)
+
+        frm_prefix_set.addWidget(self.prefix_set_true)
+        frm_prefix_set.addWidget(self.prefix_set_false)
         #----- Lat 1
         frm_lat_1 = QHBoxLayout()
         frm_lat_1.addStretch(1)
@@ -443,9 +459,9 @@ class ConfigDialogPage(QWizardPage):
         lbl_lat_1 = QLabel('Lat 1')
         frm_lat_1.addWidget(lbl_lat_1)
 
-        lat_1 = QLineEdit()
-        lat_1.setText(str(self.__parent.config.map_extent[0][0])) # TODO: make self.config
-        frm_lat_1.addWidget(lat_1)
+        self.lat_1 = QLineEdit()
+        self.lat_1.setText(str(self.__parent.config.map_extent[0][0]))
+        frm_lat_1.addWidget(self.lat_1)
         #----- Lat 2
         frm_lat_2 = QHBoxLayout()
         frm_lat_2.addStretch(1)
@@ -453,9 +469,9 @@ class ConfigDialogPage(QWizardPage):
         lbl_lat_2 = QLabel('Lat 2')
         frm_lat_2.addWidget(lbl_lat_2)
 
-        lat_2 = QLineEdit()
-        lat_2.setText(str(self.__parent.config.map_extent[1][0])) # TODO: make self.config
-        frm_lat_2.addWidget(lat_2)
+        self.lat_2 = QLineEdit()
+        self.lat_2.setText(str(self.__parent.config.map_extent[1][0]))
+        frm_lat_2.addWidget(self.lat_2)
         #----- Lon 1
         frm_lon_1 = QHBoxLayout()
         frm_lon_1.addStretch(1)
@@ -463,9 +479,9 @@ class ConfigDialogPage(QWizardPage):
         lbl_lon_1 = QLabel('Lon 1')
         frm_lon_1.addWidget(lbl_lon_1)
 
-        lon_1 = QLineEdit()
-        lon_1.setText(str(self.__parent.config.map_extent[0][1])) # TODO: make self.config
-        frm_lon_1.addWidget(lon_1)
+        self.lon_1 = QLineEdit()
+        self.lon_1.setText(str(self.__parent.config.map_extent[0][1]))
+        frm_lon_1.addWidget(self.lon_1)
         #----- Lon 2
         frm_lon_2 = QHBoxLayout()
         frm_lon_2.addStretch(1)
@@ -473,9 +489,9 @@ class ConfigDialogPage(QWizardPage):
         lbl_lon_2 = QLabel('Lon 2')
         frm_lon_2.addWidget(lbl_lon_2)
 
-        lon_2 = QLineEdit()
-        lon_2.setText(str(self.__parent.config.map_extent[1][1])) # TODO: make self.config
-        frm_lon_2.addWidget(lon_2)
+        self.lon_2 = QLineEdit()
+        self.lon_2.setText(str(self.__parent.config.map_extent[1][1]))
+        frm_lon_2.addWidget(self.lon_2)
         #----- Addr
         frm_addr = QHBoxLayout()
         frm_addr.addStretch(1)
@@ -483,9 +499,9 @@ class ConfigDialogPage(QWizardPage):
         lbl_addr = QLabel('Addr')
         frm_addr.addWidget(lbl_addr)
 
-        addr = QLineEdit()
-        addr.setText(str(self.__parent.config.connection_addr)) # TODO: make self.config
-        frm_addr.addWidget(addr)
+        self.addr = QLineEdit()
+        self.addr.setText(str(self.__parent.config.connection_addr))
+        frm_addr.addWidget(self.addr)
         #----- Port
         frm_port = QHBoxLayout()
         frm_port.addStretch(1)
@@ -493,9 +509,9 @@ class ConfigDialogPage(QWizardPage):
         lbl_port = QLabel('Port')
         frm_port.addWidget(lbl_port)
 
-        self.portEntry = QLineEdit()
-        self.portEntry.setText(str(self.__parent.config.connection_port))
-        frm_port.addWidget(self.portEntry)
+        self.portVal = QLineEdit()
+        self.portVal.setText(str(self.__parent.config.connection_port))
+        frm_port.addWidget(self.portVal)
         #----- Mode
         frm_mode = QHBoxLayout()
         frm_mode.addStretch(1)
@@ -503,9 +519,19 @@ class ConfigDialogPage(QWizardPage):
         lbl_mode = QLabel('Mode')
         frm_mode.addWidget(lbl_mode)
 
-        mode = QLineEdit()
-        mode.setText(str(self.__parent.config.connection_mode)) # TODO: make self.config
-        frm_mode.addWidget(mode)
+        self.drone_mode = QRadioButton('Drone')
+        self.tower_mode = QRadioButton('Tower')
+        if self.__parent.config.connection_mode == ConnectionMode.DRONE:
+            self.drone_mode.setChecked(True)
+        else:
+            self.tower_mode.setChecked(True)
+        mode = QButtonGroup(parent=frm_mode)
+        mode.setExclusive(True)
+        mode.addButton(self.drone_mode)
+        mode.addButton(self.tower_mode)
+
+        frm_mode.addWidget(self.drone_mode)
+        frm_mode.addWidget(self.tower_mode)
 
         #-----
         frm_holder.addLayout(frm_prefix_path)

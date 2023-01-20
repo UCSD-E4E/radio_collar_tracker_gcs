@@ -590,7 +590,7 @@ class GCS(QMainWindow):
         lay_config = QVBoxLayout()
         btn_config = QPushButton("Edit Configuration Settings")
         btn_config.resize(self.SBWidth, 100)
-        btn_config.clicked.connect(lambda:self.__handleConfigInput())
+        btn_config.clicked.connect(self.__handleConfigInput)
         self.config_select = QComboBox()
         self.config_select.resize(self.SBWidth, 100)
         self.config_select.hide()
