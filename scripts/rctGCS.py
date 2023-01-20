@@ -94,6 +94,7 @@ def configSetup() -> Path:
                 WarningMessager.showWarning("Warning, incorrect file chosen. Map tools may not "
                     "function as expected")
             config.qgis_prefix_path = qgis_path
+            config.qgis_prefix_set = True
             return qgis_path
         else:
             return config.qgis_prefix_path
