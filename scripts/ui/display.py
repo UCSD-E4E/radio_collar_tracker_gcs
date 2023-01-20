@@ -923,7 +923,7 @@ class MapControl(CollapseFrame):
         self.__mapFrame.resize(800, 500)
         self.__holder.addWidget(self.__mapFrame, 0, 0, 1, 3)
         btn_loadMap = QPushButton('Load Map')
-        btn_loadMap.clicked.connect(lambda:self.__loadMapFile())
+        btn_loadMap.clicked.connect(self.__loadMapFile)
         controlPanel.addWidget(btn_loadMap)
 
 
