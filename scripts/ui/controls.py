@@ -87,7 +87,6 @@ class SystemSettingsControl(CollapseFrame):
             root: rctGCS instance
         '''
         CollapseFrame.__init__(self, title='System Settings')
-        #self.__parent = parent
         self.__root = root
 
         self.__innerFrame = None
@@ -124,7 +123,7 @@ class SystemSettingsControl(CollapseFrame):
         self.widg_targHolder.repaint()
         self.scroll_targHolder.repaint()
         self.frm_targHolder.activate()
-        #CollapseFrame.repaint(self) // cases thread problems?
+        #CollapseFrame.repaint(self) // causes thread problems?
         self.__innerFrame.activate()
 
 
@@ -226,21 +225,21 @@ class SystemSettingsControl(CollapseFrame):
         self.__innerFrame.addWidget(self.optionVars['SDR_gain'], 3, 1)
 
         self.btn_addTarget = QPushButton('Add Target')
-        self.btn_addTarget.clicked.connect(lambda:self.addTarget())
+        self.btn_addTarget.clicked.connect(self.addTarget)
         self.btn_addTarget.setEnabled(False)
         self.__innerFrame.addWidget(self.btn_addTarget, 0, 0, 1, 2)
         self.btn_clearTargs = QPushButton('Clear Targets')
-        self.btn_clearTargs.clicked.connect(lambda:self.clearTargets())
+        self.btn_clearTargs.clicked.connect(self.clearTargets)
         self.btn_clearTargs.setEnabled(False)
         self.__innerFrame.addWidget(self.btn_clearTargs, 5, 0)
 
         self.btn_submit = QPushButton('Update')
-        self.btn_submit.clicked.connect(lambda:self._updateButtonCallback())
+        self.btn_submit.clicked.connect(self._updateButtonCallback)
         self.btn_submit.setEnabled(False)
         self.__innerFrame.addWidget(self.btn_submit, 5, 1)
 
         self.btn_advSettings = QPushButton('Expert & Debug Configuration')
-        self.btn_advSettings.clicked.connect(lambda:self.__advancedSettings())
+        self.btn_advSettings.clicked.connect(self.__advancedSettings)
         self.btn_advSettings.setEnabled(False)
         self.__innerFrame.addWidget(self.btn_advSettings, 6, 0, 1, 2)
 
@@ -283,7 +282,6 @@ class SystemSettingsControl(CollapseFrame):
         '''
         cntrFreq = int(self.optionVars['SDR_centerFreq'].text())
         sampFreq = int(self.optionVars['SDR_samplingFreq'].text())
-
 
         targetFrequencies = []
         for targetName in self.targEntries:
@@ -414,7 +412,6 @@ class SystemSettingsControl(CollapseFrame):
         '''
         Helper method to disable system settings buttons once mavModel stops
         '''
-
         self.btn_addTarget.setEnabled(False)
         self.btn_clearTargs.setEnabled(False)
         self.btn_submit.setEnabled(False)

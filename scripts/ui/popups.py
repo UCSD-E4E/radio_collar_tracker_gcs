@@ -122,7 +122,7 @@ class ExpertSettingsDialogPage(QWizardPage):
         expSettingsFrame.addWidget(self.optionVars['SYS_autostart'], 8, 1)
 
         btn_submit = QPushButton('submit')
-        btn_submit.clicked.connect(lambda:self.submit())
+        btn_submit.clicked.connect(self.submit)
         expSettingsFrame.addWidget(btn_submit, 9, 0, 1, 2)
 
         self.setLayout(expSettingsFrame)
@@ -239,7 +239,7 @@ class AddTargetDialogPage(QWizardPage):
 
         '''
         btn_submit = QPushButton('submit')
-        btn_submit.clicked.connect(lambda:self.submit())
+        btn_submit.clicked.connect(self.submit)
         frm_targetSettings.addWidget(btn_submit, 2, 0, 1, 2)
         '''
         self.setLayout(frm_targetSettings)
@@ -265,7 +265,7 @@ class ConnectionDialog(QWizard):
         self.addrVal = None
         self.addPage(self.page)
         self.resize(640,480)
-        self.button(QWizard.FinishButton).clicked.connect(lambda:self.submit())
+        self.button(QWizard.FinishButton).clicked.connect(self.submit)
 
     def submit(self):
         '''

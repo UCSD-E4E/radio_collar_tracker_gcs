@@ -30,8 +30,7 @@ class GCS(QMainWindow):
 
     sig = pyqtSignal()
 
-    connectSignal = pyqtSignal(RCTAbstractTransport, int)
-
+    connectSignal = pyqtSignal(int)
     disconnectSignal = pyqtSignal(int)
 
     mavEventSignal = pyqtSignal(rctCore.Events, int)
@@ -70,6 +69,9 @@ class GCS(QMainWindow):
 
         self.queue = q.Queue()
         self.sig.connect(self.execute_inmain, Qt.QueuedConnection)
+
+        self.connectSignal.connect(self.connectionSlot)
+        self.disconnectSignal.connect(self.disconnectSlot)
 
     def execute_inmain(self):
         while not self.queue.empty():
@@ -124,13 +126,19 @@ class GCS(QMainWindow):
             self._mavModel = model
             self.__registerModelCallbacks(id)
 
+        self.connectSignal.emit(id)
+
+    def connectionSlot(self, id):
+        '''
+        Handle GUI updates in main thread by connecting pyqt signal to the
+        remaining connection work
+        '''
         self.updateConnectionsLabel()
         self.systemSettingsWidget.connectionMade()
         self.__missionStatusBtn.setEnabled(True)
         self.__btn_exportAll.setEnabled(True)
         self.__btn_precision.setEnabled(True)
         self.__btn_heatMap.setEnabled(True)
-
         self.__log.info('Connected {}'.format(id))
 
     def __disconnectHandler(self, id):
@@ -138,6 +146,14 @@ class GCS(QMainWindow):
         del self._mavModels[id]
         if mavModel == self._mavModel:
             self._mavModel = None
+
+        self.disconnectSignal.emit(id)
+
+    def disconnectSlot(self, id):
+        '''
+        Handle GUI updates in main thread by connecting pyqt signal to the
+        remaining disconnection work
+        '''
         if len(self._mavModels) == 0:
             self.systemSettingsWidget.disconnected()
             self.__missionStatusBtn.setEnabled(False)

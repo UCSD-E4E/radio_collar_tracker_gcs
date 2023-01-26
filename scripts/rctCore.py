@@ -354,10 +354,7 @@ class MAVModel:
             callback:    Callback to call
         '''
         assert(isinstance(event, Events))
-        if event not in self.__callbacks:
-            self.__callbacks[event] = [callback]
-        else:
-            self.__callbacks[event].append(callback)
+        self.__callbacks[event].append(callback)
 
     def startMission(self, timeout:int):
         '''

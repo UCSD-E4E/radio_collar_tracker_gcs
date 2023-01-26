@@ -271,7 +271,7 @@ class GCS(QMainWindow):
         lay_sys = QVBoxLayout()
         btn_connect = QPushButton("Connect")
         btn_connect.resize(self.SBWidth, 100)
-        btn_connect.clicked.connect(lambda:self.__handleConnectInput())
+        btn_connect.clicked.connect(self.__handleConnectInput)
         lay_sys.addWidget(btn_connect)
         self._systemConnectionTab.setContentLayout(lay_sys)
 
@@ -297,7 +297,7 @@ class GCS(QMainWindow):
         # START PAYLOAD RECORDING
         btn_startRecord = QPushButton(self.__missionStatusText)
         #                            textvariable=self.__missionStatusText, 
-        btn_startRecord.clicked.connect(lambda:self.__startStopMission())
+        btn_startRecord.clicked.connect(self.__startStopMission)
 
         wlay.addWidget(self._systemConnectionTab)
         wlay.addWidget(frm_components)
@@ -522,18 +522,18 @@ class SystemSettingsControl(CollapseFrame):
         self.__innerFrame.addWidget(self.optionVars['SDR_gain'], 3, 1)
 
         btn_addTarget = QPushButton('Add Target')
-        btn_addTarget.clicked.connect(lambda:self.addTarget())
+        btn_addTarget.clicked.connect(self.addTarget)
         self.__innerFrame.addWidget(btn_addTarget, 0, 0, 1, 2)
         btn_clearTargs = QPushButton('Clear Targets')
-        btn_clearTargs.clicked.connect(lambda:self.clearTargets())
+        btn_clearTargs.clicked.connect(self.clearTargets)
         self.__innerFrame.addWidget(btn_clearTargs, 5, 0)
 
         btn_submit = QPushButton('Update')
-        btn_submit.clicked.connect(lambda:self._updateButtonCallback())
+        btn_submit.clicked.connect(self._updateButtonCallback)
         self.__innerFrame.addWidget(btn_submit, 5, 1)
 
         btn_advSettings = QPushButton('Expert & Debug Configuration')
-        btn_advSettings.clicked.connect(lambda:self.__advancedSettings())
+        btn_advSettings.clicked.connect(self.__advancedSettings)
         self.__innerFrame.addWidget(btn_advSettings, 6, 0, 1, 2)
 
         self.setContentLayout(self.__innerFrame)
@@ -716,7 +716,7 @@ class ExpertSettingsDialogPage(QWizardPage):
         expSettingsFrame.addWidget(self.optionVars['GPS_mode'], 7, 1)
 
         btn_submit = QPushButton('submit')
-        btn_submit.clicked.connect(lambda:self.submit())
+        btn_submit.clicked.connect(self.submit)
         expSettingsFrame.addWidget(btn_submit, 8, 0, 1, 2)
 
         self.setLayout(expSettingsFrame)
@@ -798,7 +798,7 @@ class AddTargetDialogPage(QWizardPage):
 
         '''
         btn_submit = QPushButton('submit')
-        btn_submit.clicked.connect(lambda:self.submit())
+        btn_submit.clicked.connect(self.submit)
         frm_targetSettings.addWidget(btn_submit, 2, 0, 1, 2)
         '''
         self.setLayout(frm_targetSettings)
@@ -817,7 +817,7 @@ class ConnectionDialog(QWizard):
         self.comms = None
         self.model = None
         self.resize(640,480)
-        self.button(QWizard.FinishButton).clicked.connect(lambda:self.submit())
+        self.button(QWizard.FinishButton).clicked.connect(self.submit)
 
     def submit(self):
         try:
@@ -909,7 +909,7 @@ class MapControl(CollapseFrame):
         self.__mapFrame = QWidget()
         self.__holder.addWidget(self.__mapFrame, 0, 0)
         btn_loadMap = QPushButton('Load Map')
-        btn_loadMap.clicked.connect(lambda:self.__loadMapFile())
+        btn_loadMap.clicked.connect(self.__loadMapFile)
         controlPanel.addWidget(btn_loadMap)
         btn_export = QPushButton(" Export")
         controlPanel.addWidget(btn_export)
@@ -943,11 +943,11 @@ class MapControl(CollapseFrame):
 
         
         btn_loadWebMap = QPushButton('Load') 
-        btn_loadWebMap.clicked.connect(lambda:self.__loadWebMap())
+        btn_loadWebMap.clicked.connect(self.__loadWebMap)
         lay_loadWebMap.addWidget(btn_loadWebMap, 3, 1)
 
         btn_cacheMap = QPushButton('Cache Map') 
-        btn_cacheMap.clicked.connect(lambda:self.__cacheMap())
+        btn_cacheMap.clicked.connect(self.__cacheMap)
         lay_loadWebMap.addWidget(btn_cacheMap, 4, 1)
         controlPanel.addWidget(frm_loadWebMap)
         controlPanel.addLayout(lay_loadWebMap)

@@ -655,22 +655,22 @@ class MapOptions(QWidget):
         lay_mapOptions.addWidget(self.btn_setSearchArea)
 
         self.btn_cacheMap = QPushButton('Cache Map')
-        self.btn_cacheMap.clicked.connect(lambda:self.__cacheMap())
+        self.btn_cacheMap.clicked.connect(self.__cacheMap)
         self.btn_cacheMap.setEnabled(False)
         lay_mapOptions.addWidget(self.btn_cacheMap)
         
         exportTab = CollapseFrame('Export')
         btn_pingExport = QPushButton('Pings')
-        btn_pingExport.clicked.connect(lambda:self.exportPing())
+        btn_pingExport.clicked.connect(self.exportPing)
 
         btn_vehiclePathExport = QPushButton('Vehicle Path')
-        btn_vehiclePathExport.clicked.connect(lambda:self.exportVehiclePath())
+        btn_vehiclePathExport.clicked.connect(self.exportVehiclePath)
 
         btn_polygonExport = QPushButton('Polygon')
-        btn_polygonExport.clicked.connect(lambda:self.exportPolygon())
+        btn_polygonExport.clicked.connect(self.exportPolygon)
 
         btn_coneExport = QPushButton('Cones')
-        btn_coneExport.clicked.connect(lambda:self.exportCone())
+        btn_coneExport.clicked.connect(self.exportCone)
         
         lay_export = QVBoxLayout()
         lay_export.addWidget(btn_pingExport)
@@ -1088,7 +1088,7 @@ class WebMap(MapWidget):
         pingRenderer = QgsGraduatedSymbolRenderer('Amp', ranges)
         
         
-        style = QgsStyle().defaultStyle()
+        style = QgsStyle.defaultStyle()
         defaultColorRampNames = style.colorRampNames()
         ramp = style.colorRamp(defaultColorRampNames[22])
         pingRenderer.setSourceColorRamp(ramp)

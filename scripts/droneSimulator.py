@@ -639,14 +639,15 @@ class droneSim:
         '''
         Runs the flight mission on a new thread.
         '''
-        self.__missionThread = threading.Thread(target=lambda:self.doMission(returnOnEnd))
+        self.__missionThread = threading.Thread(target=self.doMission, args=(returnOnEnd,))
         self.__endMissionEvent = threading.Event()
         time.sleep(0.109) # Help threads not run all together
         self.__missionThread.start()
 
     def stopMissionOnThread(self):
-        self.__endMissionEvent.set()
-        self.__missionThread.join()
+        if self.__endMissionEvent is not None:
+            self.__endMissionEvent.set()
+            self.__missionThread.join()
 
 
     def doMission(self, returnOnEnd: bool = False):
@@ -968,19 +969,43 @@ class droneSimPack:
     def __init__(self, port: int, addr: str, protocol: str, clients: int):
         '''
         Creates a pack of multiple DroneSim object
-        :param port:
+        :param port: port through which to connect
+        :param addr: host address to which to connect
+        :param protocol: transport protocol, tcp or udp
+        :param clients: the number of clients to create if in tower mode
         '''
-        self.simList: List[droneSim] = []
+        configObj = config.Configuration(Path('gcsConfig.ini'))
+        configObj.load()
+        self.simList = []
+
+        self.addr = addr
+        self.port = port
+        self.protocol = protocol
+
         if protocol == 'udp':
-            for i in range(clients):
-                tsport = RCTComms.transport.RCTUDPClient(port=port, addr=addr)
+            if configObj.connection_mode == ConnectionMode.TOWER:
+                for i in range(clients):
+                    tsport = RCTComms.transport.RCTUDPClient(port=port, addr=addr)
+                    sim = droneSim(RCTComms.comms.mavComms(tsport))
+                    self.simList.append(sim)
+            else:
+                tsport = RCTComms.transport.RCTUDPServer(port=args.port)
                 sim = droneSim(RCTComms.comms.mavComms(tsport))
                 self.simList.append(sim)
-        elif args.protocol == 'tcp':
-            for i in range(clients):
-                tsport = RCTComms.transport.RCTTCPClient(port=port, addr=addr)
-                sim = droneSim(RCTComms.comms.mavComms(tsport))
-                self.simList.append(sim)
+
+        elif protocol == 'tcp':
+            if configObj.connection_mode == ConnectionMode.TOWER:
+                for i in range(args.clients):
+                    tsport = RCTComms.transport.RCTTCPClient(port=port, addr=addr)
+                    sim = droneSim(RCTComms.comms.mavComms(tsport))
+                    self.simList.append(sim)
+            else:
+                connected = False
+                tsport = RCTComms.transport.RCTTCPServer(port, self.__connectionHandler, addr=addr)
+                port.open()
+                while len(simList) == 0:
+                    continue
+                sim = simList[0]
 
     def start(self):
         '''
@@ -998,61 +1023,30 @@ class droneSimPack:
 
     def stop(self):
         '''
-        Stops all missions and thee similators in the pack
+        Stops all missions and the simulators in the pack
         '''
         for sim in self.simList:
             sim.stopMissionOnThread()
             sim.stop()
-def addClient():
-    '''
-    Connects another client and adds the associated simulator to simList
-    '''
-    if args.protocol == 'udp':
-        port = RCTComms.transport.RCTUDPClient(port=args.port, addr=args.target)
-    elif args.protocol == 'tcp':
-        port = RCTComms.transport.RCTTCPClient(port=args.port, addr=args.target)
 
+    def addClient():
+        '''
+        Connects another client and adds the associated simulator to simList
+        '''
+        if not configObj.connection_mode == ConnectionMode.TOWER:
+            print("Must be in tower mode to run multiple clients")
+            return
 
-def doAll(action:str, args=None):
-    '''
-    Calls the specified action on each simulator in simList
+        if self.protocol == 'udp':
+            port = RCTComms.transport.RCTUDPClient(port=self.port, addr=self.target)
+        elif self.protocol == 'tcp':
+            port = RCTComms.transport.RCTTCPClient(port=self.port, addr=self.target)
 
-    :param action: the function to be called
-    '''
-    try:
-        for sim in simList:
-            if action == "start":
-                sim.start()
-            elif action == "stop":
-                sim.stop()
-            elif action == "restart":
-                sim.restart()
-            elif action == "gotPing":
-                sim.gotPing(args[0])
-            elif action == "setException":
-                sim.setException(args[0], args[1])
-            elif action == "getFrequencies":
-                sim.getFrequencies()
-            elif action == "transmitPosition":
-                sim.transmitPosition()
-            elif action == "doMission":
-                sim.doMission(args[0])
-            elif action == "calculatePingMeasurement":
-                sim.calculatePingMeasurement()
-            else:
-                print("Error: Select one of the following functions:")
-                print("\'start\', \'stop\', \'restart\', \'gotPing\', ", end='')
-                print("\'setException\', \'getFrequencies\', ", end='')
-                print("\'transmitPosition\', \'doMission\', \'calculatePingMeasurement\'")
-                break
-    except TypeError:
-        print("Error: Ensure you have provided all required arguments in a list.")
-
-def connectionHandler(connection, id):
-    print('Connected {}'.format(id))
-    comms = RCTComms.comms.mavComms(connection)
-    sim = droneSim(comms)
-    simList.append(sim)
+    def __connectionHandler(connection, id):
+        print('Connected {}'.format(id))
+        comms = RCTComms.comms.mavComms(connection)
+        sim = droneSim(comms)
+        simList.append(sim)
 
 simList = []
 if __name__ == '__main__':
@@ -1082,31 +1076,6 @@ if __name__ == '__main__':
     sim = droneSimPack(args.port, args.target, args.protocol, args.clients);
     if args.clients == 1:
         sim = sim.simList[0]; # Just hava a single simulator
-    config = config.Configuration(Path('gcsConfig.ini'))
-    config.load()
-
-    if args.protocol == 'udp':
-        if config.connection_mode == ConnectionMode.TOWER:
-            for i in range(args.clients):
-                port = RCTComms.transport.RCTUDPClient(port=args.port, addr=args.target)
-                sim = droneSim(RCTComms.comms.mavComms(port))
-                simList.append(sim)
-        else:
-            port = RCTComms.transport.RCTUDPServer(port=args.port)
-            sim = droneSim(RCTComms.comms.mavComms(port))
-    elif args.protocol == 'tcp':
-        if config.connection_mode == ConnectionMode.TOWER:
-            for i in range(args.clients):
-                port = RCTComms.transport.RCTTCPClient(port=args.port, addr=args.target)
-                sim = droneSim(RCTComms.comms.mavComms(port))
-                simList.append(sim)
-        else:
-            connected = False
-            port = RCTComms.transport.RCTTCPServer(args.port, connectionHandler, addr=args.target)
-            port.open()
-            while len(simList) == 0:
-                continue
-            sim = simList[0]
 
     try:
         __IPYTHON__
