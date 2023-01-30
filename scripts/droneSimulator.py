@@ -974,8 +974,8 @@ class droneSimPack:
         :param protocol: transport protocol, tcp or udp
         :param clients: the number of clients to create if in tower mode
         '''
-        configObj = config.Configuration(Path('gcsConfig.ini'))
-        configObj.load()
+        self.configObj = config.Configuration(Path('gcsConfig.ini'))
+        self.configObj.load()
         self.simList = []
 
         self.addr = addr
@@ -983,7 +983,7 @@ class droneSimPack:
         self.protocol = protocol
 
         if protocol == 'udp':
-            if configObj.connection_mode == ConnectionMode.TOWER:
+            if self.configObj.connection_mode == ConnectionMode.TOWER:
                 for i in range(clients):
                     tsport = RCTComms.transport.RCTUDPClient(port=port, addr=addr)
                     sim = droneSim(RCTComms.comms.mavComms(tsport))
@@ -994,7 +994,7 @@ class droneSimPack:
                 self.simList.append(sim)
 
         elif protocol == 'tcp':
-            if configObj.connection_mode == ConnectionMode.TOWER:
+            if self.configObj.connection_mode == ConnectionMode.TOWER:
                 for i in range(args.clients):
                     tsport = RCTComms.transport.RCTTCPClient(port=port, addr=addr)
                     sim = droneSim(RCTComms.comms.mavComms(tsport))
@@ -1002,10 +1002,11 @@ class droneSimPack:
             else:
                 connected = False
                 tsport = RCTComms.transport.RCTTCPServer(port, self.__connectionHandler, addr=addr)
-                port.open()
-                while len(simList) == 0:
+                tsport.open()
+                while len(tsport.simList) == 0:
                     continue
-                sim = simList[0]
+                sim = droneSim(RCTComms.comms.mavComms(tsport.simList[0]))
+                self.simList.append(sim)
 
     def start(self):
         '''
@@ -1029,20 +1030,22 @@ class droneSimPack:
             sim.stopMissionOnThread()
             sim.stop()
 
-    def addClient():
+    def addClient(self):
         '''
         Connects another client and adds the associated simulator to simList
         '''
-        if not configObj.connection_mode == ConnectionMode.TOWER:
+        if not self.configObj.connection_mode == ConnectionMode.TOWER:
             print("Must be in tower mode to run multiple clients")
             return
 
         if self.protocol == 'udp':
-            port = RCTComms.transport.RCTUDPClient(port=self.port, addr=self.target)
+            port = RCTComms.transport.RCTUDPClient(port=self.port, addr=self.addr)
         elif self.protocol == 'tcp':
-            port = RCTComms.transport.RCTTCPClient(port=self.port, addr=self.target)
+            port = RCTComms.transport.RCTTCPClient(port=self.port, addr=self.addr)
+        sim = droneSim(RCTComms.comms.mavComms(port))
+        self.simList.append(sim)
 
-    def __connectionHandler(connection, id):
+    def __connectionHandler(self, connection, id):
         print('Connected {}'.format(id))
         comms = RCTComms.comms.mavComms(connection)
         sim = droneSim(comms)
@@ -1074,8 +1077,8 @@ if __name__ == '__main__':
     logger.addHandler(ch)
 
     sim = droneSimPack(args.port, args.target, args.protocol, args.clients);
-    if args.clients == 1:
-        sim = sim.simList[0]; # Just hava a single simulator
+    if sim.configObj.connection_mode == ConnectionMode.DRONE:
+        sim = sim.simList[0]; # Just have a single simulator
 
     try:
         __IPYTHON__
