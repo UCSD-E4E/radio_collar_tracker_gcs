@@ -212,6 +212,7 @@ class GCS(QMainWindow):
         '''
         Internal Heartbeat callback
         '''
+        self.statusWidget.update()
 
     def __startCommand(self):
         '''
@@ -230,6 +231,7 @@ class GCS(QMainWindow):
         for button in self._buttons:
             button.config(state='disabled')
         WarningMessager.showWarning("No Heartbeats Received")
+        self.statusWidget.update()
 
     def __handleNewEstimate(self, id):
         '''
@@ -324,7 +326,7 @@ class GCS(QMainWindow):
             self.__missionStatusBtn.setText('Start Recording')
             self._mavModel.stopMission(timeout=self.defaultTimeout)
 
-    def __updateStatus(self):
+    def __updateStatus(self): # TODO: this isn't getting used and doesn't seem to work???
         '''
         Internal callback for status variable update
         '''
