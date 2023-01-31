@@ -658,7 +658,12 @@ class MapOptions(QWidget):
         self.btn_cacheMap.clicked.connect(self.__cacheMap)
         self.btn_cacheMap.setEnabled(False)
         lay_mapOptions.addWidget(self.btn_cacheMap)
-        
+
+        self.btn_clearMap = QPushButton('Clear Map')
+        self.btn_clearMap.clicked.connect(self.clear)
+        self.btn_clearMap.setEnabled(True)
+        lay_mapOptions.addWidget(self.btn_clearMap)
+
         exportTab = CollapseFrame('Export')
         btn_pingExport = QPushButton('Pings')
         btn_pingExport.clicked.connect(self.exportPing)
@@ -688,19 +693,20 @@ class MapOptions(QWidget):
         distLay.addWidget(lbl_dist)
         distLay.addWidget(self.lbl_dist)
         distWidg.setLayout(distLay)
-        
+
         lay_mapOptions.addWidget(distWidg)
 
         self.setLayout(lay_mapOptions)
 
     def clear(self):
         '''
-        Helper function to clear selected map areas 
+        Helper function to clear selected map areas
         '''
+        if self.mapWidget is None:
+            return
         self.mapWidget.toolPolygon.rubberBand.reset(QgsWkbTypes.PolygonGeometry)
         self.mapWidget.toolRect.rubberBand.reset(QgsWkbTypes.PolygonGeometry)
         self.mapWidget.toolPolygon.vertices.clear()
-
 
 
     def __cacheMap(self):
@@ -867,24 +873,22 @@ class MapOptions(QWidget):
             WarningMessager.showWarning("Load a map before exporting.")
             return
 
-        vpr = self.mapWidget.polygonLayer.dataProvider()
-        self.generateWaypoints()
         if self.mapWidget.toolPolygon is None:
             return
         elif len(self.mapWidget.toolPolygon.vertices) == 0:
             WarningMessager.showWarning("Use the polygon tool to choose an area on the map to export", "No specified area to export!")
             self.mapWidget.polygon()
         else:
-            
+
+            vpr = self.mapWidget.polygonLayer.dataProvider()
             pts = self.mapWidget.toolPolygon.vertices
             print(type(pts[0]))
             polyGeom = QgsGeometry.fromPolygonXY([pts])
-            
+
             feature = QgsFeature()
             feature.setGeometry(polyGeom)
             vpr.addFeatures([feature])
             self.mapWidget.polygonLayer.updateExtents()
-
 
             folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
             file = folder + '/polygon.shp'
@@ -893,6 +897,8 @@ class MapOptions(QWidget):
 
             QgsVectorFileWriter.writeAsVectorFormatV2(self.mapWidget.polygonLayer, file,
                                                     QgsCoordinateTransformContext(), options)
+
+            vpr.truncate()
 
     def exportCone(self):
         '''
