@@ -3,6 +3,7 @@ from RCTComms.transport import RCTTCPClient, RCTTCPServer
 import rctCore
 from PyQt5.QtCore import QRegExp
 from PyQt5.QtWidgets import *
+from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QRegExpValidator
 from config import ConnectionMode
 import config
@@ -414,125 +415,82 @@ class ConfigDialogPage(QWizardPage):
 
         self.__createWidget()
 
+    def __createTextBox(self, name: str, text: str):
+        '''
+        Params: 
+            name: takes a sting that is the name of the text box
+            text: takes a string that will be used as value for the text box. 
+        Returns: 
+            QGridLayout Object
+        '''
+        frm = QGridLayout()
+        frm.setColumnStretch(0,0)
+
+        lbl = QLabel(name)
+        frm.addWidget(lbl)
+
+        line = QLineEdit()
+        line.setText(text)
+        #The text box will be formatted in a grid addWidget allows the box the be manipulated according to the column and row. (c,r)
+        frm.addWidget(line,0,1)
+        return frm
+
+    def __createBinaryRadioButton(self, name: str, labels: list[str], condition: bool): 
+        '''
+        Creates a binary radio button box. The box will only have two options to select and will check according to a boolean condition
+        Params: 
+            name: takes a sting that is the name of the text box
+            labels: takes an list of strings and reads the first 2 elements.
+            It uses those two elements as labels for each radio button. 
+            condition: takes conditional returns as a boolean 
+        Returns: 
+            QGridLayout Object
+        '''
+        frm = QGridLayout()
+        frm.setColumnStretch(1,0)
+
+        lbl = QLabel(name)
+        frm.addWidget(lbl)
+
+        true_event = QRadioButton(labels[0])
+        false_event = QRadioButton(labels[1])
+        if condition:
+            true_event.setChecked(True)
+        else:
+            false_event.setChecked(True)
+        button = QButtonGroup(parent=frm)
+        button.setExclusive(True)
+        button.addButton(true_event)
+        button.addButton(false_event)
+
+        frm.addWidget(true_event,0,1, Qt.AlignLeft)
+        frm.addWidget(false_event,0,0,Qt.AlignCenter)
+        return frm
+
 
     def __createWidget(self):
         '''
         Internal function to create widgets
         '''
         frm_holder = QVBoxLayout()
-        frm_holder.addStretch(1)
-
         #----- Prefix Path
-        frm_prefix_path = QHBoxLayout()
-        frm_prefix_path.addStretch(1)
-
-        lbl_prefix_path = QLabel('QGis Prefix Path')
-        frm_prefix_path.addWidget(lbl_prefix_path)
-
-        self.prefix_path = QLineEdit()
-        self.prefix_path.setText(str(self.__parent.config.qgis_prefix_path))
-        frm_prefix_path.addWidget(self.prefix_path, 15)
+        frm_prefix_path = self.__createTextBox('QGis Prefix Path', str(self.__parent.config.qgis_prefix_path))
         #----- Prefix Set
-        frm_prefix_set = QHBoxLayout()
-        frm_prefix_set.addStretch(1)
-
-        lbl_prefix_set = QLabel('QGis Prefix Set')
-        frm_prefix_set.addWidget(lbl_prefix_set)
-
-        self.prefix_set_true = QRadioButton('True')
-        self.prefix_set_false = QRadioButton('False')
-        if self.__parent.config.qgis_prefix_set:
-            self.prefix_set_true.setChecked(True)
-        else:
-            self.prefix_set_false.setChecked(True)
-        prefix_set = QButtonGroup(parent=frm_prefix_set)
-        prefix_set.setExclusive(True)
-        prefix_set.addButton(self.prefix_set_true)
-        prefix_set.addButton(self.prefix_set_false)
-
-        frm_prefix_set.addWidget(self.prefix_set_true)
-        frm_prefix_set.addWidget(self.prefix_set_false)
+        frm_prefix_set = self.__createBinaryRadioButton('QGis Prefix Set', ['True', 'False'], self.__parent.config.qgis_prefix_set)
         #----- Lat 1
-        frm_lat_1 = QHBoxLayout()
-        frm_lat_1.addStretch(1)
-
-        lbl_lat_1 = QLabel('Lat 1')
-        frm_lat_1.addWidget(lbl_lat_1)
-
-        self.lat_1 = QLineEdit()
-        self.lat_1.setText(str(self.__parent.config.map_extent[0][0]))
-        frm_lat_1.addWidget(self.lat_1)
+        frm_lat_1 = self.__createTextBox('Lat 1', str(self.__parent.config.map_extent[0][0]))
         #----- Lat 2
-        frm_lat_2 = QHBoxLayout()
-        frm_lat_2.addStretch(1)
-
-        lbl_lat_2 = QLabel('Lat 2')
-        frm_lat_2.addWidget(lbl_lat_2)
-
-        self.lat_2 = QLineEdit()
-        self.lat_2.setText(str(self.__parent.config.map_extent[1][0]))
-        frm_lat_2.addWidget(self.lat_2)
+        frm_lat_2 = self.__createTextBox('Lat 2', str(self.__parent.config.map_extent[1][0]))
         #----- Lon 1
-        frm_lon_1 = QHBoxLayout()
-        frm_lon_1.addStretch(1)
-
-        lbl_lon_1 = QLabel('Lon 1')
-        frm_lon_1.addWidget(lbl_lon_1)
-
-        self.lon_1 = QLineEdit()
-        self.lon_1.setText(str(self.__parent.config.map_extent[0][1]))
-        frm_lon_1.addWidget(self.lon_1)
+        frm_lon_1 = self.__createTextBox('Lon 1', str(self.__parent.config.map_extent[0][1]))
         #----- Lon 2
-        frm_lon_2 = QHBoxLayout()
-        frm_lon_2.addStretch(1)
-
-        lbl_lon_2 = QLabel('Lon 2')
-        frm_lon_2.addWidget(lbl_lon_2)
-
-        self.lon_2 = QLineEdit()
-        self.lon_2.setText(str(self.__parent.config.map_extent[1][1]))
-        frm_lon_2.addWidget(self.lon_2)
+        frm_lon_2 = self.__createTextBox('Lon 2', str(self.__parent.config.map_extent[1][1]))
         #----- Addr
-        frm_addr = QHBoxLayout()
-        frm_addr.addStretch(1)
-
-        lbl_addr = QLabel('Addr')
-        frm_addr.addWidget(lbl_addr)
-
-        self.addr = QLineEdit()
-        self.addr.setText(str(self.__parent.config.connection_addr))
-        frm_addr.addWidget(self.addr)
+        frm_addr = self.__createTextBox('Addr', str(self.__parent.config.connection_addr))
         #----- Port
-        frm_port = QHBoxLayout()
-        frm_port.addStretch(1)
-
-        lbl_port = QLabel('Port')
-        frm_port.addWidget(lbl_port)
-
-        self.portVal = QLineEdit()
-        self.portVal.setText(str(self.__parent.config.connection_port))
-        frm_port.addWidget(self.portVal)
+        frm_port = self.__createTextBox('Port', str(self.__parent.config.connection_port))
         #----- Mode
-        frm_mode = QHBoxLayout()
-        frm_mode.addStretch(1)
-
-        lbl_mode = QLabel('Mode')
-        frm_mode.addWidget(lbl_mode)
-
-        self.drone_mode = QRadioButton('Drone')
-        self.tower_mode = QRadioButton('Tower')
-        if self.__parent.config.connection_mode == ConnectionMode.DRONE:
-            self.drone_mode.setChecked(True)
-        else:
-            self.tower_mode.setChecked(True)
-        mode = QButtonGroup(parent=frm_mode)
-        mode.setExclusive(True)
-        mode.addButton(self.drone_mode)
-        mode.addButton(self.tower_mode)
-
-        frm_mode.addWidget(self.drone_mode)
-        frm_mode.addWidget(self.tower_mode)
-
+        frm_mode = self.__createBinaryRadioButton('Mode', ['Drone', 'Tower'], self.__parent.config.connection_mode == ConnectionMode.DRONE)
         #-----
         frm_holder.addLayout(frm_prefix_path)
         frm_holder.addLayout(frm_prefix_set)
