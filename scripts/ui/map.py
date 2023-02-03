@@ -655,22 +655,22 @@ class MapOptions(QWidget):
         lay_mapOptions.addWidget(self.btn_setSearchArea)
 
         self.btn_cacheMap = QPushButton('Cache Map')
-        self.btn_cacheMap.clicked.connect(lambda:self.__cacheMap())
+        self.btn_cacheMap.clicked.connect(self.__cacheMap)
         self.btn_cacheMap.setEnabled(False)
         lay_mapOptions.addWidget(self.btn_cacheMap)
         
         exportTab = CollapseFrame('Export')
         btn_pingExport = QPushButton('Pings')
-        btn_pingExport.clicked.connect(lambda:self.exportPing())
+        btn_pingExport.clicked.connect(self.exportPing)
 
         btn_vehiclePathExport = QPushButton('Vehicle Path')
-        btn_vehiclePathExport.clicked.connect(lambda:self.exportVehiclePath())
+        btn_vehiclePathExport.clicked.connect(self.exportVehiclePath)
 
         btn_polygonExport = QPushButton('Polygon')
-        btn_polygonExport.clicked.connect(lambda:self.exportPolygon())
+        btn_polygonExport.clicked.connect(self.exportPolygon)
 
         btn_coneExport = QPushButton('Cones')
-        btn_coneExport.clicked.connect(lambda:self.exportCone())
+        btn_coneExport.clicked.connect(self.exportCone)
         
         lay_export = QVBoxLayout()
         lay_export.addWidget(btn_pingExport)
@@ -1088,7 +1088,7 @@ class WebMap(MapWidget):
         pingRenderer = QgsGraduatedSymbolRenderer('Amp', ranges)
         
         
-        style = QgsStyle().defaultStyle()
+        style = QgsStyle.defaultStyle()
         defaultColorRampNames = style.colorRampNames()
         ramp = style.colorRamp(defaultColorRampNames[22])
         pingRenderer.setSourceColorRamp(ramp)
@@ -1330,24 +1330,29 @@ class StaticMap(MapWidget):
         '''
         if(self.fileName == None):
             return
-        
+
+        self.mapLayer = QgsRasterLayer(self.fileName[0], "SRTM layer name")
+        if not self.mapLayer.crs().isValid():
+            raise FileNotFoundError("Invalid file, loading from web...")
+        print(self.mapLayer.crs())
+
         if self.estimate is None:
             uri = "Point?crs=epsg:4326"
-            
+
             self.estimate = QgsVectorLayer(uri, 'Estimate', "memory")
-            
+
             symbol = QgsMarkerSymbol.createSimple({'name': 'diamond', 'color': 'blue'})
             self.estimate.renderer().setSymbol(symbol)
-            
-            
+
+
             self.estimate.setAutoRefreshInterval(500)
             self.estimate.setAutoRefreshEnabled(True)
-            
-            
+
+
         if self.vehicle is None:
             uri = "Point?crs=epsg:4326"
             uriLine = "Linestring?crs=epsg:4326"
-            
+
             self.vehicle = QgsVectorLayer(uri, 'Vehicle', "memory")
             self.vehiclePath = QgsVectorLayer(uriLine, 'VehiclePath', "memory")
 
@@ -1417,12 +1422,7 @@ class StaticMap(MapWidget):
             self.pingLayer.setAutoRefreshInterval(500)
             self.pingLayer.setAutoRefreshEnabled(True)
 
-        self.mapLayer = QgsRasterLayer(self.fileName[0], "SRTM layer name")
-        print(self.mapLayer.crs())
-
-
-        
-        if self.mapLayer.isValid():   
+        if self.mapLayer.isValid():
             QgsProject.instance().addMapLayer(self.mapLayer)
             QgsProject.instance().addMapLayer(self.estimate)
             QgsProject.instance().addMapLayer(self.vehicle)

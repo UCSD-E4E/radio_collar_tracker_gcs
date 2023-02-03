@@ -42,26 +42,26 @@
 #
 ###############################################################################
 import argparse
-import math
-import threading
-import socket
 import datetime as dt
-from enum import Enum
-import logging
-import sys
-import RCTComms.transport as rctTransport
-import numpy as np
-from time import sleep
-from ping import rctPing
-import utm
 import json
+import logging
+import math
+import socket
+import sys
+import threading
+import time
+from pathlib import Path
+from time import sleep
+from typing import List
+
+import config
+import numpy as np
 import RCTComms.comms
 import RCTComms.transport
-import time
-import math
+import utm
 from config import ConnectionMode
-import config
-from pathlib import Path
+from ping import rctPing
+
 
 def getIPs():
     '''
@@ -635,11 +635,11 @@ class droneSim:
 
         self.port.sendVehicle(packet)
 
-    def doMissionOnTread(self, returnOnEnd: bool = False):
+    def doMissionOnThread(self, returnOnEnd: bool = False):
         '''
         Runs the flight mission on a new thread.
         '''
-        self.__missionThread = threading.Thread(target=lambda:self.doMission(returnOnEnd))
+        self.__missionThread = threading.Thread(target=self.doMission, args=(returnOnEnd,))
         self.__endMissionEvent = threading.Event()
         time.sleep(0.109) # Help threads not run all together
         self.__missionThread.start()
@@ -970,7 +970,7 @@ class droneSimPack:
         Creates a pack of multiple DroneSim object
         :param port:
         '''
-        self.simList = []
+        self.simList: List[droneSim] = []
         if protocol == 'udp':
             for i in range(clients):
                 tsport = RCTComms.transport.RCTUDPClient(port=port, addr=addr)
@@ -994,7 +994,7 @@ class droneSimPack:
         Starts missions for all the simulators in the pack
         '''
         for sim in self.simList:
-            sim.doMissionOnTread(returnOnEnd)
+            sim.doMissionOnThread(returnOnEnd)
 
     def stop(self):
         '''

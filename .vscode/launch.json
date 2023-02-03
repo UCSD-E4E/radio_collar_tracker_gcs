@@ -22,6 +22,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/scripts/droneSimulator.py",
             "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/scripts",
             "args": [
                 "--protocol",
                 "tcp"

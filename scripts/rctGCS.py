@@ -89,11 +89,12 @@ def configSetup() -> Path:
     '''    
     with get_instance(Path('gcsConfig.ini')) as config:
         if not config.qgis_prefix_set:
-            qgis_path = Path(QFileDialog.getExistingDirectory(None, 'Select the Qgis directory'))
+            qgis_path = Path(QFileDialog.getExistingDirectory(None, 'Select the Qgis directory', config.qgis_prefix_path.as_posix()))
             if 'qgis' not in qgis_path.as_posix():
                 WarningMessager.showWarning("Warning, incorrect file chosen. Map tools may not "
                     "function as expected")
             config.qgis_prefix_path = qgis_path
+            config.qgis_prefix_set = True
             return qgis_path
         else:
             return config.qgis_prefix_path

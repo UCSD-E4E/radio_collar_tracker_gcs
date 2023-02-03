@@ -63,10 +63,6 @@ class GCS(QMainWindow):
 
         self.config = config.Configuration(Path('gcsConfig.ini'))
         self.config.load()
-        if self.config.connection_mode == config.ConnectionMode.DRONE:
-            self.__runningModeText = "Switch to Tower Mode"
-        else:
-            self.__runningModeText = "Switch to Drone Mode"
 
         self.__createWidgets()
         for button in self._buttons:
@@ -103,23 +99,21 @@ class GCS(QMainWindow):
             mavModel.registerCallback(eventType,
             partial(self.mavEventSignal.emit, eventType, id))
 
-    def __startServer(self):
-        if self._server is not None:
-            self._server.close()
-        self.connectSignal.connect(self.__connectionHandler)
-        self.disconnectSignal.connect(self.__disconnectHandler)
-        self.mavEventSignal.connect(self.__mavEventHandler)
-        self._server = RCTTCPServer(self.portVal, self.connectSignal.emit)
-        self._server.open()
     def __startTransport(self):
-        if self._transport is not None:
+        if self._transport is not None and self._transport.isOpen():
             self._transport.close()
+        self.mavEventSignal.connect(self.__mavEventHandler)
         if self.config.connection_mode == config.ConnectionMode.TOWER:
             self._transport = RCTTCPServer(self.portVal, self.connectionHandler)
-        if self._transport is not None:
             self._transport.open()
         else:
-            print("Transport could not be started")
+            try:
+                self._transport = RCTTCPClient(addr=self.addrVal, port=self.portVal)
+                self.connectionHandler(self._transport, 0)
+            except ConnectionRefusedError:
+                WarningMessager.showWarning("Failure to connect:\nPlease ensure server is running.")
+                self._transport.close()
+                return
 
     def connectionHandler(self, connection, id):
         comms = gcsComms(connection, partial(self.__disconnectHandler, id))
@@ -133,7 +127,6 @@ class GCS(QMainWindow):
         self.updateConnectionsLabel()
         self.systemSettingsWidget.connectionMade()
         self.__missionStatusBtn.setEnabled(True)
-        self.__runningModeBtn.setEnabled(False)
         self.__btn_exportAll.setEnabled(True)
         self.__btn_precision.setEnabled(True)
         self.__btn_heatMap.setEnabled(True)
@@ -148,7 +141,6 @@ class GCS(QMainWindow):
         if len(self._mavModels) == 0:
             self.systemSettingsWidget.disconnected()
             self.__missionStatusBtn.setEnabled(False)
-            self.__runningModeBtn.setEnabled(True)
             self.__btn_exportAll.setEnabled(False)
             self.__btn_precision.setEnabled(False)
             self.__btn_heatMap.setEnabled(False)
@@ -493,7 +485,7 @@ class GCS(QMainWindow):
             mavModel.stop()
         self._mavModels = {}
         self._mavModel = None
-        if self._transport is not None:
+        if self._transport is not None and self._transport.isOpen():
             self._transport.close()
         self._transport = None
         super().closeEvent(event)
@@ -505,10 +497,13 @@ class GCS(QMainWindow):
         connectionDialog = ConnectionDialog(self.portVal, self)
         connectionDialog.exec_()
 
-        if connectionDialog.portVal is None or connectionDialog.portVal == self.portVal:
+        if connectionDialog.portVal is None or \
+            (connectionDialog.portVal == self.portVal and len(self._mavModels) > 1):
             return
 
-        self._portVal = connectionDialog.portVal
+        self.portVal = connectionDialog.portVal
+        if self.config.connection_mode == ConnectionMode.DRONE:
+            self.addrVal = connectionDialog.addrVal
         self.__startTransport()
 
     def __handleConfigInput(self):
@@ -553,7 +548,7 @@ class GCS(QMainWindow):
         lay_sys = QVBoxLayout()
         btn_setup = QPushButton("Connection Settings")
         btn_setup.resize(self.SBWidth, 100)
-        btn_setup.clicked.connect(lambda:self.__handleConnectInput())
+        btn_setup.clicked.connect(self.__handleConnectInput)
         self.model_select = QComboBox()
         self.model_select.resize(self.SBWidth, 100)
         self.model_select.currentIndexChanged.connect(self.__changeModelByIndex)
@@ -603,23 +598,19 @@ class GCS(QMainWindow):
         # START PAYLOAD RECORDING
         self.__missionStatusBtn = QPushButton(self.__missionStatusText)
         self.__missionStatusBtn.setEnabled(False)
-        self.__missionStatusBtn.clicked.connect(lambda:self.__startStopMission())
-
-        self.__runningModeBtn = QPushButton(self.__runningModeText)
-        self.__runningModeBtn.setEnabled(True)
-        self.__runningModeBtn.clicked.connect(lambda:self.__toggleRunningMode())
+        self.__missionStatusBtn.clicked.connect(self.__startStopMission)
 
         self.__btn_exportAll = QPushButton('Export Info')
         self.__btn_exportAll.setEnabled(False)
-        self.__btn_exportAll.clicked.connect(lambda:self.exportAll())
+        self.__btn_exportAll.clicked.connect(self.exportAll)
 
         self.__btn_precision = QPushButton('Do Precision')
         self.__btn_precision.setEnabled(False)
-        self.__btn_precision.clicked.connect(lambda:self._mavModel.EST_mgr.doPrecisions(173500000))
+        self.__btn_precision.clicked.connect(self.__do_precision)
 
         self.__btn_heatMap = QPushButton('Display Heatmap')
         self.__btn_heatMap.setEnabled(False)
-        self.__btn_heatMap.clicked.connect(lambda:self.mapDisplay.setupHeatMap())
+        self.__btn_heatMap.clicked.connect(self.__do_display_heatmap)
 
         wlay.addWidget(self._systemConnectionTab)
         wlay.addWidget(self.statusWidget)
@@ -628,7 +619,6 @@ class GCS(QMainWindow):
         wlay.addWidget(self.upgradeDisplay)
         wlay.addWidget(self._configTab)
         wlay.addWidget(self.__missionStatusBtn)
-        wlay.addWidget(self.__runningModeBtn)
         wlay.addWidget(self.__btn_exportAll)
         wlay.addWidget(self.__btn_precision)
         wlay.addWidget(self.__btn_heatMap)
@@ -641,6 +631,16 @@ class GCS(QMainWindow):
         centr_widget.setLayout(holder)
         self.resize(1800, 1100)
         self.show()
+    
+    def __do_display_heatmap(self):
+        if self.mapDisplay:
+            self.mapDisplay.setupHeatMap
+        else:
+            raise RuntimeError('No map loaded')
+    
+    def __do_precision(self):
+        # todo: add modular frequencies
+        self._mavModel.EST_mgr.doPrecisions(173500000)
 
 class UpgradeDisplay(CollapseFrame):
     '''
@@ -681,11 +681,11 @@ class UpgradeDisplay(CollapseFrame):
         self.__innerFrame.addWidget(self.filename, 1, 1)
 
         browse_file_btn = QPushButton('Browse for Upgrade File')
-        browse_file_btn.clicked.connect(lambda:self.fileDialogue())
+        browse_file_btn.clicked.connect(self.fileDialogue)
         self.__innerFrame.addWidget(browse_file_btn, 2, 0)
 
         upgrade_btn = QPushButton('Upgrade')
-        upgrade_btn.clicked.connect(lambda:self.sendUpgradeFile())
+        upgrade_btn.clicked.connect(self.sendUpgradeFile)
         self.__innerFrame.addWidget(upgrade_btn, 3, 0)
 
 
@@ -956,7 +956,7 @@ class MapControl(CollapseFrame):
         self.__mapFrame.resize(800, 500)
         self.__holder.addWidget(self.__mapFrame, 0, 0, 1, 3)
         btn_loadMap = QPushButton('Load Map')
-        btn_loadMap.clicked.connect(lambda:self.__loadMapFile())
+        btn_loadMap.clicked.connect(self.__loadMapFile)
         controlPanel.addWidget(btn_loadMap)
 
 
@@ -986,11 +986,11 @@ class MapControl(CollapseFrame):
 
 
         btn_loadWebMap = QPushButton('Load from Web')
-        btn_loadWebMap.clicked.connect(lambda:self.__loadWebMap())
+        btn_loadWebMap.clicked.connect(self.__loadWebMap)
         lay_loadWebMap.addWidget(btn_loadWebMap, 3, 1, 1, 2)
 
         btn_loadCachedMap = QPushButton('Load from Cache')
-        btn_loadCachedMap.clicked.connect(lambda:self.__loadCachedMap())
+        btn_loadCachedMap.clicked.connect(self.__loadCachedMap)
         lay_loadWebMap.addWidget(btn_loadCachedMap, 4, 1, 1, 2)
 
         controlPanel.addWidget(frm_loadWebMap)
@@ -1081,7 +1081,12 @@ class MapControl(CollapseFrame):
         Internal function to load user-specified raster file
         '''
         self.__mapFrame.setParent(None)
-        self.__mapFrame = StaticMap(self.__holder)
-        self.__mapFrame.resize(800, 500)
-        self.__mapOptions.setMap(self.__mapFrame, False)
-        self.__root.setMap(self.__mapFrame)
+        try:
+            self.__mapFrame = StaticMap(self.__holder)
+        except FileNotFoundError as e:
+            print(e)
+            self.__loadWebMap()
+        else:
+            self.__mapFrame.resize(800, 500)
+            self.__mapOptions.setMap(self.__mapFrame, False)
+            self.__root.setMap(self.__mapFrame)
