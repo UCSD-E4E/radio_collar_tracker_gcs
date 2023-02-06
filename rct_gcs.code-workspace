@@ -5,7 +5,10 @@
 		}
 	],
 	"settings": {
-		"python.linting.pylintEnabled": true
+		"python.linting.pylintEnabled": true,
+		"editor.rulers": [
+			100
+		]
 	},
 	"extensions": {
 		"recommendations": [
