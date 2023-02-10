@@ -1,17 +1,71 @@
-from RCTComms.comms import gcsComms
-from RCTComms.transport import RCTTCPClient, RCTTCPServer
-import rctCore
-from PyQt5.QtCore import QRegExp
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QRegExpValidator
-from config import ConnectionMode
-import config
 from pathlib import Path
+from typing import Any, List
+from PyQt5.QtCore import QRegExp, Qt
+from PyQt5.QtGui import QRegExpValidator
+from PyQt5.QtWidgets import (QButtonGroup, QCheckBox, QGridLayout, QHBoxLayout,
+                             QLabel, QLineEdit, QMessageBox, QPushButton,
+                             QRadioButton, QVBoxLayout, QWizard, QWizardPage)
+import config
+from config import ConnectionMode
 
-class WarningMessager:
 
-    def showWarning(text: str, title: str ="Warning"):
+class UserPopups:
+    """ Creates popup boxes for user display
+
+    """
+    def create_text_box(self, name: str, text: str) -> Any:
+        '''
+        Params:
+            name: takes a sting that is the name of the text box
+            text: takes a string that will be used as value for the text box.
+        Returns:
+            Any
+        '''
+        form = QGridLayout()
+        form.setColumnStretch(0,0)
+
+        label = QLabel(name)
+        form.addWidget(label)
+
+        line = QLineEdit()
+        line.setText(text)
+        #The text box will be formatted in a grid addWidget allows\
+        # the box the be manipulated according to the column and row. (c,r)
+        form.addWidget(line,0,1)
+        print(form)
+        return form
+
+    def create_binary_radio_button(self, name: str, labels_list: List[str], condition: bool) -> Any:
+        '''
+        Creates a binary radio button box. The box will only have two\
+            options to select and will check according to a boolean condition
+        Params:
+            name: takes a sting that is the name of the text box
+            labels: takes an list of strings and reads the first 2 elements.
+            It uses those two elements as labels for each radio button.
+            condition: takes conditional returns as a boolean.
+        Returns:
+            QGridLayout Object
+        '''
+        form = QGridLayout()
+        form.setColumnStretch(1,0)
+        label = QLabel(name)
+        form.addWidget(label)
+        true_event = QRadioButton(labels_list[0])
+        false_event = QRadioButton(labels_list[1])
+        if condition:
+            true_event.setChecked(True)
+        else:
+            false_event.setChecked(True)
+        button = QButtonGroup(parent=form)
+        button.setExclusive(True)
+        button.addButton(true_event)
+        button.addButton(false_event)
+        form.addWidget(true_event,0,1, Qt.AlignLeft)
+        form.addWidget(false_event,0,0,Qt.AlignCenter)
+        return form
+
+    def show_warning(self, text: str, title: str ="Warning"):
         '''
         Creates warning popups
         Args:
@@ -31,7 +85,7 @@ class ExpertSettingsDialog(QWizard):
     A Custom Dialog Widget to facilitate user input for expert
     settings
     '''
-    def __init__(self, parent, optionVars):
+    def __init__(self, parent, option_vars):
         '''
         Creates a new ExpertSettingsDialog
         Args:
@@ -40,16 +94,16 @@ class ExpertSettingsDialog(QWizard):
         '''
         super(ExpertSettingsDialog, self).__init__(parent)
         self.parent = parent
-        self.addPage(ExpertSettingsDialogPage(self, optionVars))
+        self.addPage(ExpertSettingsDialogPage(self, option_vars))
         self.setWindowTitle('Expert/Engineering Settings')
         self.resize(640,480)
 
 class ExpertSettingsDialogPage(QWizardPage):
     '''
     Custom DialogPage widget to facilitate user configured
-    expert settings
+    expert settings.
     '''
-    def __init__(self, parent=None, optionVars=None):
+    def __init__(self, parent=None, option_vars=None):
         '''
         Creates a new ExpertSettingsDialogPage object
         Args:
@@ -58,79 +112,79 @@ class ExpertSettingsDialogPage(QWizardPage):
         '''
         super(ExpertSettingsDialogPage, self).__init__(parent)
         self.__parent = parent
-        self.optionVars = optionVars
+        self.option_vars = option_vars
 
-        self.__createWidget()
+        self.create_widget()
         # Configure member vars here
-        self.__parent.parent.updateGUIOptionVars(0xFF, self.optionVars)
+        self.__parent.parent.updateGUIOptionVars(0xFF, self.option_vars)
 
-    def __createWidget(self):
+    def create_widget(self):
         '''
         Internal function to create widgets
         '''
-        expSettingsFrame = QGridLayout()
+        exp_settings_frame = QGridLayout()
 
-        lbl_pingWidth = QLabel('Expected Ping Width(ms)')
-        expSettingsFrame.addWidget(lbl_pingWidth, 0, 0)
+        lbl_ping_width = QLabel('Expected Ping Width(ms)')
+        exp_settings_frame.addWidget(lbl_ping_width, 0, 0)
 
-        lbl_minWidthMult = QLabel('Min. Width Multiplier')
-        expSettingsFrame.addWidget(lbl_minWidthMult, 1, 0)
+        lbl_min_width_mult = QLabel('Min. Width Multiplier')
+        exp_settings_frame.addWidget(lbl_min_width_mult, 1, 0)
 
-        lbl_maxWidthMult = QLabel('Max. Width Multiplier')
-        expSettingsFrame.addWidget(lbl_maxWidthMult, 2, 0)
+        lbl_max_width_mult = QLabel('Max. Width Multiplier')
+        exp_settings_frame.addWidget(lbl_max_width_mult, 2, 0)
 
-        lbl_minPingSNR = QLabel('Min. Ping SNR(dB)')
-        expSettingsFrame.addWidget(lbl_minPingSNR, 3, 0)
+        lbl_min_ping_snr = QLabel('Min. Ping SNR(dB)')
+        exp_settings_frame.addWidget(lbl_min_ping_snr, 3, 0)
 
-        lbl_GPSPort = QLabel('GPS Port')
-        expSettingsFrame.addWidget(lbl_GPSPort, 4, 0)
+        lbl_gps_port = QLabel('GPS Port')
+        exp_settings_frame.addWidget(lbl_gps_port, 4, 0)
 
-        lbl_GPSBaudRate = QLabel('GPS Baud Rate')
-        expSettingsFrame.addWidget(lbl_GPSBaudRate, 5, 0)
+        lbl_gps_baud_rate = QLabel('GPS Baud Rate')
+        exp_settings_frame.addWidget(lbl_gps_baud_rate, 5, 0)
 
-        lbl_outputDir = QLabel('Output Directory')
-        expSettingsFrame.addWidget(lbl_outputDir, 6, 0)
+        lbl_output_dir = QLabel('Output Directory')
+        exp_settings_frame.addWidget(lbl_output_dir, 6, 0)
 
-        lbl_GPSMode = QLabel('GPS Mode')
-        expSettingsFrame.addWidget(lbl_GPSMode, 7, 0)
+        lbl_gps_mode = QLabel('GPS Mode')
+        exp_settings_frame.addWidget(lbl_gps_mode, 7, 0)
 
-        lbl_SYSautostart = QLabel("SYS Autostart")
-        expSettingsFrame.addWidget(lbl_SYSautostart, 8, 0)
+        lbl_sys_auto_start = QLabel("SYS Autostart")
+        exp_settings_frame.addWidget(lbl_sys_auto_start, 8, 0)
 
-        self.optionVars['DSP_pingWidth'] = QLineEdit()
-        expSettingsFrame.addWidget(self.optionVars['DSP_pingWidth'], 0, 1)
+        self.option_vars['DSP_pingWidth'] = QLineEdit()
+        exp_settings_frame.addWidget(self.option_vars['DSP_pingWidth'], 0, 1)
 
-        self.optionVars['DSP_pingMin'] = QLineEdit()
-        expSettingsFrame.addWidget(self.optionVars['DSP_pingMin'], 1, 1)
+        self.option_vars['DSP_pingMin'] = QLineEdit()
+        exp_settings_frame.addWidget(self.option_vars['DSP_pingMin'], 1, 1)
 
-        self.optionVars['DSP_pingMax'] = QLineEdit()
-        expSettingsFrame.addWidget(self.optionVars['DSP_pingMax'], 2, 1)
+        self.option_vars['DSP_pingMax'] = QLineEdit()
+        exp_settings_frame.addWidget(self.option_vars['DSP_pingMax'], 2, 1)
 
-        self.optionVars['DSP_pingSNR'] = QLineEdit()
-        expSettingsFrame.addWidget(self.optionVars['DSP_pingSNR'], 3, 1)
+        self.option_vars['DSP_pingSNR'] = QLineEdit()
+        exp_settings_frame.addWidget(self.option_vars['DSP_pingSNR'], 3, 1)
 
-        self.optionVars['GPS_device'] = QLineEdit()
-        expSettingsFrame.addWidget(self.optionVars['GPS_device'], 4, 1)
+        self.option_vars['GPS_device'] = QLineEdit()
+        exp_settings_frame.addWidget(self.option_vars['GPS_device'], 4, 1)
 
-        self.optionVars['GPS_baud'] = QLineEdit()
-        expSettingsFrame.addWidget(self.optionVars['GPS_baud'], 5, 1)
+        self.option_vars['GPS_baud'] = QLineEdit()
+        exp_settings_frame.addWidget(self.option_vars['GPS_baud'], 5, 1)
 
-        self.optionVars['SYS_outputDir'] = QLineEdit()
-        expSettingsFrame.addWidget(self.optionVars['SYS_outputDir'], 6, 1)
+        self.option_vars['SYS_outputDir'] = QLineEdit()
+        exp_settings_frame.addWidget(self.option_vars['SYS_outputDir'], 6, 1)
 
-        self.optionVars['GPS_mode'] = QLineEdit()
-        expSettingsFrame.addWidget(self.optionVars['GPS_mode'], 7, 1)
+        self.option_vars['GPS_mode'] = QLineEdit()
+        exp_settings_frame.addWidget(self.option_vars['GPS_mode'], 7, 1)
 
-        self.optionVars['SYS_autostart'] = QLineEdit()
-        expSettingsFrame.addWidget(self.optionVars['SYS_autostart'], 8, 1)
+        self.option_vars['SYS_autostart'] = QLineEdit()
+        exp_settings_frame.addWidget(self.option_vars['SYS_autostart'], 8, 1)
 
         btn_submit = QPushButton('submit')
         btn_submit.clicked.connect(self.submit)
-        expSettingsFrame.addWidget(btn_submit, 9, 0, 1, 2)
+        exp_settings_frame.addWidget(btn_submit, 9, 0, 1, 2)
 
-        self.setLayout(expSettingsFrame)
+        self.setLayout(exp_settings_frame)
 
-    def validateParameters(self):
+    def validate_parameters(self):
         '''
         Inner function to validate parameters set
         '''
@@ -140,8 +194,9 @@ class ExpertSettingsDialogPage(QWizardPage):
         '''
         Inner function to submit enterred information
         '''
-        if not self.validateParameters():
-            WarningMessager.showWarning("Entered information could not be validated")
+        if not self.validate_parameters():
+            user_pops = UserPopups()
+            user_pops.show_warning(text="Entered information could not be validated")
             return
         self.__parent.parent.submitGUIOptionVars(0xFF)
 
@@ -151,7 +206,7 @@ class AddTargetDialog(QWizard):
     '''
     A Custom Dialog Widget to facilitate user-added target frequencies
     '''
-    def __init__(self, parent, centerFrequency: int, samplingFrequency: int):
+    def __init__(self, parent, center_frequency: int, sampling_frequency: int):
         '''
         Creates a new AddTargetDialog
         Args:
@@ -164,9 +219,9 @@ class AddTargetDialog(QWizard):
         self.__parent = parent
         self.name = "filler"
         self.freq = 0
-        self.centerFrequency = centerFrequency
-        self.samplingFrequency = samplingFrequency
-        self.page = AddTargetDialogPage(self, centerFrequency, samplingFrequency)
+        self.center_frequency = center_frequency
+        self.sampling_frequency = sampling_frequency
+        self.page = AddTargetDialogPage(self, center_frequency, sampling_frequency)
         self.addPage(self.page)
         self.setWindowTitle('Add Target')
         self.resize(640,480)
@@ -176,26 +231,27 @@ class AddTargetDialog(QWizard):
         '''
         Helper Method ot validate input frequency
         '''
-        return abs(int(self.page.targFreqEntry.text()) - self.centerFrequency) <= self.samplingFrequency
+        return abs(int(self.page.targ_freq_entry.text()) -\
+             self.center_frequency) <= self.sampling_frequency
 
 
     def submit(self):
-        '''
-        Internal function to submit newly added target frequency
+        '''Internal function to submit newly added target frequency
         '''
         if not self.validate():
-            WarningMessager.showWarning("You have entered an invalid target frequency. Please try again.", "Invalid frequency")
+            user_pops = UserPopups()
+            user_pops.show_warning("You have entered an invalid target\
+            frequency. Please try again.", "Invalid frequency")
             return
-        self.name = self.page.targNameEntry.text()
-        self.freq = int(self.page.targFreqEntry.text())
-
+        self.name = self.page.targ_name_entry.text()
+        self.freq = int(self.page.targ_freq_entry.text())
 
 class AddTargetDialogPage(QWizardPage):
     '''
     Custom DialogPage widget to facilitate user-added target
     frequencies
     '''
-    def __init__(self, parent, centerFrequency: int, samplingFrequency: int):
+    def __init__(self, parent, center_frequency: int, sampling_frequency: int):
         '''
         Creates a new AddTargetDialog
         Args:
@@ -206,55 +262,46 @@ class AddTargetDialogPage(QWizardPage):
         '''
         QWizardPage.__init__(self, parent)
         self.__parent = parent
-        self.targNameEntry = None
-        self.targFreqEntry = None
+        self.targ_name_entry = None
+        self.targ_freq_entry = None
 
-        self.__centerFreq = centerFrequency
-        self.__samplingFreq = samplingFrequency
+        self.__center_freq = center_frequency
+        self.__sampling_freq = sampling_frequency
 
         self.name = None
         self.freq = None
 
-        self.__createWidget()
+        self.__create_widget()
 
 
-    def __createWidget(self):
+    def __create_widget(self):
         '''
         Internal function to create widgets
         '''
-        rx  = QRegExp("[0-9]{30}")
-        val = QRegExpValidator(rx)
-        frm_targetSettings = QGridLayout()
+        regex_string  = QRegExp("[0-9]{30}")
+        val = QRegExpValidator(regex_string)
+        frm_target_settings = QGridLayout()
 
-        lbl_targetName = QLabel('Target Name:')
-        frm_targetSettings.addWidget(lbl_targetName, 0, 0)
+        lbl_target_name = QLabel('Target Name:')
+        frm_target_settings.addWidget(lbl_target_name, 0, 0)
 
         #entr_targetName = QLineEdit()
-        self.targNameEntry = QLineEdit()
-        frm_targetSettings.addWidget(self.targNameEntry, 0, 1)
+        self.targ_name_entry = QLineEdit()
+        frm_target_settings.addWidget(self.targ_name_entry, 0, 1)
 
-        lbl_targetFreq = QLabel('Target Frequency:')
-        frm_targetSettings.addWidget(lbl_targetFreq, 1, 0)
+        lbl_target_freq = QLabel('Target Frequency:')
+        frm_target_settings.addWidget(lbl_target_freq, 1, 0)
 
-        self.targFreqEntry = QLineEdit()
-        self.targFreqEntry.setValidator(val)
-        frm_targetSettings.addWidget(self.targFreqEntry, 1, 1)
-
-        '''
-        btn_submit = QPushButton('submit')
-        btn_submit.clicked.connect(self.submit)
-        frm_targetSettings.addWidget(btn_submit, 2, 0, 1, 2)
-        '''
-        self.setLayout(frm_targetSettings)
-
-
-
+        self.targ_freq_entry = QLineEdit()
+        self.targ_freq_entry.setValidator(val)
+        frm_target_settings.addWidget(self.targ_freq_entry, 1, 1)
+        self.setLayout(frm_target_settings)
 
 class ConnectionDialog(QWizard):
     '''
     Custom Dialog widget to facilitate connecting to the drone
     '''
-    def __init__(self, portVal, parent):
+    def __init__(self, port_val, parent):
         '''
         Creates new ConnectionDialog widget
         Args:
@@ -263,9 +310,9 @@ class ConnectionDialog(QWizard):
         super(ConnectionDialog, self).__init__()
         self.parent = parent
         self.setWindowTitle('Connect Settings')
-        self.page = ConnectionDialogPage(portVal, self)
-        self.portVal = portVal
-        self.addrVal = None
+        self.page = ConnectionDialogPage(port_val, self)
+        self.port_val = port_val
+        self.addr_val = None
         self.addPage(self.page)
         self.resize(640,480)
         self.button(QWizard.FinishButton).clicked.connect(self.submit)
@@ -274,44 +321,44 @@ class ConnectionDialog(QWizard):
         '''
         Internal Function to submit user inputted connection settings
         '''
-        self.portVal = int(self.page.portEntry.text())
+        self.port_val = int(self.page.port_entry.text())
         if self.parent.config.connection_mode == ConnectionMode.DRONE:
-            self.addrVal = self.page.addrEntry.text()
+            self.addr_val = self.page.addr_entry.text()
 
 class ConnectionDialogPage(QWizardPage):
     '''
     Custom DialogPage widget - Allows the user to configure
     settings to connect to the drone
     '''
-    def __init__(self, portVal, parent):
+    def __init__(self, port_val, parent):
         '''
         Creates a new AddTargetDialog
         Args:
             portVal: The port value used
         '''
         super(ConnectionDialogPage, self).__init__()
-        self.__portEntryVal = portVal # default value
-        self.portEntry = None # default value
+        self.__port_entry_val = port_val # default value
+        self.port_entry = None # default value
         self.__parent = parent
 
-        self.__createWidget()
+        self.__create_widget()
 
 
-    def __createWidget(self):
+    def __create_widget(self):
         '''
         Internal function to create widgets
         '''
         frm_holder = QVBoxLayout()
         frm_holder.addStretch(1)
         #-----
-        frm_conType = QHBoxLayout()
-        frm_conType.addStretch(1)
+        frm_con_type = QHBoxLayout()
+        frm_con_type.addStretch(1)
 
-        lbl_conType = QLabel('Connection Type:')
-        frm_conType.addWidget(lbl_conType)
+        lbl_con_type = QLabel('Connection Type:')
+        frm_con_type.addWidget(lbl_con_type)
 
-        btn_TCP = QCheckBox('TCP')
-        frm_conType.addWidget(btn_TCP)
+        btn_tcp = QCheckBox('TCP')
+        frm_con_type.addWidget(btn_tcp)
         #-----
         frm_port = QHBoxLayout()
         frm_port.addStretch(1)
@@ -319,9 +366,9 @@ class ConnectionDialogPage(QWizardPage):
         lbl_port = QLabel('Port')
         frm_port.addWidget(lbl_port)
 
-        self.portEntry = QLineEdit()
-        self.portEntry.setText(str(self.__portEntryVal))
-        frm_port.addWidget(self.portEntry)
+        self.port_entry = QLineEdit()
+        self.port_entry.setText(str(self.__port_entry_val))
+        frm_port.addWidget(self.port_entry)
 
         if self.__parent.parent.config.connection_mode == ConnectionMode.DRONE:
             frm_addr = QHBoxLayout()
@@ -329,16 +376,16 @@ class ConnectionDialogPage(QWizardPage):
 
             lbl_addr = QLabel('Address')
             frm_addr.addWidget(lbl_addr)
-            self.addrEntry = QLineEdit()
+            self.addr_entry = QLineEdit()
 
-            self.addrEntry.setText('127.0.0.1')
-            frm_addr.addWidget(self.addrEntry)
+            self.addr_entry.setText('127.0.0.1')
+            frm_addr.addWidget(self.addr_entry)
 
             frm_holder.addLayout(frm_addr)
 
         #-----
         frm_holder.addLayout(frm_port)
-        frm_holder.addLayout(frm_conType)
+        frm_holder.addLayout(frm_con_type)
         self.setLayout(frm_holder)
 
 class ConfigDialog(QWizard):
@@ -361,7 +408,7 @@ class ConfigDialog(QWizard):
         self.page = ConfigDialogPage(self)
         self.addPage(self.page)
         self.resize(640,480)
-        self.button(QWizard.FinishButton).clicked.connect(lambda:self.submit())
+        self.button(QWizard.FinishButton).clicked.connect(self.submit())
 
     def submit(self):
         '''
@@ -398,88 +445,38 @@ class ConfigDialogPage(QWizardPage):
             portVal: The port value used
         '''
         super(ConfigDialogPage, self).__init__()
-        '''self.__portEntryVal = portVal # default value
-        self.portEntry = None # default value'''
         self.__parent = parent
 
-        self.__createWidget()
+        self.__create_widget()
 
-    def __createTextBox(self, name: str, text: str):
-        '''
-        Params: 
-            name: takes a sting that is the name of the text box
-            text: takes a string that will be used as value for the text box. 
-        Returns: 
-            QGridLayout Object
-        '''
-        frm = QGridLayout()
-        frm.setColumnStretch(0,0)
-
-        lbl = QLabel(name)
-        frm.addWidget(lbl)
-
-        line = QLineEdit()
-        line.setText(text)
-        #The text box will be formatted in a grid addWidget allows the box the be manipulated according to the column and row. (c,r)
-        frm.addWidget(line,0,1)
-        return frm
-
-    def __createBinaryRadioButton(self, name: str, labels: list[str], condition: bool): 
-        '''
-        Creates a binary radio button box. The box will only have two options to select and will check according to a boolean condition
-        Params: 
-            name: takes a sting that is the name of the text box
-            labels: takes an list of strings and reads the first 2 elements.
-            It uses those two elements as labels for each radio button. 
-            condition: takes conditional returns as a boolean 
-        Returns: 
-            QGridLayout Object
-        '''
-        frm = QGridLayout()
-        frm.setColumnStretch(1,0)
-
-        lbl = QLabel(name)
-        frm.addWidget(lbl)
-
-        true_event = QRadioButton(labels[0])
-        false_event = QRadioButton(labels[1])
-        if condition:
-            true_event.setChecked(True)
-        else:
-            false_event.setChecked(True)
-        button = QButtonGroup(parent=frm)
-        button.setExclusive(True)
-        button.addButton(true_event)
-        button.addButton(false_event)
-
-        frm.addWidget(true_event,0,1, Qt.AlignLeft)
-        frm.addWidget(false_event,0,0,Qt.AlignCenter)
-        return frm
-
-
-    def __createWidget(self):
+    def __create_widget(self):
         '''
         Internal function to create widgets
         '''
+        pop_up_box = UserPopups()
+
         frm_holder = QVBoxLayout()
         #----- Prefix Path
-        frm_prefix_path = self.__createTextBox('QGis Prefix Path', str(self.__parent.config.qgis_prefix_path))
+        frm_prefix_path = pop_up_box.create_text_box('QGis Prefix Path',\
+            str(self.__parent.config.qgis_prefix_path))
         #----- Prefix Set
-        frm_prefix_set = self.__createBinaryRadioButton('QGis Prefix Set', ['True', 'False'], self.__parent.config.qgis_prefix_set)
+        frm_prefix_set = pop_up_box.create_binary_radio_button('QGis Prefix Set',\
+            ['True', 'False'], self.__parent.config.qgis_prefix_set)
         #----- Lat 1
-        frm_lat_1 = self.__createTextBox('Lat 1', str(self.__parent.config.map_extent[0][0]))
+        frm_lat_1 = pop_up_box.create_text_box('Lat 1', str(self.__parent.config.map_extent[0][0]))
         #----- Lat 2
-        frm_lat_2 = self.__createTextBox('Lat 2', str(self.__parent.config.map_extent[1][0]))
+        frm_lat_2 = pop_up_box.create_text_box('Lat 2', str(self.__parent.config.map_extent[1][0]))
         #----- Lon 1
-        frm_lon_1 = self.__createTextBox('Lon 1', str(self.__parent.config.map_extent[0][1]))
+        frm_lon_1 = pop_up_box.create_text_box('Lon 1', str(self.__parent.config.map_extent[0][1]))
         #----- Lon 2
-        frm_lon_2 = self.__createTextBox('Lon 2', str(self.__parent.config.map_extent[1][1]))
+        frm_lon_2 = pop_up_box.create_text_box('Lon 2', str(self.__parent.config.map_extent[1][1]))
         #----- Addr
-        frm_addr = self.__createTextBox('Addr', str(self.__parent.config.connection_addr))
+        frm_addr = pop_up_box.create_text_box('Addr', str(self.__parent.config.connection_addr))
         #----- Port
-        frm_port = self.__createTextBox('Port', str(self.__parent.config.connection_port))
+        frm_port = pop_up_box.create_text_box('Port', str(self.__parent.config.connection_port))
         #----- Mode
-        frm_mode = self.__createBinaryRadioButton('Mode', ['Drone', 'Tower'], self.__parent.config.connection_mode == ConnectionMode.DRONE)
+        frm_mode = pop_up_box.create_binary_radio_button('Mode',
+            ['Drone', 'Tower'], self.__parent.config.connection_mode == ConnectionMode.DRONE)
         #-----
         frm_holder.addLayout(frm_prefix_path)
         frm_holder.addLayout(frm_prefix_set)
