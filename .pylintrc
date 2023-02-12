@@ -146,6 +146,7 @@ class-const-naming-style=UPPER_CASE
 # const-naming-style. If left empty, class constant names will be checked with
 # the set naming style.
 #class-const-rgx=
+
 # PyQt5 C extensions
 extension-pkg-whitelist=PyQt5.
 
