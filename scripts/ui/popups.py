@@ -1,12 +1,13 @@
 from pathlib import Path
 from typing import Any, List
+import config
+import rctCore
+from config import ConnectionMode
 from PyQt5.QtCore import QRegExp, Qt
 from PyQt5.QtGui import QRegExpValidator
-from PyQt5.QtWidgets import (QButtonGroup, QCheckBox, QGridLayout, QHBoxLayout,
-                             QLabel, QLineEdit, QMessageBox, QPushButton,
-                             QRadioButton, QVBoxLayout, QWizard, QWizardPage)
-import config
-from config import ConnectionMode
+from PyQt5.QtWidgets import *
+from RCTComms.comms import gcsComms
+from RCTComms.transport import RCTTCPClient, RCTTCPServer
 
 
 class UserPopups:
@@ -341,7 +342,7 @@ class ConnectionDialogPage(QWizardPage):
         self.__port_entry_val = port_val # default value
         self.port_entry = None # default value
         self.__parent = parent
-
+        
         self.__create_widget()
 
 

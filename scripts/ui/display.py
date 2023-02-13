@@ -42,7 +42,7 @@ class GCS(QMainWindow):
         '''
         super().__init__()
         self.__log = logging.getLogger('rctGCS.GCS')
-        self.portVal = self.defaultPortVal
+        self.port_val = self.defaultPortVal
         self._transport = None
         self._mavModels = {}
         self._mavModel = None
@@ -104,11 +104,11 @@ class GCS(QMainWindow):
             self._transport.close()
         self.mavEventSignal.connect(self.__mavEventHandler)
         if self.config.connection_mode == config.ConnectionMode.TOWER:
-            self._transport = RCTTCPServer(self.portVal, self.connectionHandler)
+            self._transport = RCTTCPServer(self.port_val, self.connectionHandler)
             self._transport.open()
         else:
             try:
-                self._transport = RCTTCPClient(addr=self.addrVal, port=self.portVal)
+                self._transport = RCTTCPClient(addr=self.addrVal, port=self.port_val)
                 self.connectionHandler(self._transport, 0)
             except ConnectionRefusedError:
                 self.user_popups.show_warning("Failure to connect:\nPlease ensure server is running.")
@@ -494,16 +494,16 @@ class GCS(QMainWindow):
         '''
         Internal callback to connect GCS to drone
         '''
-        connectionDialog = ConnectionDialog(self.portVal, self)
+        connectionDialog = ConnectionDialog(self.port_val, self)
         connectionDialog.exec_()
 
-        if connectionDialog.port_number is None or \
-            (connectionDialog.port_number == self.portVal and len(self._mavModels) > 1):
+        if connectionDialog.port_val is None or \
+            (connectionDialog.port_val == self.port_val and len(self._mavModels) > 1):
             return
 
-        self.portVal = connectionDialog.port_number
+        self.port_val = connectionDialog.port_val
         if self.config.connection_mode == ConnectionMode.DRONE:
-            self.addrVal = connectionDialog.address
+            self.addrVal = connectionDialog.addr_val
         self.__startTransport()
 
     def __handleConfigInput(self):
