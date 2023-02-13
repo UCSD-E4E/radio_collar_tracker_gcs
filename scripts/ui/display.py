@@ -497,13 +497,13 @@ class GCS(QMainWindow):
         connectionDialog = ConnectionDialog(self.portVal, self)
         connectionDialog.exec_()
 
-        if connectionDialog.portVal is None or \
-            (connectionDialog.portVal == self.portVal and len(self._mavModels) > 1):
+        if connectionDialog.port_number is None or \
+            (connectionDialog.port_number == self.portVal and len(self._mavModels) > 1):
             return
 
-        self.portVal = connectionDialog.portVal
+        self.portVal = connectionDialog.port_number
         if self.config.connection_mode == ConnectionMode.DRONE:
-            self.addrVal = connectionDialog.addrVal
+            self.addrVal = connectionDialog.address
         self.__startTransport()
 
     def __handleConfigInput(self):
