@@ -288,7 +288,7 @@ class SystemSettingsControl(CollapseFrame):
         targetFrequencies = []
         for targetName in self.targEntries:
             if not self.validateFrequency(self.targEntries[targetName][0]):
-                WarningMessager.showWarning("Target frequency " + str(self.targEntries[targetName][0]) + " is invalid. Please enter another value.")
+                UserPopups.showWarning("Target frequency " + str(self.targEntries[targetName][0]) + " is invalid. Please enter another value.")
                 return
             targetFreq = self.targEntries[targetName][0]
             targetFrequencies.append(targetFreq)
@@ -313,13 +313,13 @@ class SystemSettingsControl(CollapseFrame):
                     else:
                         self.optionVars[optionName].setText('false')
                 except AttributeError:
-                    WarningMessager.showWarning("Failed to update GUI option vars", "Unexpected Error")
+                    UserPopups.showWarning("Failed to update GUI option vars", "Unexpected Error")
                     print(optionName)
             else:
                 try:
                     self.optionVars[optionName].setText(str(optionValue))
                 except AttributeError:
-                    WarningMessager.showWarning("Failed to update GUI option vars", "Unexpected Error")
+                    UserPopups.showWarning("Failed to update GUI option vars", "Unexpected Error")
                     print(optionName)
         self.update()
 
@@ -367,19 +367,19 @@ class SystemSettingsControl(CollapseFrame):
             sampFreq = int(self.optionVars['SDR_samplingFreq'].text())
             sdrGain = float(self.optionVars['SDR_gain'].text())
         except ValueError:
-            WarningMessager.showWarning("Please enter center and sampling frequences and SDR gain settings.")
+            UserPopups.showWarning("Please enter center and sampling frequences and SDR gain settings.")
             return
 
         if (cntrFreq < 70000000 or cntrFreq > 6000000000):
-            WarningMessager.showWarning("Center frequency " + str(cntrFreq) +
+            UserPopups.showWarning("Center frequency " + str(cntrFreq) +
                 " is invalid. Please enter another value.")
             return
         if (sampFreq < 0 or sampFreq > 56000000):
-            WarningMessager.showWarning("Sampling frequency " + str(sampFreq) +
+            UserPopups.showWarning("Sampling frequency " + str(sampFreq) +
                 " is invalid. Please enter another value.")
             return
         if (sdrGain < 0 or sdrGain > 70):
-            WarningMessager.showWarning("SDR gain" + str(sdrGain) +
+            UserPopups.showWarning("SDR gain" + str(sdrGain) +
                 " is invalid. Please enter another value.")
             return
 
@@ -391,7 +391,7 @@ class SystemSettingsControl(CollapseFrame):
         freq = addTargetWindow.freq
 
         if freq is None or not self.validateFrequency(freq):
-            #WarningMessager.showWarning("Target frequency " + str(freq) +
+            #UserPopups.showWarning("Target frequency " + str(freq) +
                 #" is invalid. Please enter another value.")
             return
 

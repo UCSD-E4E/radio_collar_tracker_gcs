@@ -19,7 +19,8 @@ class UserPopups:
             name: takes a sting that is the name of the text box
             text: takes a string that will be used as value for the text box.
         Returns:
-            Any
+            form: Text box QGridLayout
+            line: QLineEdit line  
         '''
         form = QGridLayout()
         form.setColumnStretch(0,0)
@@ -32,10 +33,9 @@ class UserPopups:
         #The text box will be formatted in a grid addWidget allows\
         # the box the be manipulated according to the column and row. (c,r)
         form.addWidget(line,0,1)
-        print(form)
-        return form
+        return form, line
 
-    def create_binary_radio_button(self, name: str, labels_list: List[str], condition: bool) -> Any:
+    def create_binary_radio_button(self, name: str, labels_list: List[str], condition: bool):
         '''
         Creates a binary radio button box. The box will only have two\
             options to select and will check according to a boolean condition
@@ -43,9 +43,10 @@ class UserPopups:
             name: takes a sting that is the name of the text box
             labels: takes an list of strings and reads the first 2 elements.
             It uses those two elements as labels for each radio button.
-            condition: takes conditional returns as a boolean.
+            condition: takes conditional returns as a boolean. 
         Returns:
-            QGridLayout Object
+            form: Text box QGridLayout
+            retval: QRadioButton 
         '''
         form = QGridLayout()
         form.setColumnStretch(1,0)
@@ -57,13 +58,14 @@ class UserPopups:
             true_event.setChecked(True)
         else:
             false_event.setChecked(True)
+
         button = QButtonGroup(parent=form)
         button.setExclusive(True)
         button.addButton(true_event)
         button.addButton(false_event)
         form.addWidget(true_event,0,1, Qt.AlignLeft)
         form.addWidget(false_event,0,0,Qt.AlignCenter)
-        return form
+        return form, true_event
 
     def show_warning(self, text: str, title: str ="Warning"):
         '''
@@ -113,7 +115,7 @@ class ExpertSettingsDialogPage(QWizardPage):
         super(ExpertSettingsDialogPage, self).__init__(parent)
         self.__parent = parent
         self.option_vars = option_vars
-
+        self.user_pops = UserPopups()
         self.create_widget()
         # Configure member vars here
         self.__parent.parent.updateGUIOptionVars(0xFF, self.option_vars)
@@ -195,8 +197,7 @@ class ExpertSettingsDialogPage(QWizardPage):
         Inner function to submit enterred information
         '''
         if not self.validate_parameters():
-            user_pops = UserPopups()
-            user_pops.show_warning(text="Entered information could not be validated")
+            self.user_pops.show_warning(text="Entered information could not be validated")
             return
         self.__parent.parent.submitGUIOptionVars(0xFF)
 
@@ -226,6 +227,7 @@ class AddTargetDialog(QWizard):
         self.setWindowTitle('Add Target')
         self.resize(640,480)
         self.button(QWizard.FinishButton).clicked.connect(self.submit)
+        self.user_pops = UserPopups()
 
     def validate(self):
         '''
@@ -239,8 +241,7 @@ class AddTargetDialog(QWizard):
         '''Internal function to submit newly added target frequency
         '''
         if not self.validate():
-            user_pops = UserPopups()
-            user_pops.show_warning("You have entered an invalid target\
+            self.user_pops.show_warning("You have entered an invalid target\
             frequency. Please try again.", "Invalid frequency")
             return
         self.name = self.page.targ_name_entry.text()
@@ -408,24 +409,24 @@ class ConfigDialog(QWizard):
         self.page = ConfigDialogPage(self)
         self.addPage(self.page)
         self.resize(640,480)
-        self.button(QWizard.FinishButton).clicked.connect(self.submit())
+        self.button(QWizard.FinishButton).clicked.connect(lambda:self.submit())
 
     def submit(self):
         '''
         Internal Function to submit user inputted configuration settings and
         close GCS UI
         '''
-        self.config.qgis_prefix_path = Path(self.page.prefix_path.text())
-        if self.page.prefix_set_true.isChecked():
+        self.config.qgis_prefix_path = Path(self.page.prefix_path[1].text())
+        if self.page.prefix_set[1].isChecked():
             self.config.qgis_prefix_set = True
         else:
             self.config.qgis_prefix_set = False
         self.config.map_extent = (
-            (float(self.page.lat_1.text()), float(self.page.lon_1.text())),
-            (float(self.page.lat_2.text()), float(self.page.lon_2.text())) )
-        self.config.connection_addr = self.page.addr.text()
-        self.config.connection_port = int(self.page.portVal.text())
-        if self.page.drone_mode.isChecked():
+            (float(self.page.lat_1[1].text()), float(self.page.lon_1[1].text())),
+            (float(self.page.lat_2[1].text()), float(self.page.lon_2[1].text())) )
+        self.config.connection_addr = self.page.address[1].text()
+        self.config.connection_port = int(self.page.port_number[1].text())
+        if self.page.drone_mode[1].isChecked():
             self.config.connection_mode = ConnectionMode.DRONE
         else:
             self.config.connection_mode = ConnectionMode.TOWER
@@ -457,35 +458,35 @@ class ConfigDialogPage(QWizardPage):
 
         frm_holder = QVBoxLayout()
         #----- Prefix Path
-        frm_prefix_path = pop_up_box.create_text_box('QGis Prefix Path',\
+        self.prefix_path = pop_up_box.create_text_box('QGis Prefix Path',\
             str(self.__parent.config.qgis_prefix_path))
         #----- Prefix Set
-        frm_prefix_set = pop_up_box.create_binary_radio_button('QGis Prefix Set',\
+        self.prefix_set = pop_up_box.create_binary_radio_button('QGis Prefix Set',\
             ['True', 'False'], self.__parent.config.qgis_prefix_set)
         #----- Lat 1
-        frm_lat_1 = pop_up_box.create_text_box('Lat 1', str(self.__parent.config.map_extent[0][0]))
+        self.lat_1 = pop_up_box.create_text_box('Lat 1', str(self.__parent.config.map_extent[0][0]))
         #----- Lat 2
-        frm_lat_2 = pop_up_box.create_text_box('Lat 2', str(self.__parent.config.map_extent[1][0]))
+        self.lat_2 = pop_up_box.create_text_box('Lat 2', str(self.__parent.config.map_extent[1][0]))
         #----- Lon 1
-        frm_lon_1 = pop_up_box.create_text_box('Lon 1', str(self.__parent.config.map_extent[0][1]))
+        self.lon_1 = pop_up_box.create_text_box('Lon 1', str(self.__parent.config.map_extent[0][1]))
         #----- Lon 2
-        frm_lon_2 = pop_up_box.create_text_box('Lon 2', str(self.__parent.config.map_extent[1][1]))
+        self.lon_2 = pop_up_box.create_text_box('Lon 2', str(self.__parent.config.map_extent[1][1]))
         #----- Addr
-        frm_addr = pop_up_box.create_text_box('Addr', str(self.__parent.config.connection_addr))
+        self.address = pop_up_box.create_text_box('Addr', str(self.__parent.config.connection_addr))
         #----- Port
-        frm_port = pop_up_box.create_text_box('Port', str(self.__parent.config.connection_port))
+        self.port_number = pop_up_box.create_text_box('Port', str(self.__parent.config.connection_port))
         #----- Mode
-        frm_mode = pop_up_box.create_binary_radio_button('Mode',
+        self.drone_mode = pop_up_box.create_binary_radio_button('Mode',
             ['Drone', 'Tower'], self.__parent.config.connection_mode == ConnectionMode.DRONE)
         #-----
-        frm_holder.addLayout(frm_prefix_path)
-        frm_holder.addLayout(frm_prefix_set)
-        frm_holder.addLayout(frm_lat_1)
-        frm_holder.addLayout(frm_lat_2)
-        frm_holder.addLayout(frm_lon_1)
-        frm_holder.addLayout(frm_lon_2)
-        frm_holder.addLayout(frm_addr)
-        frm_holder.addLayout(frm_port)
-        frm_holder.addLayout(frm_mode)
+        frm_holder.addLayout(self.prefix_path[0])
+        frm_holder.addLayout(self.prefix_set[0])
+        frm_holder.addLayout(self.lat_1[0])
+        frm_holder.addLayout(self.lat_2[0])
+        frm_holder.addLayout(self.lon_1[0])
+        frm_holder.addLayout(self.lon_2[0])
+        frm_holder.addLayout(self.address[0])
+        frm_holder.addLayout(self.port_number[0])
+        frm_holder.addLayout(self.drone_mode[0])
 
         self.setLayout(frm_holder)

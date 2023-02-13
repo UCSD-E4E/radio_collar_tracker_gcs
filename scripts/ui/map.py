@@ -637,7 +637,7 @@ class MapOptions(QWidget):
         self.created = False
         self.writer = None
         self.hasPoint = False
-        
+        self.user_pops = UserPopups()
 
 
     def __createWidgets(self):
@@ -709,7 +709,7 @@ class MapOptions(QWidget):
         '''
         if self.isWebMap:
             if (self.mapWidget.toolRect.rectangle() == None):
-                WarningMessager.showWarning("Use the rect tool to choose an area on the map to cache", "No specified area to cache!")
+                self.user_pops.show_warning("Use the rect tool to choose an area on the map to cache", "No specified area to cache!")
                 self.mapWidget.rect()
             else:
                 cacheThread = Thread(target=self.mapWidget.cacheMap)
@@ -829,7 +829,7 @@ class MapOptions(QWidget):
         Method to export a MapWidget's pingLayer to a shapefile
         '''
         if self.mapWidget is None:
-            WarningMessager.showWarning("Load a map before exporting.")
+            self.user_pops.show_warning("Load a map before exporting.")
             return
 
         folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
@@ -846,7 +846,7 @@ class MapOptions(QWidget):
         Method to export a MapWidget's vehiclePath to a shapefile
         '''
         if self.mapWidget is None:
-            WarningMessager.showWarning("Load a map before exporting.")
+            self.user_pops.show_warning("Load a map before exporting.")
             return
 
         folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
@@ -864,7 +864,7 @@ class MapOptions(QWidget):
         Method to export MapWidget's Polygon shape to a shapefile
         '''
         if self.mapWidget is None:
-            WarningMessager.showWarning("Load a map before exporting.")
+            self.user_pops.show_warning("Load a map before exporting.")
             return
 
         vpr = self.mapWidget.polygonLayer.dataProvider()
@@ -872,7 +872,7 @@ class MapOptions(QWidget):
         if self.mapWidget.toolPolygon is None:
             return
         elif len(self.mapWidget.toolPolygon.vertices) == 0:
-            WarningMessager.showWarning("Use the polygon tool to choose an area on the map to export", "No specified area to export!")
+            self.user_pops.show_warning("Use the polygon tool to choose an area on the map to export", "No specified area to export!")
             self.mapWidget.polygon()
         else:
             
@@ -899,7 +899,7 @@ class MapOptions(QWidget):
         Method to export a MapWidget's cones to a shapefile
         '''
         if self.mapWidget is None:
-            WarningMessager.showWarning("Load a map before exporting.")
+            self.user_pops.show_warning("Load a map before exporting.")
             return
         folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
         file = folder + '/cones.shp'

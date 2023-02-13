@@ -60,7 +60,7 @@ class GCS(QMainWindow):
         self.mainThread = None
         self.testFrame = None
         self.pingSheetCreated = False
-
+        self.user_popups = UserPopups()
         self.config = config.Configuration(Path('gcsConfig.ini'))
         self.config.load()
 
@@ -111,7 +111,7 @@ class GCS(QMainWindow):
                 self._transport = RCTTCPClient(addr=self.addrVal, port=self.portVal)
                 self.connectionHandler(self._transport, 0)
             except ConnectionRefusedError:
-                WarningMessager.showWarning("Failure to connect:\nPlease ensure server is running.")
+                self.user_popups.show_warning("Failure to connect:\nPlease ensure server is running.")
                 self._transport.close()
                 return
 
@@ -213,7 +213,7 @@ class GCS(QMainWindow):
         '''
         for button in self._buttons:
             button.config(state='disabled')
-        WarningMessager.showWarning("No Heartbeats Received")
+        self.user_popups.show_warning("No Heartbeats Received")
 
     def __handleNewEstimate(self, id):
         '''
@@ -291,7 +291,7 @@ class GCS(QMainWindow):
         Internal callback for an exception message
         '''
         mavModel = self._mavModels[id]
-        WarningMessager.showWarning('An exception has occured!\n%s\n%s' % (
+        self.user_popups.show_warning('An exception has occured!\n%s\n%s' % (
             mavModel.lastException[0], mavModel.lastException[1]))
 
     def __startStopMission(self):
@@ -664,6 +664,7 @@ class UpgradeDisplay(CollapseFrame):
         self.filename = None
 
         self.__createWidget()
+        self.user_pops = UserPopups()
 
     def update(self):
         self.updateGUIOptionVars()
@@ -707,7 +708,7 @@ class UpgradeDisplay(CollapseFrame):
         try:
             file = open(self.filename.text(), "rb")
         except FileNotFoundError:
-            WarningMessager.showWarning("Please choose a valid file.")
+            self.user_pops.show_warning("Please choose a valid file.")
             return
         byteStream = file.read()
         self.__root._mavModel.sendUpgradePacket(byteStream)
@@ -799,6 +800,7 @@ class ComponentStatusDisplay(CollapseFrame):
             root: The application root
         '''
         CollapseFrame.__init__(self, 'Component Statuses')
+        self.user_pops = UserPopups()
         self.sdrMap = {
             "SDR_INIT_STATES.find_devices": {'text': 'SDR: Searching for devices', 'bg':'yellow'},
             "SDR_INIT_STATES.wait_recycle": {'text':'SDR: Recycling!', 'bg':'yellow'},
@@ -916,7 +918,7 @@ class ComponentStatusDisplay(CollapseFrame):
                         if varName in self.statusLabels:
                             self.statusLabels[varName].setStyleSheet(style)
             except KeyError:
-                WarningMessager.showWarning("Failed to update GUI option vars", "Unexpected Error")
+                self.user_pops.show_warning("Failed to update GUI option vars", "Unexpected Error")
                 continue
 
 class MapControl(CollapseFrame):
@@ -933,7 +935,7 @@ class MapControl(CollapseFrame):
         self.__latEntry = None
         self.__lonEntry = None
         self.__zoomEntry = None
-
+        self.user_pops = UserPopups()
         self.__createWidgets()
 
 
@@ -1014,7 +1016,7 @@ class MapControl(CollapseFrame):
             lon2 = config['LastCoords']['lon2']
             return lat1, lon1, lat2, lon2
         except KeyError:
-            WarningMessager.showWarning("Could not read config path", config_path)
+            self.user_pops.show_warning("Could not read config path", config_path)
             return None, None, None, None
 
     def __initLatLon(self):
@@ -1056,7 +1058,7 @@ class MapControl(CollapseFrame):
             temp = WebMap(self.__holder, p1lat, p1lon,
                     p2lat, p2lon, False)
         except RuntimeError:
-            WarningMessager.showWarning("Failed to load web map")
+            self.user_pops.show_warning("Failed to load web map")
             return
         self.__mapFrame.setParent(None)
         self.__mapFrame = temp
