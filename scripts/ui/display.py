@@ -42,7 +42,7 @@ class GCS(QMainWindow):
         '''
         super().__init__()
         self.__log = logging.getLogger('rctGCS.GCS')
-        self.portVal = self.defaultPortVal
+        self.port_val = self.defaultPortVal
         self._transport = None
         self._mavModels = {}
         self._mavModel = None
@@ -60,7 +60,7 @@ class GCS(QMainWindow):
         self.mainThread = None
         self.testFrame = None
         self.pingSheetCreated = False
-
+        self.user_popups = UserPopups()
         self.config = config.Configuration(Path('gcsConfig.ini'))
         self.config.load()
 
@@ -104,14 +104,14 @@ class GCS(QMainWindow):
             self._transport.close()
         self.mavEventSignal.connect(self.__mavEventHandler)
         if self.config.connection_mode == config.ConnectionMode.TOWER:
-            self._transport = RCTTCPServer(self.portVal, self.connectionHandler)
+            self._transport = RCTTCPServer(self.port_val, self.connectionHandler)
             self._transport.open()
         else:
             try:
-                self._transport = RCTTCPClient(addr=self.addrVal, port=self.portVal)
+                self._transport = RCTTCPClient(addr=self.addrVal, port=self.port_val)
                 self.connectionHandler(self._transport, 0)
             except ConnectionRefusedError:
-                WarningMessager.showWarning("Failure to connect:\nPlease ensure server is running.")
+                self.user_popups.show_warning("Failure to connect:\nPlease ensure server is running.")
                 self._transport.close()
                 return
 
@@ -213,7 +213,7 @@ class GCS(QMainWindow):
         '''
         for button in self._buttons:
             button.config(state='disabled')
-        WarningMessager.showWarning("No Heartbeats Received")
+        self.user_popups.show_warning("No Heartbeats Received")
 
     def __handleNewEstimate(self, id):
         '''
@@ -291,7 +291,7 @@ class GCS(QMainWindow):
         Internal callback for an exception message
         '''
         mavModel = self._mavModels[id]
-        WarningMessager.showWarning('An exception has occured!\n%s\n%s' % (
+        self.user_popups.show_warning('An exception has occured!\n%s\n%s' % (
             mavModel.lastException[0], mavModel.lastException[1]))
 
     def __startStopMission(self):
@@ -494,17 +494,24 @@ class GCS(QMainWindow):
         '''
         Internal callback to connect GCS to drone
         '''
-        connectionDialog = ConnectionDialog(self.portVal, self)
+        connectionDialog = ConnectionDialog(self.port_val, self)
         connectionDialog.exec_()
 
-        if connectionDialog.portVal is None or \
-            (connectionDialog.portVal == self.portVal and len(self._mavModels) > 1):
+        if connectionDialog.port_val is None or \
+            (connectionDialog.port_val == self.port_val and len(self._mavModels) > 1):
             return
 
-        self.portVal = connectionDialog.portVal
+        self.port_val = connectionDialog.port_val
         if self.config.connection_mode == ConnectionMode.DRONE:
-            self.addrVal = connectionDialog.addrVal
+            self.addrVal = connectionDialog.addr_val
         self.__startTransport()
+
+    def __handleConfigInput(self):
+        '''
+        Internal callback to connect GCS to drone
+        '''
+        connectionDialog = ConfigDialog(self)
+        connectionDialog.exec_()
 
     def setMap(self, mapWidget):
         '''
@@ -572,6 +579,21 @@ class GCS(QMainWindow):
         self.upgradeDisplay = UpgradeDisplay(content, self)
         self.upgradeDisplay.resize(self.SBWidth, 400)
 
+        # CONFIG TAB
+        self._configTab = CollapseFrame(title='Configuration Settings')
+        self._configTab.resize(self.SBWidth, 400)
+        lay_config = QVBoxLayout()
+        btn_config = QPushButton("Edit Configuration Settings")
+        btn_config.resize(self.SBWidth, 100)
+        btn_config.clicked.connect(self.__handleConfigInput)
+        self.config_select = QComboBox()
+        self.config_select.resize(self.SBWidth, 100)
+        self.config_select.hide()
+        lay_config.addWidget(btn_config)
+        lay_config.addWidget(self.config_select)
+
+        self._configTab.setContentLayout(lay_config)
+
 
         # START PAYLOAD RECORDING
         self.__missionStatusBtn = QPushButton(self.__missionStatusText)
@@ -595,6 +617,7 @@ class GCS(QMainWindow):
         wlay.addWidget(self.mapControl)
         wlay.addWidget(self.systemSettingsWidget)
         wlay.addWidget(self.upgradeDisplay)
+        wlay.addWidget(self._configTab)
         wlay.addWidget(self.__missionStatusBtn)
         wlay.addWidget(self.__btn_exportAll)
         wlay.addWidget(self.__btn_precision)
@@ -641,6 +664,7 @@ class UpgradeDisplay(CollapseFrame):
         self.filename = None
 
         self.__createWidget()
+        self.user_pops = UserPopups()
 
     def update(self):
         self.updateGUIOptionVars()
@@ -684,7 +708,7 @@ class UpgradeDisplay(CollapseFrame):
         try:
             file = open(self.filename.text(), "rb")
         except FileNotFoundError:
-            WarningMessager.showWarning("Please choose a valid file.")
+            self.user_pops.show_warning("Please choose a valid file.")
             return
         byteStream = file.read()
         self.__root._mavModel.sendUpgradePacket(byteStream)
@@ -776,6 +800,7 @@ class ComponentStatusDisplay(CollapseFrame):
             root: The application root
         '''
         CollapseFrame.__init__(self, 'Component Statuses')
+        self.user_pops = UserPopups()
         self.sdrMap = {
             "SDR_INIT_STATES.find_devices": {'text': 'SDR: Searching for devices', 'bg':'yellow'},
             "SDR_INIT_STATES.wait_recycle": {'text':'SDR: Recycling!', 'bg':'yellow'},
@@ -893,7 +918,7 @@ class ComponentStatusDisplay(CollapseFrame):
                         if varName in self.statusLabels:
                             self.statusLabels[varName].setStyleSheet(style)
             except KeyError:
-                WarningMessager.showWarning("Failed to update GUI option vars", "Unexpected Error")
+                self.user_pops.show_warning("Failed to update GUI option vars", "Unexpected Error")
                 continue
 
 class MapControl(CollapseFrame):
@@ -910,7 +935,7 @@ class MapControl(CollapseFrame):
         self.__latEntry = None
         self.__lonEntry = None
         self.__zoomEntry = None
-
+        self.user_pops = UserPopups()
         self.__createWidgets()
 
 
@@ -991,7 +1016,7 @@ class MapControl(CollapseFrame):
             lon2 = config['LastCoords']['lon2']
             return lat1, lon1, lat2, lon2
         except KeyError:
-            WarningMessager.showWarning("Could not read config path", config_path)
+            self.user_pops.show_warning("Could not read config path", config_path)
             return None, None, None, None
 
     def __initLatLon(self):
@@ -1033,7 +1058,7 @@ class MapControl(CollapseFrame):
             temp = WebMap(self.__holder, p1lat, p1lon,
                     p2lat, p2lon, False)
         except RuntimeError:
-            WarningMessager.showWarning("Failed to load web map")
+            self.user_pops.show_warning("Failed to load web map")
             return
         self.__mapFrame.setParent(None)
         self.__mapFrame = temp
