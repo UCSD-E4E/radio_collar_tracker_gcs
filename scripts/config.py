@@ -211,7 +211,7 @@ class Configuration:
             raise RuntimeError("Not a conda environment")
         pkgs_dir = Path(os.environ['_CONDA_ROOT']).joinpath('pkgs')
         qgis_dirs = [qgis_dir for qgis_dir in pkgs_dir.glob('qgis*') if qgis_dir.is_dir()]
-        return sorted(qgis_dirs)[-1]
+        return sorted(qgis_dirs)[-1].joinpath('Library')
 
     def __enter__(self) -> Configuration:
         self.load()

@@ -121,7 +121,7 @@ if __name__ == '__main__':
 
     prefix_path = configSetup()
 
-    QgsApplication.setPrefixPath(str(prefix_path))
+    QgsApplication.setPrefixPath(str(prefix_path), True)
 
     app.initQgis()
 
