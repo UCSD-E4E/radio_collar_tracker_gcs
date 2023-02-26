@@ -22,19 +22,16 @@ class GCS(QMainWindow):
     Ground Control Station GUI
     '''
 
-    SBWidth = 500
-
-    defaultTimeout = 5
-
-    defaultPortVal = 9000
+    sb_width = 500
+    default_timeout = 5
+    default_port_val = 9000
 
     sig = pyqtSignal()
 
-    connectSignal = pyqtSignal(RCTAbstractTransport, int)
+    connect_signal = pyqtSignal(int)
+    disconnect_signal = pyqtSignal(int)
 
-    disconnectSignal = pyqtSignal(int)
-
-    mavEventSignal = pyqtSignal(rctCore.Events, int)
+    mav_event_signal = pyqtSignal(rctCore.Events, int)
 
     def __init__(self):
         '''
@@ -42,148 +39,164 @@ class GCS(QMainWindow):
         '''
         super().__init__()
         self.__log = logging.getLogger('rctGCS.GCS')
-        self.port_val = self.defaultPortVal
+        self.port_val = self.default_port_val
         self._transport = None
-        self._mavModels = {}
-        self._mavModel = None
+        self._mav_models = {}
+        self._mav_model = None
         self._buttons = []
-        self._systemConnectionTab = None
-        self.systemSettingsWidget = None
-        self.__missionStatusText = "Start Recording"
-        self.__missionStatusBtn = None
-        self.innerFreqFrame = None
-        self.freqElements = []
-        self.targEntries = {}
-        self.mapControl = None
-        self.mapOptions = None
-        self.mapDisplay = None
-        self.mainThread = None
-        self.testFrame = None
-        self.pingSheetCreated = False
+        self._system_connection_tab = None
+        self.system_settings_widget = None
+        self.__mission_status_text = "Start Recording"
+        self.__mission_status_btn = None
+        self.inner_freq_frame = None
+        self.freq_elements = []
+        self.targ_entries = {}
+        self.map_control = None
+        self.map_options = None
+        self.map_display = None
+        self.test_frame = None
+        self.ping_sheet_created = False
         self.user_popups = UserPopups()
         self.config = config.Configuration(Path('gcsConfig.ini'))
         self.config.load()
 
-        self.__createWidgets()
+        self.__create_widgets()
         for button in self._buttons:
             button.config(state='disabled')
 
         self.queue = q.Queue()
         self.sig.connect(self.execute_inmain, Qt.QueuedConnection)
 
+        self.connect_signal.connect(self.connection_slot)
+        self.disconnect_signal.connect(self.disconnect_slot)
+
     def execute_inmain(self):
         while not self.queue.empty():
-            (fn, coord, frequency, numPings) = self.queue.get()
-            fn(coord, frequency, numPings)
+            (fn, coord, frequency, num_pings) = self.queue.get()
+            fn(coord, frequency, num_pings)
 
-    def __mavEventHandler(self, event, id):
+    def __mav_event_handler(self, event, id):
         if event == rctCore.Events.Heartbeat:
-            self.__heartbeatCallback(id)
+            self.__heartbeat_callback(id)
         if event == rctCore.Events.Exception:
-            self.__handleRemoteException(id)
+            self.__handle_remote_exception(id)
         if event == rctCore.Events.VehicleInfo:
-            self.__handleVehicleInfo(id)
+            self.__handle_vehicle_info(id)
         if event == rctCore.Events.NewPing:
-            self.__handleNewPing(id)
+            self.__handle_new_ping(id)
         if event == rctCore.Events.NewEstimate:
-            self.__handleNewEstimate(id)
+            self.__handle_new_estimate(id)
         if event == rctCore.Events.ConeInfo:
-            self.__handleNewCone(id)
+            self.__handle_new_cone(id)
 
-    def __registerModelCallbacks(self, id):
-        mavModel = self._mavModels[id]
-        eventTypes = [rctCore.Events.Heartbeat, rctCore.Events.Exception,
-        rctCore.Events.VehicleInfo, rctCore.Events.NewPing,
-        rctCore.Events.NewEstimate, rctCore.Events.ConeInfo]
-        for eventType in eventTypes:
-            mavModel.registerCallback(eventType,
-            partial(self.mavEventSignal.emit, eventType, id))
+    def __register_model_callbacks(self, id):
+        mav_model = self._mav_models[id]
+        event_types = [rctCore.Events.Heartbeat, rctCore.Events.Exception,
+                    rctCore.Events.VehicleInfo, rctCore.Events.NewPing,
+                    rctCore.Events.NewEstimate, rctCore.Events.ConeInfo]
+        for event_type in event_types:
+            mav_model.registerCallback(event_type,
+            partial(self.mav_event_signal.emit, event_type, id))
 
-    def __startTransport(self):
+    def __start_transport(self):
         if self._transport is not None and self._transport.isOpen():
             self._transport.close()
-        self.mavEventSignal.connect(self.__mavEventHandler)
+        self.mav_event_signal.connect(self.__mav_event_handler)
         if self.config.connection_mode == config.ConnectionMode.TOWER:
-            self._transport = RCTTCPServer(self.port_val, self.connectionHandler)
+            self._transport = RCTTCPServer(self.port_val, self.connection_handler)
             self._transport.open()
         else:
             try:
-                self._transport = RCTTCPClient(addr=self.addrVal, port=self.port_val)
-                self.connectionHandler(self._transport, 0)
+                self._transport = RCTTCPClient(addr=self.addr_val, port=self.port_val)
+                self.connection_handler(self._transport, 0)
             except ConnectionRefusedError:
                 self.user_popups.show_warning("Failure to connect:\nPlease ensure server is running.")
                 self._transport.close()
                 return
 
-    def connectionHandler(self, connection, id):
-        comms = gcsComms(connection, partial(self.__disconnectHandler, id))
+    def connection_handler(self, connection, id):
+        comms = gcsComms(connection, partial(self.__disconnect_handler, id))
         model = rctCore.MAVModel(comms)
         model.start()
-        self._mavModels[id] = model
-        if self._mavModel is None:
-            self._mavModel = model
-            self.__registerModelCallbacks(id)
+        self._mav_models[id] = model
+        if self._mav_model is None:
+            self._mav_model = model
+            self.__register_model_callbacks(id)
 
-        self.updateConnectionsLabel()
-        self.systemSettingsWidget.connectionMade()
-        self.__missionStatusBtn.setEnabled(True)
-        self.__btn_exportAll.setEnabled(True)
+        self.connect_signal.emit(id)
+
+    def connection_slot(self, id):
+        '''
+        Handle GUI updates in main thread by connecting pyqt signal to the
+        remaining connection work
+        '''
+        self.update_connections_label()
+        self.system_settings_widget.connection_made()
+        self.__mission_status_btn.setEnabled(True)
+        self.__btn_export_all.setEnabled(True)
         self.__btn_precision.setEnabled(True)
-        self.__btn_heatMap.setEnabled(True)
-
+        self.__btn_heat_map.setEnabled(True)
         self.__log.info('Connected {}'.format(id))
 
-    def __disconnectHandler(self, id):
-        mavModel = self._mavModels[id]
-        del self._mavModels[id]
-        if mavModel == self._mavModel:
-            self._mavModel = None
-        if len(self._mavModels) == 0:
-            self.systemSettingsWidget.disconnected()
-            self.__missionStatusBtn.setEnabled(False)
-            self.__btn_exportAll.setEnabled(False)
+    def __disconnect_handler(self, id):
+        mav_model = self._mav_models[id]
+        del self._mav_models[id]
+        if mav_model == self._mav_model:
+            self._mav_model = None
+
+        self.disconnect_signal.emit(id)
+
+    def disconnect_slot(self, id):
+        '''
+        Handle GUI updates in main thread by connecting pyqt signal to the
+        remaining disconnection work
+        '''
+        if len(self._mav_models) == 0:
+            self.system_settings_widget.disconnected()
+            self.__mission_status_btn.setEnabled(False)
+            self.__btn_export_all.setEnabled(False)
             self.__btn_precision.setEnabled(False)
-            self.__btn_heatMap.setEnabled(False)
-        self.updateConnectionsLabel()
+            self.__btn_heat_map.setEnabled(False)
+        self.update_connections_label()
         self.__log.info('Disconnected {}'.format(id))
 
-    def updateConnectionsLabel(self):
-        numConnections = len(self._mavModels)
+    def update_connections_label(self):
+        num_connections = len(self._mav_models)
         label = "System: No Connection"
-        if numConnections == 1:
+        if num_connections == 1:
             label = "System: 1 Connection"
-        elif numConnections > 1:
-            label = "System: {} Connections".format(numConnections)
-        self._systemConnectionTab.updateText(label)
+        elif num_connections > 1:
+            label = "System: {} Connections".format(num_connections)
+        self._system_connection_tab.update_text(label)
 
-    def __changeModel(self, id):
+    def __change_model(self, id: int):
         '''
-        Changing the selected _mavModel
+        Changing the selected _mav_model
         '''
-        self._mavModel = self._mavModels[id]
-        self.systemSettingsWidget.connectionMade()
+        self._mav_model = self._mav_models[id]
+        self.system_settings_widget.connection_made()
 
-    def __changeModelByIndex(self, index):
+    def __change_model_by_index(self, index: int):
         '''
-        Changing the selected _mavModel by index
+        Changing the selected _mav_model by index
         '''
-        if index < 0 or index > len(self._mavModels):
+        if index < 0 or index > len(self._mav_models):
             return
         try:
-            self.__changeModel(list(self._mavModels.keys())[index])
+            self.__change_model(list(self._mav_models.keys())[index])
         except:
             print('Failed to change Model to {}'.format(index))
-            self.__useDefaultModel()
+            self.__use_default_model()
 
-    def __useDefaultModel(self):
+    def __use_default_model(self):
         '''
         Using the first model as the default if possible
         '''
         try:
-            if len(self._mavModels) > 0:
-                self.__changeModel(list(self._mavModels.keys())[0])
+            if len(self._mav_models) > 0:
+                self.__change_model(list(self._mav_models.keys())[0])
         except:
-            self._mavModel = None
+            self._mav_model = None
 
     def mainloop(self, n=0):
         '''
@@ -192,22 +205,23 @@ class GCS(QMainWindow):
         :type n:
         '''
 
-    def __heartbeatCallback(self, id):
+    def __heartbeat_callback(self, id):
         '''
         Internal Heartbeat callback
         '''
+        self.status_widget.update()
 
-    def __startCommand(self):
+    def __start_command(self):
         '''
         Internal callback to send the start command
         '''
 
-    def __stopCommand(self):
+    def __stop_command(self):
         '''
         Internal callback to send the stop command
         '''
 
-    def __noHeartbeat(self):
+    def __no_heartbeat(self):
         '''
         Internal callback for the no heartbeat state
         '''
@@ -215,243 +229,239 @@ class GCS(QMainWindow):
             button.config(state='disabled')
         self.user_popups.show_warning("No Heartbeats Received")
 
-    def __handleNewEstimate(self, id):
+    def __handle_new_estimate(self, id):
         '''
         Internal callback to handle when a new estimate is received
         '''
-        mavModel = self._mavModels[id]
-        freqList = mavModel.EST_mgr.getFrequencies()
-        for frequency in freqList:
-            params, stale, res = mavModel.EST_mgr.getEstimate(frequency)
+        mav_model = self._mav_models[id]
+        freq_list = mav_model.EST_mgr.getFrequencies()
+        for frequency in freq_list:
+            params, stale, res = mav_model.EST_mgr.getEstimate(frequency)
 
-            zone, let = mavModel.EST_mgr.getUTMZone()
+            zone, let = mav_model.EST_mgr.getUTMZone()
             coord = utm.to_latlon(params[0], params[1], zone, let)
 
-            numPings = mavModel.EST_mgr.getNumPings(frequency)
+            num_pings = mav_model.EST_mgr.getnum_pings(frequency)
 
-            if self.mapDisplay is not None:
-                self.mapDisplay.plotEstimate(coord, frequency)
-                #self.queue.put( (self.mapDisplay.plotPrecision, coord, frequency, numPings) )
+            if self.map_display is not None:
+                self.map_display.plot_estimate(coord, frequency)
+                #self.queue.put( (self.map_display.plot_precision, coord, frequency, num_pings) )
                 #self.sig.emit()
-                #self.mapDisplay.plotPrecision(coord, frequency, numPings)
+                #self.map_display.plot_precision(coord, frequency, num_pings)
 
-            if self.mapOptions is not None:
-                self.mapOptions.estDistance(coord, stale, res)
+            if self.map_options is not None:
+                self.map_options.est_distance(coord, stale, res)
 
 
-    def __handleNewPing(self, id):
+    def __handle_new_ping(self, id):
         '''
         Internal callback to handle when a new ping is received
         '''
-        mavModel = self._mavModels[id]
-        freqList = mavModel.EST_mgr.getFrequencies()
-        for frequency in freqList:
-            last = mavModel.EST_mgr.getPings(frequency)[-1].tolist()
-            zone, let = mavModel.EST_mgr.getUTMZone()
+        mav_model = self._mav_models[id]
+        freq_list = mav_model.EST_mgr.getFrequencies()
+        for frequency in freq_list:
+            last = mav_model.EST_mgr.getPings(frequency)[-1].tolist()
+            zone, let = mav_model.EST_mgr.getUTMZone()
             u = (last[0], last[1], zone, let)
             coord = utm.to_latlon(*u)
             power = last[3]
 
-            if self.mapDisplay is not None:
-                self.mapDisplay.plotPing(coord, power)
+            if self.map_display is not None:
+                self.map_display.plot_ping(coord, power)
 
-
-
-    def __handleVehicleInfo(self, id):
+    def __handle_vehicle_info(self, id):
         '''
         Internal Callback for Vehicle Info
         '''
-        mavModel = self._mavModels[id]
-        if mavModel == None:
+        mav_model = self._mav_models[id]
+        if mav_model == None:
             return
-        last = list(mavModel.state['VCL_track'])[-1]
-        coord = mavModel.state['VCL_track'][last]
+        last = list(mav_model.state['VCL_track'])[-1]
+        coord = mav_model.state['VCL_track'][last]
 
-        mavModel.EST_mgr.addVehicleLocation(coord)
+        mav_model.EST_mgr.addVehicleLocation(coord)
 
-        if self.mapDisplay is not None:
-            self.mapDisplay.plotVehicle(id, coord)
+        if self.map_display is not None:
+            self.map_display.plot_vehicle(id, coord)
 
-    def __handleNewCone(self, id):
+    def __handle_new_cone(self, id):
         '''
         Internal callback to handle new cone info
         '''
-        mavModel = self._mavModels[id]
-        if mavModel == None:
+        mav_model = self._mav_models[id]
+        if mav_model == None:
             return
 
-        recentCone = list(mavModel.state['CONE_track'])[-1]
-        cone = mavModel.state['CONE_track'][recentCone]
+        recent_cone = list(mav_model.state['CONE_track'])[-1]
+        cone = mav_model.state['CONE_track'][recent_cone]
 
-        if self.mapDisplay is not None:
-            self.mapDisplay.plotCone(cone)
+        if self.map_display is not None:
+            self.map_display.plot_cone(cone)
 
-    def __handleRemoteException(self, id):
+    def __handle_remote_exception(self, id):
         '''
         Internal callback for an exception message
         '''
-        mavModel = self._mavModels[id]
+        mav_model = self._mav_models[id]
         self.user_popups.show_warning('An exception has occured!\n%s\n%s' % (
-            mavModel.lastException[0], mavModel.lastException[1]))
+            mav_model.lastException[0], mav_model.lastException[1]))
 
-    def __startStopMission(self):
+    def __start_stop_mission(self):
         # State machine for start recording -> stop recording
-
-        if self._mavModel == None:
+        if self._mav_model == None:
             return
 
-        if self.__missionStatusBtn.text() == 'Start Recording':
-            self.__missionStatusBtn.setText('Stop Recording')
-
-            self._mavModel.startMission(timeout=self.defaultTimeout)
+        if self.__mission_status_btn.text() == 'Start Recording':
+            self.__mission_status_btn.setText('Stop Recording')
+            self._mav_model.startMission(timeout=self.default_timeout)
         else:
-            self.__missionStatusBtn.setText('Start Recording')
-            self._mavModel.stopMission(timeout=self.defaultTimeout)
+            self.__mission_status_btn.setText('Start Recording')
+            self._mav_model.stopMission(timeout=self.default_timeout)
 
-    def __updateStatus(self):
+    def __update_status(self): # TODO: this isn't getting used and doesn't seem to work???
         '''
         Internal callback for status variable update
         '''
         for button in self._buttons:
             button.config(state='normal')
-        self.progressBar['value'] = 0
-        sdrStatus = self._mavModel.STS_sdrStatus
-        dirStatus = self._mavModel.STS_dirStatus
-        gpsStatus = self._mavModel.STS_gpsStatus
-        sysStatus = self._mavModel.STS_sysStatus
-        swStatus = self._mavModel.STS_swStatus
+        self.progress_bar['value'] = 0
+        sdr_status = self._mav_model.STS_sdr_status
+        dir_status = self._mav_model.STS_dir_status
+        gps_status = self._mav_model.STS_gps_status
+        sys_status = self._mav_model.STS_sys_status
+        sw_status = self._mav_model.STS_sw_status
 
-        sdrMap = {
-            self._mavModel.SDR_INIT_STATES.find_devices: ('SDR: Searching for devices', 'yellow'),
-            self._mavModel.SDR_INIT_STATES.wait_recycle: ('SDR: Recycling!', 'yellow'),
-            self._mavModel.SDR_INIT_STATES.usrp_probe: ('SDR: Initializing SDR', 'yellow'),
-            self._mavModel.SDR_INIT_STATES.rdy: ('SDR: Ready', 'green'),
-            self._mavModel.SDR_INIT_STATES.fail: ('SDR: Failed!', 'red')
+        sdr_map = {
+            self._mav_model.SDR_INIT_STATES.find_devices: ('SDR: Searching for devices', 'yellow'),
+            self._mav_model.SDR_INIT_STATES.wait_recycle: ('SDR: Recycling!', 'yellow'),
+            self._mav_model.SDR_INIT_STATES.usrp_probe: ('SDR: Initializing SDR', 'yellow'),
+            self._mav_model.SDR_INIT_STATES.rdy: ('SDR: Ready', 'green'),
+            self._mav_model.SDR_INIT_STATES.fail: ('SDR: Failed!', 'red')
         }
 
         try:
-            self.sdrStatusLabel.config(
-                text=sdrMap[sdrStatus][0], bg=sdrMap[sdrStatus][1])
+            self.sdr_status_label.config(
+                text=sdr_map[sdr_status][0], bg=sdr_map[sdr_status][1])
         except KeyError:
-            self.sdrStatusLabel.config(
+            self.sdr_status_label.config(
                 text='SDR: NULL', bg='red')
 
-        dirMap = {
-            self._mavModel.OUTPUT_DIR_STATES.get_output_dir: ('DIR: Searching', 'yellow'),
-            self._mavModel.OUTPUT_DIR_STATES.check_output_dir: ('DIR: Checking for mount', 'yellow'),
-            self._mavModel.OUTPUT_DIR_STATES.check_space: ('DIR: Checking for space', 'yellow'),
-            self._mavModel.OUTPUT_DIR_STATES.wait_recycle: ('DIR: Recycling!', 'yellow'),
-            self._mavModel.OUTPUT_DIR_STATES.rdy: ('DIR: Ready', 'green'),
-            self._mavModel.OUTPUT_DIR_STATES.fail: ('DIR: Failed!', 'red'),
+        dir_map = {
+            self._mav_model.OUTPUT_DIR_STATES.get_output_dir: ('DIR: Searching', 'yellow'),
+            self._mav_model.OUTPUT_DIR_STATES.check_output_dir: ('DIR: Checking for mount', 'yellow'),
+            self._mav_model.OUTPUT_DIR_STATES.check_space: ('DIR: Checking for space', 'yellow'),
+            self._mav_model.OUTPUT_DIR_STATES.wait_recycle: ('DIR: Recycling!', 'yellow'),
+            self._mav_model.OUTPUT_DIR_STATES.rdy: ('DIR: Ready', 'green'),
+            self._mav_model.OUTPUT_DIR_STATES.fail: ('DIR: Failed!', 'red'),
         }
 
         try:
-            self.dirStatusLabel.config(
-                text=dirMap[dirStatus][0], bg=dirMap[dirStatus][1])
+            self.dir_status_label.config(
+                text=dir_map[dir_status][0], bg=dir_map[dir_status][1])
         except KeyError:
-            self.dirStatusLabel.config(text='DIR: NULL', bg='red')
+            self.dir_status_label.config(text='DIR: NULL', bg='red')
 
-        gpsMap = {
-            self._mavModel.GPS_STATES.get_tty: {'text': 'GPS: Getting TTY Device', 'bg': 'yellow'},
-            self._mavModel.GPS_STATES.get_msg: {'text': 'GPS: Waiting for message', 'bg': 'yellow'},
-            self._mavModel.GPS_STATES.wait_recycle: {'text': 'GPS: Recycling', 'bg': 'yellow'},
-            self._mavModel.GPS_STATES.rdy: {'text': 'GPS: Ready', 'bg': 'green'},
-            self._mavModel.GPS_STATES.fail: {
+        gps_map = {
+            self._mav_model.GPS_STATES.get_tty: {'text': 'GPS: Getting TTY Device', 'bg': 'yellow'},
+            self._mav_model.GPS_STATES.get_msg: {'text': 'GPS: Waiting for message', 'bg': 'yellow'},
+            self._mav_model.GPS_STATES.wait_recycle: {'text': 'GPS: Recycling', 'bg': 'yellow'},
+            self._mav_model.GPS_STATES.rdy: {'text': 'GPS: Ready', 'bg': 'green'},
+            self._mav_model.GPS_STATES.fail: {
                 'text': 'GPS: Failed!', 'bg': 'red'}
         }
 
         try:
-            self.gpsStatusLabel.config(**gpsMap[gpsStatus])
+            self.gps_status_label.config(**gps_map[gps_status])
         except KeyError:
-            self.gpsStatusLabel.config(text='GPS: NULL', bg='red')
+            self.gps_status_label.config(text='GPS: NULL', bg='red')
 
-        sysMap = {
-            self._mavModel.RCT_STATES.init: {'text': 'SYS: Initializing', 'bg': 'yellow'},
-            self._mavModel.RCT_STATES.wait_init: {'text': 'SYS: Initializing', 'bg': 'yellow'},
-            self._mavModel.RCT_STATES.wait_start: {'text': 'SYS: Ready for start', 'bg': 'green'},
-            self._mavModel.RCT_STATES.start: {'text': 'SYS: Starting', 'bg': 'blue'},
-            self._mavModel.RCT_STATES.wait_end: {'text': 'SYS: Running', 'bg': 'blue'},
-            self._mavModel.RCT_STATES.finish: {'text': 'SYS: Stopping', 'bg': 'blue'},
-            self._mavModel.RCT_STATES.fail: {'text': 'SYS: Failed!', 'bg': 'red'},
+        sys_map = {
+            self._mav_model.RCT_STATES.init: {'text': 'SYS: Initializing', 'bg': 'yellow'},
+            self._mav_model.RCT_STATES.wait_init: {'text': 'SYS: Initializing', 'bg': 'yellow'},
+            self._mav_model.RCT_STATES.wait_start: {'text': 'SYS: Ready for start', 'bg': 'green'},
+            self._mav_model.RCT_STATES.start: {'text': 'SYS: Starting', 'bg': 'blue'},
+            self._mav_model.RCT_STATES.wait_end: {'text': 'SYS: Running', 'bg': 'blue'},
+            self._mav_model.RCT_STATES.finish: {'text': 'SYS: Stopping', 'bg': 'blue'},
+            self._mav_model.RCT_STATES.fail: {'text': 'SYS: Failed!', 'bg': 'red'},
         }
 
         try:
-            self.sysStatusLabel.config(**sysMap[sysStatus])
+            self.sys_status_label.config(**sys_map[sys_status])
         except KeyError:
-            self.sysStatusLabel.config(text='SYS: NULL', bg='red')
+            self.sys_status_label.config(text='SYS: NULL', bg='red')
 
-        if swStatus == 0:
-            self.swStatusLabel.config(text='SW: OFF', bg='yellow')
-        elif swStatus == 1:
-            self.swStatusLabel.config(text='SW: ON', bg='green')
+        if sw_status == 0:
+            self.sw_status_label.config(text='SW: OFF', bg='yellow')
+        elif sw_status == 1:
+            self.sw_status_label.config(text='SW: ON', bg='green')
         else:
-            self.swStatusLabel.config(text='SW: NULL', bg='red')
+            self.sw_status_label.config(text='SW: NULL', bg='red')
 
-    def exportAll(self):
+    def export_all(self):
         '''
         Exports pings, vehcle path, and settings as json file
         '''
         final = {}
 
-        if self.mapDisplay is not None:
-            vPath = self._mavModel.EST_mgr.getVehiclePath()
-            pingDict = {}
-            vDict = {}
-            indPing = 0
-            indPath = 0
-            freqList = self._mavModel.EST_mgr.getFrequencies()
-            for frequency in freqList:
-                pings = self._mavModel.EST_mgr.getPings(frequency)
-                for pingArray in pings:
-                    pingArr = pingArray.tolist()
-                    zone, let = self._mavModel.EST_mgr.getUTMZone()
-                    u = (pingArr[0], pingArr[1], zone, let)
+        if self.map_display is not None:
+            vehicle_path = self._mav_model.EST_mgr.getVehiclePath()
+            ping_dict = {}
+            vehicle_dict = {}
+            ind_ping = 0
+            ind_path = 0
+            freq_list = self._mav_model.EST_mgr.getFrequencies()
+            for frequency in freq_list:
+                pings = self._mav_model.EST_mgr.getPings(frequency)
+                for ping_array in pings:
+                    ping_list = ping_array.tolist()
+                    zone, let = self._mav_model.EST_mgr.getUTMZone()
+                    u = (ping_list[0], ping_list[1], zone, let)
                     coord = utm.to_latlon(*u)
-                    amp = pingArr[3]
-                    newPing = {}
-                    newPing['Frequency'] = frequency
-                    newPing['Coordinate'] = coord
-                    newPing['Amplitude'] = amp
-                    pingDict[indPing] = newPing
-                    indPing = indPing + 1
-            for coord in vPath:
-                newCoord = {}
-                newCoord['Coordinate'] = (coord[0], coord[1])
-                vDict[indPath] = newCoord
-                indPath = indPath + 1
+                    amp = ping_list[3]
+                    new_ping = {}
+                    new_ping['Frequency'] = frequency
+                    new_ping['Coordinate'] = coord
+                    new_ping['Amplitude'] = amp
+                    ping_dict[ind_ping] = new_ping
+                    ind_ping = ind_ping + 1
+            for coord in vehicle_path:
+                new_coord = {}
+                new_coord['Coordinate'] = (coord[0], coord[1])
+                vehicle_dict[ind_path] = new_coord
+                ind_path = ind_path + 1
 
-            final['Pings'] = pingDict
-            final['Vehicle Path'] = vDict
+            final['Pings'] = ping_dict
+            final['Vehicle Path'] = vehicle_dict
 
-        if self.systemSettingsWidget is not None:
-            optionVars = self.systemSettingsWidget.optionVars
-            optionDict = {}
-            for key in optionVars.keys():
+        if self.system_settings_widget is not None:
+            option_vars = self.system_settings_widget.option_vars
+            option_dict = {}
+            for key in option_vars.keys():
                 if key == "TGT_frequencies":
-                    optionDict[key] = optionVars[key]
-                elif optionVars[key] is not None:
-                    optionDict[key] = optionVars[key].text()
+                    option_dict[key] = option_vars[key]
+                elif option_vars[key] is not None:
+                    option_dict[key] = option_vars[key].text()
 
-            final['System Settings'] = optionDict
+            final['System Settings'] = option_dict
 
-        if self._mavModel is not None:
-            varDict = self._mavModel.state
-            newVarDict = {}
+        if self._mav_model is not None:
+            var_dict = self._mav_model.state
+            new_var_dict = {}
 
-            for key in varDict.keys():
-                if ((key == 'STS_sdrStatus') or (key == 'STS_dirStatus') or
-                    (key == 'STS_gpsStatus') or (key == 'STS_sysStatus')):
+            for key in var_dict.keys():
+                if ((key == 'STS_sdr_status') or (key == 'STS_dir_status') or
+                    (key == 'STS_gps_status') or (key == 'STS_sys_status')):
                     temp = {}
-                    temp['name'] = varDict[key].name
-                    temp['value'] = varDict[key].value
-                    newVarDict[key] = temp
+                    temp['name'] = var_dict[key].name
+                    temp['value'] = var_dict[key].value
+                    new_var_dict[key] = temp
                 elif(key == 'VCL_track'):
                     pass
                 else:
-                    newVarDict[key] = varDict[key]
+                    new_var_dict[key] = var_dict[key]
 
 
-            final['States'] = newVarDict
+            final['States'] = new_var_dict
 
         with open('data.json', 'w') as outfile:
             json.dump(final, outfile)
@@ -466,8 +476,8 @@ class GCS(QMainWindow):
             QgsCoordinateReferenceSystem("EPSG:3857"),
             QgsCoordinateReferenceSystem("EPSG:4326"),
             QgsProject.instance())
-        if self.mapDisplay is not None:
-            ext = trans.transformBoundingBox(self.mapDisplay.canvas.extent())
+        if self.map_display is not None:
+            ext = trans.transformBoundingBox(self.map_display.canvas.extent())
             lat1 = ext.yMaximum()
             lon1 = ext.xMinimum()
             lat2 = ext.yMinimum()
@@ -480,167 +490,162 @@ class GCS(QMainWindow):
                     (lat2, lon2)
                 )
 
-        for id in self._mavModels:
-            mavModel = self._mavModels[id]
-            mavModel.stop()
-        self._mavModels = {}
-        self._mavModel = None
+        for id in self._mav_models:
+            mav_model = self._mav_models[id]
+            mav_model.stop()
+        self._mav_models = {}
+        self._mav_model = None
         if self._transport is not None and self._transport.isOpen():
             self._transport.close()
         self._transport = None
         super().closeEvent(event)
 
-    def __handleConnectInput(self):
+    def __handle_connect_input(self):
         '''
         Internal callback to connect GCS to drone
         '''
-        connectionDialog = ConnectionDialog(self.port_val, self)
-        connectionDialog.exec_()
+        connection_dialog = ConnectionDialog(self.port_val, self)
+        connection_dialog.exec_()
 
-        if connectionDialog.port_val is None or \
-            (connectionDialog.port_val == self.port_val and len(self._mavModels) > 1):
+        if connection_dialog.port_val is None or \
+            (connection_dialog.port_val == self.port_val and \
+            len(self._mav_models) > 1):
             return
 
-        self.port_val = connectionDialog.port_val
+        self.port_val = connection_dialog.port_val
         if self.config.connection_mode == ConnectionMode.DRONE:
-            self.addrVal = connectionDialog.addr_val
-        self.__startTransport()
+            self.addr_val = connection_dialog.addr_val
+        self.__start_transport()
 
-    def __handleConfigInput(self):
+    def __handle_config_input(self):
         '''
         Internal callback to connect GCS to drone
         '''
-        connectionDialog = ConfigDialog(self)
-        connectionDialog.exec_()
+        connection_dialog = ConfigDialog(self)
+        connection_dialog.exec_()
 
-    def setMap(self, mapWidget):
+    def set_map(self, map_widget):
         '''
-        Function to set the mapDisplay widget
+        Function to set the map_display widget
         Args:
-            mapWidget: A MapWidget object
+            map_widget: A MapWidget object
         '''
-        self.mapDisplay = mapWidget
+        self.map_display = map_widget
 
-    def __createWidgets(self):
+    def __create_widgets(self):
         '''
         Internal helper to make GUI widgets
         '''
-        self.mainThread = QThread.currentThread()
-
         holder = QGridLayout()
         centr_widget = QFrame()
         self.setCentralWidget(centr_widget)
 
         self.setWindowTitle('RCT GCS')
-        frm_sideControl = QScrollArea()
+        frm_side_control = QScrollArea()
 
         content = QWidget()
-        frm_sideControl.setWidget(content)
-        frm_sideControl.setWidgetResizable(True)
+        frm_side_control.setWidget(content)
+        frm_side_control.setWidgetResizable(True)
 
         #wlay is the layout that holds all tabs
         wlay = QVBoxLayout(content)
 
-
         # SYSTEM TAB
-        self._systemConnectionTab = CollapseFrame(title='System: No Connection')
-        self._systemConnectionTab.resize(self.SBWidth, 400)
+        self._system_connection_tab = CollapseFrame(title='System: No Connection')
+        self._system_connection_tab.resize(self.sb_width, 400)
         lay_sys = QVBoxLayout()
         btn_setup = QPushButton("Connection Settings")
-        btn_setup.resize(self.SBWidth, 100)
-        btn_setup.clicked.connect(self.__handleConnectInput)
+        btn_setup.resize(self.sb_width, 100)
+        btn_setup.clicked.connect(self.__handle_connect_input)
         self.model_select = QComboBox()
-        self.model_select.resize(self.SBWidth, 100)
-        self.model_select.currentIndexChanged.connect(self.__changeModelByIndex)
+        self.model_select.resize(self.sb_width, 100)
+        self.model_select.currentIndexChanged.connect(self.__change_model_by_index)
         self.model_select.hide()
         lay_sys.addWidget(btn_setup)
         lay_sys.addWidget(self.model_select)
 
-
-        self._systemConnectionTab.setContentLayout(lay_sys)
+        self._system_connection_tab.set_content_layout(lay_sys)
 
         # COMPONENTS TAB
-        self.statusWidget = StatusDisplay(frm_sideControl, self)
-
+        self.status_widget = StatusDisplay(frm_side_control, self)
 
         # DATA DISPLAY TOOLS
-        self.mapOptions = MapOptions()
-        self.mapOptions.resize(300, 100)
-        self.mapControl = MapControl(frm_sideControl, holder,
-                self.mapOptions, self)
+        self.map_options = MapOptions()
+        self.map_options.resize(300, 100)
+        self.map_control = MapControl(frm_side_control, holder,
+                self.map_options, self)
 
         # SYSTEM SETTINGS
-        self.systemSettingsWidget = SystemSettingsControl(self)
-        self.systemSettingsWidget.resize(self.SBWidth, 400)
-        scrollArea = QScrollArea()
-        scrollArea.setWidgetResizable(True)
-        scrollArea.setWidget(self.systemSettingsWidget)
+        self.system_settings_widget = SystemSettingsControl(self)
+        self.system_settings_widget.resize(self.sb_width, 400)
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setWidget(self.system_settings_widget)
 
-        self.upgradeDisplay = UpgradeDisplay(content, self)
-        self.upgradeDisplay.resize(self.SBWidth, 400)
+        self.upgrade_display = UpgradeDisplay(content, self)
+        self.upgrade_display.resize(self.sb_width, 400)
 
         # CONFIG TAB
-        self._configTab = CollapseFrame(title='Configuration Settings')
-        self._configTab.resize(self.SBWidth, 400)
+        self._config_tab = CollapseFrame(title='Configuration Settings')
+        self._config_tab.resize(self.sb_width, 400)
         lay_config = QVBoxLayout()
         btn_config = QPushButton("Edit Configuration Settings")
-        btn_config.resize(self.SBWidth, 100)
-        btn_config.clicked.connect(self.__handleConfigInput)
+        btn_config.resize(self.sb_width, 100)
+        btn_config.clicked.connect(self.__handle_config_input)
         self.config_select = QComboBox()
-        self.config_select.resize(self.SBWidth, 100)
+        self.config_select.resize(self.sb_width, 100)
         self.config_select.hide()
         lay_config.addWidget(btn_config)
         lay_config.addWidget(self.config_select)
 
-        self._configTab.setContentLayout(lay_config)
-
+        self._config_tab.set_content_layout(lay_config)
 
         # START PAYLOAD RECORDING
-        self.__missionStatusBtn = QPushButton(self.__missionStatusText)
-        self.__missionStatusBtn.setEnabled(False)
-        self.__missionStatusBtn.clicked.connect(self.__startStopMission)
+        self.__mission_status_btn = QPushButton(self.__mission_status_text)
+        self.__mission_status_btn.setEnabled(False)
+        self.__mission_status_btn.clicked.connect(self.__start_stop_mission)
 
-        self.__btn_exportAll = QPushButton('Export Info')
-        self.__btn_exportAll.setEnabled(False)
-        self.__btn_exportAll.clicked.connect(self.exportAll)
+        self.__btn_export_all = QPushButton('Export Info')
+        self.__btn_export_all.setEnabled(False)
+        self.__btn_export_all.clicked.connect(self.export_all)
 
         self.__btn_precision = QPushButton('Do Precision')
         self.__btn_precision.setEnabled(False)
         self.__btn_precision.clicked.connect(self.__do_precision)
 
-        self.__btn_heatMap = QPushButton('Display Heatmap')
-        self.__btn_heatMap.setEnabled(False)
-        self.__btn_heatMap.clicked.connect(self.__do_display_heatmap)
+        self.__btn_heat_map = QPushButton('Display Heatmap')
+        self.__btn_heat_map.setEnabled(False)
+        self.__btn_heat_map.clicked.connect(self.__do_display_heatmap)
 
-        wlay.addWidget(self._systemConnectionTab)
-        wlay.addWidget(self.statusWidget)
-        wlay.addWidget(self.mapControl)
-        wlay.addWidget(self.systemSettingsWidget)
-        wlay.addWidget(self.upgradeDisplay)
-        wlay.addWidget(self._configTab)
-        wlay.addWidget(self.__missionStatusBtn)
-        wlay.addWidget(self.__btn_exportAll)
+        wlay.addWidget(self._system_connection_tab)
+        wlay.addWidget(self.status_widget)
+        wlay.addWidget(self.map_control)
+        wlay.addWidget(self.system_settings_widget)
+        wlay.addWidget(self.upgrade_display)
+        wlay.addWidget(self._config_tab)
+        wlay.addWidget(self.__mission_status_btn)
+        wlay.addWidget(self.__btn_export_all)
         wlay.addWidget(self.__btn_precision)
-        wlay.addWidget(self.__btn_heatMap)
+        wlay.addWidget(self.__btn_heat_map)
 
         wlay.addStretch()
-        content.resize(self.SBWidth, 400)
-        frm_sideControl.setMinimumWidth(self.SBWidth)
-        holder.addWidget(frm_sideControl, 0, 0, alignment=Qt.AlignLeft)
-        holder.addWidget(self.mapOptions, 0, 4, alignment=Qt.AlignTop)
+        content.resize(self.sb_width, 400)
+        frm_side_control.setMinimumWidth(self.sb_width)
+        holder.addWidget(frm_side_control, 0, 0, alignment=Qt.AlignLeft)
+        holder.addWidget(self.map_options, 0, 4, alignment=Qt.AlignTop)
         centr_widget.setLayout(holder)
         self.resize(1800, 1100)
         self.show()
-    
+
     def __do_display_heatmap(self):
-        if self.mapDisplay:
-            self.mapDisplay.setupHeatMap
+        if self.map_display:
+            self.map_display.set_up_heat_map
         else:
             raise RuntimeError('No map loaded')
-    
+
     def __do_precision(self):
         # todo: add modular frequencies
-        self._mavModel.EST_mgr.doPrecisions(173500000)
+        self._mav_model.EST_mgr.doPrecisions(173500000)
 
 class UpgradeDisplay(CollapseFrame):
     '''
@@ -659,61 +664,61 @@ class UpgradeDisplay(CollapseFrame):
         self.__parent = parent
         self.__root = root
 
-        self.__innerFrame = None
+        self.__inner_frame = None
 
-        self.filename = None
+        self.file_name = None
 
-        self.__createWidget()
+        self.__create_widget()
         self.user_pops = UserPopups()
 
     def update(self):
-        self.updateGUIOptionVars()
+        self.update_gui_option_vars()
 
-    def __createWidget(self):
+    def __create_widget(self):
         '''
         Inner function to create internal widgets
         '''
-        self.__innerFrame = QGridLayout()
+        self.__inner_frame = QGridLayout()
 
         file_lbl = QLabel('Selected File:')
-        self.__innerFrame.addWidget(file_lbl, 1, 0)
+        self.__inner_frame.addWidget(file_lbl, 1, 0)
 
-        self.filename = QLineEdit()
-        self.__innerFrame.addWidget(self.filename, 1, 1)
+        self.file_name = QLineEdit()
+        self.__inner_frame.addWidget(self.file_name, 1, 1)
 
         browse_file_btn = QPushButton('Browse for Upgrade File')
-        browse_file_btn.clicked.connect(self.fileDialogue)
-        self.__innerFrame.addWidget(browse_file_btn, 2, 0)
+        browse_file_btn.clicked.connect(self.file_dialog)
+        self.__inner_frame.addWidget(browse_file_btn, 2, 0)
 
         upgrade_btn = QPushButton('Upgrade')
-        upgrade_btn.clicked.connect(self.sendUpgradeFile)
-        self.__innerFrame.addWidget(upgrade_btn, 3, 0)
+        upgrade_btn.clicked.connect(self.send_upgrade_file)
+        self.__inner_frame.addWidget(upgrade_btn, 3, 0)
 
 
-        self.setContentLayout(self.__innerFrame)
+        self.set_content_layout(self.__inner_frame)
 
-    def fileDialogue(self):
+    def file_dialog(self):
         '''
         Opens a dialog to allow the user to indicate a file
         '''
-        filename = QFileDialog.getOpenFileName()
-        if filename is None:
+        file_name = QFileDialog.getOpenFileName()
+        if file_name is None:
             return
-        self.filename.setText(filename[0])
+        self.file_name.setText(file_name[0])
 
-    def sendUpgradeFile(self):
+    def send_upgrade_file(self):
         '''
-        Inner function to send a user specified upgrade file to the mavModel
+        Inner function to send a user specified upgrade file to the mav_model
         '''
         try:
-            file = open(self.filename.text(), "rb")
+            file = open(self.file_name.text(), "rb")
         except FileNotFoundError:
             self.user_pops.show_warning("Please choose a valid file.")
             return
-        byteStream = file.read()
-        self.__root._mavModel.sendUpgradePacket(byteStream)
+        byte_stream = file.read()
+        self.__root._mav_model.sendUpgradePacket(byte_stream)
 
-    def updateGUIOptionVars(self):
+    def update_gui_option_vars(self):
         pass
 
 class StatusDisplay(CollapseFrame):
@@ -725,68 +730,76 @@ class StatusDisplay(CollapseFrame):
 
         self.__parent = parent
         self.__root = root
-        self.componentStatusWidget = None
+        self.component_status_widget = None
 
-        self.__innerFrame = None
+        self.__inner_frame = None
 
-        self.statusLabel = None
+        self.status_label = None
 
-        self.__createWidget()
+        self.__create_widget()
 
     def update(self):
         CollapseFrame.update(self)
-        self.updateGUIOptionVars()
+        self.update_gui_option_vars()
 
-    def __createWidget(self):
+    def __create_widget(self):
         '''
         Inner funciton to create internal widgets
         '''
-        self.__innerFrame = QGridLayout()
+        self.__inner_frame = QGridLayout()
 
         lbl_overall_status = QLabel('Status:')
-        self.__innerFrame.addWidget(lbl_overall_status, 1, 0)
+        self.__inner_frame.addWidget(lbl_overall_status, 1, 0)
 
         entr_overall_status = QLabel('')
-        self.__innerFrame.addWidget(entr_overall_status, 1, 1)
+        self.__inner_frame.addWidget(entr_overall_status, 1, 1)
 
-        self.componentStatusWidget = ComponentStatusDisplay(root=self.__root)
-        h1 = self.componentStatusWidget.innerFrame.sizeHint().height()
-        self.__innerFrame.addWidget(self.componentStatusWidget, 2, 0, 1, 2)
+        self.component_status_widget = ComponentStatusDisplay(root=self.__root)
+        h1 = self.component_status_widget.inner_frame.sizeHint().height()
+        self.__inner_frame.addWidget(self.component_status_widget, 2, 0, 1, 2)
 
-        self.statusLabel = entr_overall_status
-        h2 = self.__innerFrame.sizeHint().height()
+        self.status_label = entr_overall_status
+        h2 = self.__inner_frame.sizeHint().height()
         h3 = self.toggle_button.sizeHint().height()
 
 
         self.content_height = h1 + h2 + h3 + h3
-        self.setContentLayout(self.__innerFrame)
+        self.set_content_layout(self.__inner_frame)
 
-    def updateGUIOptionVars(self, scope=0):
-        varDict = self.__root._mavModel.state
+    def update_gui_option_vars(self, scope=0):
+        var_dict = self.__root._mav_model.state
 
-        sdr_status = varDict["STS_sdrStatus"]
-        dir_status = varDict["STS_dirStatus"]
-        gps_status = varDict["STS_gpsStatus"]
-        sys_status = varDict["STS_sysStatus"]
-        sw_status = varDict["STS_swStatus"]
+        sdr_status = var_dict["STS_sdr_status"]
+        dir_status = var_dict["STS_dir_status"]
+        gps_status = var_dict["STS_gps_status"]
+        sys_status = var_dict["STS_sys_status"]
+        sw_status = var_dict["STS_sw_status"]
 
         if sys_status == rctCore.RCT_STATES.finish:
-            self.statusLabel.setText('Stopping')
-            self.statusLabel.setStyleSheet("background-color: red")
-        elif sdr_status == rctCore.SDR_INIT_STATES.fail or dir_status == rctCore.OUTPUT_DIR_STATES.fail or gps_status == rctCore.EXTS_STATES.fail or sys_status == rctCore.RCT_STATES.fail or (sw_status != 0 and sw_status != 1):
-            self.statusLabel.setText('Failed')
-            self.statusLabel.setStyleSheet("background-color: red")
-        elif sys_status == rctCore.RCT_STATES.start or sys_status == rctCore.RCT_STATES.wait_end:
-            self.statusLabel.setText('Running')
-            self.statusLabel.setStyleSheet("background-color: green")
-        elif sdr_status == rctCore.SDR_INIT_STATES.rdy and dir_status == rctCore.OUTPUT_DIR_STATES.rdy and gps_status == rctCore.EXTS_STATES.rdy and sys_status == rctCore.RCT_STATES.wait_start and sw_status == 1:
-            self.statusLabel.setText('Idle')
-            self.statusLabel.setStyleSheet("background-color: yellow")
+            self.status_label.setText('Stopping')
+            self.status_label.setStyleSheet("background-color: red")
+        elif sdr_status == rctCore.SDR_INIT_STATES.fail or \
+            dir_status == rctCore.OUTPUT_DIR_STATES.fail or \
+            gps_status == rctCore.EXTS_STATES.fail or \
+            sys_status == rctCore.RCT_STATES.fail or \
+            (sw_status != 0 and sw_status != 1):
+            self.status_label.setText('Failed')
+            self.status_label.setStyleSheet("background-color: red")
+        elif sys_status == rctCore.RCT_STATES.start or \
+            sys_status == rctCore.RCT_STATES.wait_end:
+            self.status_label.setText('Running')
+            self.status_label.setStyleSheet("background-color: green")
+        elif sdr_status == rctCore.SDR_INIT_STATES.rdy and \
+            dir_status == rctCore.OUTPUT_DIR_STATES.rdy and \
+            gps_status == rctCore.EXTS_STATES.rdy and \
+            sys_status == rctCore.RCT_STATES.wait_start and sw_status == 1:
+            self.status_label.setText('Idle')
+            self.status_label.setStyleSheet("background-color: yellow")
         else:
-            self.statusLabel.setText('Not Connected')
-            self.statusLabel.setStyleSheet("background-color: yellow")
+            self.status_label.setText('Not Connected')
+            self.status_label.setStyleSheet("background-color: yellow")
 
-        self.componentStatusWidget.update()
+        self.component_status_widget.update()
 
 class ComponentStatusDisplay(CollapseFrame):
     '''
@@ -801,7 +814,7 @@ class ComponentStatusDisplay(CollapseFrame):
         '''
         CollapseFrame.__init__(self, 'Component Statuses')
         self.user_pops = UserPopups()
-        self.sdrMap = {
+        self.sdr_map = {
             "SDR_INIT_STATES.find_devices": {'text': 'SDR: Searching for devices', 'bg':'yellow'},
             "SDR_INIT_STATES.wait_recycle": {'text':'SDR: Recycling!', 'bg':'yellow'},
             "SDR_INIT_STATES.usrp_probe": {'text':'SDR: Initializing SDR', 'bg':'yellow'},
@@ -809,7 +822,7 @@ class ComponentStatusDisplay(CollapseFrame):
             "SDR_INIT_STATES.fail": {'text':'SDR: Failed!', 'bg':'red'}
         }
 
-        self.dirMap = {
+        self.dir_map = {
             "OUTPUT_DIR_STATES.get_output_dir": {'text':'DIR: Searching', 'bg':'yellow'},
             "OUTPUT_DIR_STATES.check_output_dir": {'text':'DIR: Checking for mount', 'bg':'yellow'},
             "OUTPUT_DIR_STATES.check_space": {'text':'DIR: Checking for space', 'bg':'yellow'},
@@ -818,7 +831,7 @@ class ComponentStatusDisplay(CollapseFrame):
             "OUTPUT_DIR_STATES.fail": {'text':'DIR: Failed!', 'bg':'red'},
         }
 
-        self.gpsMap = {
+        self.gps_map = {
             "EXTS_STATES.get_tty": {'text': 'GPS: Getting TTY Device', 'bg': 'yellow'},
             "EXTS_STATES.get_msg": {'text': 'GPS: Waiting for message', 'bg': 'yellow'},
             "EXTS_STATES.wait_recycle": {'text': 'GPS: Recycling', 'bg': 'yellow'},
@@ -826,7 +839,7 @@ class ComponentStatusDisplay(CollapseFrame):
             "EXTS_STATES.fail": {'text': 'GPS: Failed!', 'bg': 'red'}
         }
 
-        self.sysMap = {
+        self.sys_map = {
             "RCT_STATES.init": {'text': 'SYS: Initializing', 'bg': 'yellow'},
             "RCT_STATES.wait_init": {'text': 'SYS: Initializing', 'bg': 'yellow'},
             "RCT_STATES.wait_start": {'text': 'SYS: Ready for start', 'bg': 'green'},
@@ -836,87 +849,83 @@ class ComponentStatusDisplay(CollapseFrame):
             "RCT_STATES.fail": {'text': 'SYS: Failed!', 'bg': 'red'},
         }
 
-        self.swMap = {
+        self.sw_map = {
             '0': {'text': 'SW: OFF', 'bg': 'yellow'},
             '1': {'text': 'SW: ON', 'bg': 'green'},
         }
 
-        self.compDicts = {
-            "STS_sdrStatus": self.sdrMap,
-            "STS_dirStatus": self.dirMap,
-            "STS_gpsStatus": self.gpsMap,
-            "STS_sysStatus": self.sysMap,
-            "STS_swStatus": self.swMap,
+        self.comp_dict = {
+            "STS_sdr_status": self.sdr_map,
+            "STS_dir_status": self.dir_map,
+            "STS_gps_status": self.gps_map,
+            "STS_sys_status": self.sys_map,
+            "STS_sw_status": self.sw_map,
         }
 
-        #self.__parent = parent
         self.__root = root
-
-        self.innerFrame = None
-
-        self.statusLabels = {}
-
-        self.__createWidget()
+        self.inner_frame = None
+        self.status_labels = {}
+        self.__create_widget()
 
     def update(self):
-        self.updateGUIOptionVars()
+        self.update_gui_option_vars()
 
-    def __createWidget(self):
+    def __create_widget(self):
         '''
         Inner Function to create internal widgets
         '''
-        self.innerFrame = QGridLayout()
+        self.inner_frame = QGridLayout()
 
         lbl_sdr_status = QLabel('SDR Status')
-        self.innerFrame.addWidget(lbl_sdr_status, 1, 0)
+        self.inner_frame.addWidget(lbl_sdr_status, 1, 0)
 
         lbl_dir_status = QLabel('Storage Status')
-        self.innerFrame.addWidget(lbl_dir_status, 2, 0)
+        self.inner_frame.addWidget(lbl_dir_status, 2, 0)
 
         lbl_gps_status = QLabel('GPS Status')
-        self.innerFrame.addWidget(lbl_gps_status, 3, 0)
+        self.inner_frame.addWidget(lbl_gps_status, 3, 0)
 
         lbl_sys_status = QLabel('System Status')
-        self.innerFrame.addWidget(lbl_sys_status, 4, 0)
+        self.inner_frame.addWidget(lbl_sys_status, 4, 0)
 
         lbl_sw_status = QLabel('Software Status')
-        self.innerFrame.addWidget(lbl_sw_status, 5, 0)
+        self.inner_frame.addWidget(lbl_sw_status, 5, 0)
 
         entr_sdr_status = QLabel('')
-        self.innerFrame.addWidget(entr_sdr_status, 1, 1)
+        self.inner_frame.addWidget(entr_sdr_status, 1, 1)
 
         entr_dir_status = QLabel('')
-        self.innerFrame.addWidget(entr_dir_status, 2, 1)
+        self.inner_frame.addWidget(entr_dir_status, 2, 1)
 
         entr_gps_status = QLabel('')
-        self.innerFrame.addWidget(entr_gps_status, 3, 1)
+        self.inner_frame.addWidget(entr_gps_status, 3, 1)
 
         entr_sys_status = QLabel('')
-        self.innerFrame.addWidget(entr_sys_status, 4, 1)
+        self.inner_frame.addWidget(entr_sys_status, 4, 1)
 
         entr_sw_status = QLabel('')
-        self.innerFrame.addWidget(entr_sw_status, 5, 1)
+        self.inner_frame.addWidget(entr_sw_status, 5, 1)
 
-        self.statusLabels["STS_sdrStatus"] = entr_sdr_status
-        self.statusLabels["STS_dirStatus"] = entr_dir_status
-        self.statusLabels["STS_gpsStatus"] = entr_gps_status
-        self.statusLabels["STS_sysStatus"] = entr_sys_status
-        self.statusLabels["STS_swStatus"] = entr_sw_status
-        self.setContentLayout(self.innerFrame)
+        self.status_labels["STS_sdr_status"] = entr_sdr_status
+        self.status_labels["STS_dir_status"] = entr_dir_status
+        self.status_labels["STS_gps_status"] = entr_gps_status
+        self.status_labels["STS_sys_status"] = entr_sys_status
+        self.status_labels["STS_sw_status"] = entr_sw_status
+        self.set_content_layout(self.inner_frame)
 
-    def updateGUIOptionVars(self, scope=0):
-        varDict = self.__root._mavModel.state
-        for varName, varValue in varDict.items():
+    def update_gui_option_vars(self, scope=0):
+        var_dict = self.__root._mav_model.state
+        for var_name, var_value in var_dict.items():
             try:
-                if varName in self.compDicts:
-                    configDict = self.compDicts[varName]
-                    if str(varValue) in configDict:
-                        configOpts = configDict[str(varValue)]
-                        if varName in self.statusLabels:
-                            self.statusLabels[varName].setText(configOpts['text'])
-                        style = "background-color: %s" % configOpts['bg']
-                        if varName in self.statusLabels:
-                            self.statusLabels[varName].setStyleSheet(style)
+                if var_name in self.comp_dict:
+                    config_dict = self.comp_dict[var_name]
+                    if str(var_value) in config_dict:
+                        config_opts = config_dict[str(var_value)]
+                        if var_name in self.status_labels:
+                            self.status_labels[var_name].setText(config_opts['text'])
+                        style = "background-color: %s" % config_opts['bg']
+                        if var_name in self.status_labels:
+                            self.status_labels[var_name].setStyleSheet(style)
             except KeyError:
                 self.user_pops.show_warning("Failed to update GUI option vars", "Unexpected Error")
                 continue
@@ -925,83 +934,76 @@ class MapControl(CollapseFrame):
     '''
     Custom Widget Class to facilitate Map Loading
     '''
-    def __init__(self, parent, holder, mapOptions, root: GCS):
+    def __init__(self, parent, holder, map_options, root: GCS):
         CollapseFrame.__init__(self, title='Map Display Tools')
         self.__parent = parent
         self.__root = root
-        self.__mapOptions = mapOptions
+        self.__map_options = map_options
         self.__holder = holder
-        self.__mapFrame = None
-        self.__latEntry = None
-        self.__lonEntry = None
-        self.__zoomEntry = None
+        self.__map_frame = None
+        self.__lat_entry = None
+        self.__lon_entry = None
+        self.__zoom_entry = None
         self.user_pops = UserPopups()
-        self.__createWidgets()
+        self.__create_widgets()
 
-
-
-    def __createWidgets(self):
+    def __create_widgets(self):
         '''
         Internal function to create widgets
         '''
-        controlPanelHolder = QScrollArea()
+        control_panel_holder = QScrollArea()
         content = QWidget()
 
-        controlPanelHolder.setWidget(content)
-        controlPanelHolder.setWidgetResizable(True)
+        control_panel_holder.setWidget(content)
+        control_panel_holder.setWidgetResizable(True)
 
-        controlPanel = QVBoxLayout(content)
+        control_panel = QVBoxLayout(content)
+        control_panel.addStretch()
 
-        controlPanel.addStretch()
+        self.__map_frame = QWidget()
+        self.__map_frame.resize(800, 500)
+        self.__holder.addWidget(self.__map_frame, 0, 0, 1, 3)
+        btn_load_map = QPushButton('Load Map')
+        btn_load_map.clicked.connect(self.__load_map_file)
+        control_panel.addWidget(btn_load_map)
 
-        self.__mapFrame = QWidget()
-        self.__mapFrame.resize(800, 500)
-        self.__holder.addWidget(self.__mapFrame, 0, 0, 1, 3)
-        btn_loadMap = QPushButton('Load Map')
-        btn_loadMap.clicked.connect(self.__loadMapFile)
-        controlPanel.addWidget(btn_loadMap)
-
-
-
-        frm_loadWebMap = QLabel('Load WebMap')
-        controlPanel.addWidget(frm_loadWebMap)
-        lay_loadWebMap = QGridLayout()
-        lay_loadWebMapHolder = QVBoxLayout()
-        lay_loadWebMapHolder.addStretch()
+        frm_load_web_map = QLabel('Load WebMap')
+        control_panel.addWidget(frm_load_web_map)
+        lay_load_web_map = QGridLayout()
+        lay_load_web_map_holder = QVBoxLayout()
+        lay_load_web_map_holder.addStretch()
 
 
         lbl_p1 = QLabel('Lat/Long NW Point')
-        lay_loadWebMap.addWidget(lbl_p1, 0, 0)
+        lay_load_web_map.addWidget(lbl_p1, 0, 0)
 
-        self.__p1latEntry = QLineEdit()
-        lay_loadWebMap.addWidget(self.__p1latEntry, 0, 1)
-        self.__p1lonEntry = QLineEdit()
-        lay_loadWebMap.addWidget(self.__p1lonEntry, 0, 2)
+        self.__p1_lat_entry = QLineEdit()
+        lay_load_web_map.addWidget(self.__p1_lat_entry, 0, 1)
+        self.__p1_lon_entry = QLineEdit()
+        lay_load_web_map.addWidget(self.__p1_lon_entry, 0, 2)
 
         lbl_p2 = QLabel('Lat/Long SE Point')
-        lay_loadWebMap.addWidget(lbl_p2, 1, 0)
+        lay_load_web_map.addWidget(lbl_p2, 1, 0)
 
-        self.__p2latEntry = QLineEdit()
-        lay_loadWebMap.addWidget(self.__p2latEntry, 1, 1)
-        self.__p2lonEntry = QLineEdit()
-        lay_loadWebMap.addWidget(self.__p2lonEntry, 1, 2)
+        self.__p2_lat_entry = QLineEdit()
+        lay_load_web_map.addWidget(self.__p2_lat_entry, 1, 1)
+        self.__p2_lon_entry = QLineEdit()
+        lay_load_web_map.addWidget(self.__p2_lon_entry, 1, 2)
 
+        btn_load_web_map = QPushButton('Load from Web')
+        btn_load_web_map.clicked.connect(self.__load_web_map)
+        lay_load_web_map.addWidget(btn_load_web_map, 3, 1, 1, 2)
 
-        btn_loadWebMap = QPushButton('Load from Web')
-        btn_loadWebMap.clicked.connect(self.__loadWebMap)
-        lay_loadWebMap.addWidget(btn_loadWebMap, 3, 1, 1, 2)
+        btn_load_cached_map = QPushButton('Load from Cache')
+        btn_load_cached_map.clicked.connect(self.__load_cached_map)
+        lay_load_web_map.addWidget(btn_load_cached_map, 4, 1, 1, 2)
 
-        btn_loadCachedMap = QPushButton('Load from Cache')
-        btn_loadCachedMap.clicked.connect(self.__loadCachedMap)
-        lay_loadWebMap.addWidget(btn_loadCachedMap, 4, 1, 1, 2)
+        control_panel.addWidget(frm_load_web_map)
+        control_panel.addLayout(lay_load_web_map)
 
-        controlPanel.addWidget(frm_loadWebMap)
-        controlPanel.addLayout(lay_loadWebMap)
+        self.set_content_layout(control_panel)
 
-
-        self.setContentLayout(controlPanel)
-
-    def __coordsFromConf(self):
+    def __coords_from_config(self):
         '''
         Internal function to pull past coordinates from the config
         file if they exist
@@ -1019,13 +1021,11 @@ class MapControl(CollapseFrame):
             self.user_pops.show_warning("Could not read config path", config_path)
             return None, None, None, None
 
-    def __initLatLon(self):
-        lat1 = self.__p1latEntry.text()
-        lon1 = self.__p1lonEntry.text()
-        lat2 = self.__p2latEntry.text()
-        lon2 = self.__p2lonEntry.text()
-
-
+    def __init_lat_lon(self):
+        lat1 = self.__p1_lat_entry.text()
+        lon1 = self.__p1_lon_entry.text()
+        lat2 = self.__p2_lat_entry.text()
+        lon2 = self.__p2_lon_entry.text()
 
         if lat1 is None or lat2 is None or lon1 is None or lon2 is None or \
                 lat1 == '' or lon1 == '' or lat2 == '' or lon2 == '':
@@ -1033,62 +1033,60 @@ class MapControl(CollapseFrame):
                 nw_extent, se_extent = config.map_extent
 
             lat1 = str(nw_extent[0])
-            self.__p1latEntry.setText(lat1)
+            self.__p1_lat_entry.setText(lat1)
             lon1 = str(nw_extent[1])
-            self.__p1lonEntry.setText(lon1)
+            self.__p1_lon_entry.setText(lon1)
             lat2 = str(se_extent[0])
-            self.__p2latEntry.setText(lat2)
+            self.__p2_lat_entry.setText(lat2)
             lon2 = str(se_extent[1])
-            self.__p2lonEntry.setText(lon2)
+            self.__p2_lon_entry.setText(lon2)
 
+        p1_lat = float(lat1)
+        p1_lon = float(lon1)
+        p2_lat = float(lat2)
+        p2_lon = float(lon2)
 
-        p1lat = float(lat1)
-        p1lon = float(lon1)
-        p2lat = float(lat2)
-        p2lon = float(lon2)
+        return [p1_lat, p1_lon, p2_lat, p2_lon]
 
-        return [p1lat, p1lon, p2lat, p2lon]
-
-    def __loadWebMap(self):
+    def __load_web_map(self):
         '''
         Internal function to load map from web
         '''
-        p1lat, p1lon, p2lat, p2lon = self.__initLatLon()
+        p1_lat, p1_lon, p2_lat, p2_lon = self.__init_lat_lon()
         try:
-            temp = WebMap(self.__holder, p1lat, p1lon,
-                    p2lat, p2lon, False)
+            temp = WebMap(self.__holder, p1_lat, p1_lon, p2_lat, p2_lon, False)
         except RuntimeError:
             self.user_pops.show_warning("Failed to load web map")
             return
-        self.__mapFrame.setParent(None)
-        self.__mapFrame = temp
-        self.__mapFrame.resize(800, 500)
-        self.__mapOptions.setMap(self.__mapFrame, True)
-        self.__root.setMap(self.__mapFrame)
+        self.__map_frame.setParent(None)
+        self.__map_frame = temp
+        self.__map_frame.resize(800, 500)
+        self.__map_options.set_map(self.__map_frame, True)
+        self.__root.set_map(self.__map_frame)
 
-    def __loadCachedMap(self):
+    def __load_cached_map(self):
         '''
         Internal function to load map from cached tiles
         '''
-        p1lat, p1lon, p2lat, p2lon = self.__initLatLon()
-        self.__mapFrame.setParent(None)
-        self.__mapFrame = WebMap(self.__holder, p1lat, p1lon,
-                p2lat, p2lon, True)
-        self.__mapFrame.resize(800, 500)
-        self.__mapOptions.setMap(self.__mapFrame, True)
-        self.__root.setMap(self.__mapFrame)
+        p1_lat, p1_lon, p2_lat, p2_lon = self.__init_lat_lon()
+        self.__map_frame.setParent(None)
+        self.__map_frame = WebMap(self.__holder, p1_lat, p1_lon,
+                p2_lat, p2_lon, True)
+        self.__map_frame.resize(800, 500)
+        self.__map_options.set_map(self.__map_frame, True)
+        self.__root.set_map(self.__map_frame)
 
-    def __loadMapFile(self):
+    def __load_map_file(self):
         '''
         Internal function to load user-specified raster file
         '''
-        self.__mapFrame.setParent(None)
+        self.__map_frame.setParent(None)
         try:
-            self.__mapFrame = StaticMap(self.__holder)
+            self.__map_frame = StaticMap(self.__holder)
         except FileNotFoundError as e:
             print(e)
-            self.__loadWebMap()
+            self.__load_web_map()
         else:
-            self.__mapFrame.resize(800, 500)
-            self.__mapOptions.setMap(self.__mapFrame, False)
-            self.__root.setMap(self.__mapFrame)
+            self.__map_frame.resize(800, 500)
+            self.__map_options.set_map(self.__map_frame, False)
+            self.__root.set_map(self.__map_frame)

@@ -9,112 +9,111 @@ droneSimulator.py: error: the following arguments are required: --protocol
 
 For instance, to run interactively with TCP: `ipython -i droneSimulator.py -- --protocol tcp`
 
-The following parameters are avilable for the simulator (member variables of `sim`):
+The following parameters are available for the simulator (member variables of `sim`):
 - SM - Simulator Mission parameters
-	- SM_missionRun
-	- SM_utmZoneNum
-	- SM_utmZone
+	- SM_mission_run
+	- SM_utm_zone_num
+	- SM_utm_zone
 	- SM_origin
-	- SM_TakeoffTarget
+	- SM_takeoff_target
 	- SM_waypoints
-	- SM_targetThreshold
-	- SM_loopPeriod
-	- SM_TakeoffVel
-	- SM_WPVel
-	- SM_RTLVel
-	- SM_LandVel
+	- SM_target_threshold
+	- SM_loop_period
+	- SM_takeoff_vel
+	- SM_wp_vel
+	- SM_rtl_vel
+	- SM_land_vel
 - SC - Simulation Communication parameters
-	- SC_VehiclePositionMsgPeriod
-	- SC_PingMeasurementPeriod
-	- SC_PingMeasurementSigma
-	- SC_HeartbeatPeriod
+	- SC_vehicle_position_msg_period
+	- SC_ping_measurement_period
+	- SC_ping_measurement_sigma
+	- SC_heartbeat_period
 - SP - Simulation Ping parameters
-	- SP_TxPower
-	- SP_TxPowerSigma
-	- SP_SystemLoss
-	- SP_SystemLossSigma
-	- SP_Exponent
-	- SP_ExponentSigma
-	- SP_Position
-	- SP_NoiseFloor
-	- SP_NoiseFloorSigma
-	- SP_TxFreq
+	- SP_tx_power
+	- SP_tx_power_sigma
+	- SP_system_loss
+	- SP_system_loss_sigma
+	- SP_exponent
+	- SP_exponent_sigma
+	- SP_position
+	- SP_noise_floor
+	- SP_noise_floor_sigma
+	- SP_tx_freq
 - SV - Simulation Vehicle parameters
-	- SV_vehiclePositionSigma
+	- SV_vehicle_position_sigma
 - HS - Heartbeat State parameters
 	- HS_run
 - SS - Simulation State parameters
-	- SS_utmZoneNum
-	- SS_utmZone
-	- SS_vehiclePosition
-	- SS_vehicleState
-	- SS_startTime
-	- SS_velocityVector
-	- SS_vehicleTarget
-	- SS_waypointIdx
-	- SS_payloadRunning
+	- SS_utm_zone_num
+	- SS_utm_zone
+	- SS_vehicle_position
+	- SS_vehicle_state
+	- SS_start_time
+	- SS_velocity_vector
+	- SS_vehicle_target
+	- SS_waypoint_idx
+	- SS_payload_running
 
-The following parameters are avilable for the payload:
+The following parameters are available for the payload:
 - SDR - Software Defined Radio parameters
-	- SDR_centerFreq
-	- SDR_samplingFreq
+	- SDR_center_freq
+	- SDR_sampling_freq
 	- SDR_gain
 - TGT - Target parameters
 	- TGT_frequencies
 - DSP - Digital Signal Processing parameters
-	- DSP_pingWidth
-	- DSP_pingSNR
-	- DSP_pingMax
-	- DSP_pingMin
+	- DSP_ping_width
+	- DSP_ping_snr
+	- DSP_ping_max
+	- DSP_ping_min
 - GPS - GPS Sensor parameters
 	- GPS_mode
 	- GPS_device
 	- GPS_baud
 - SYS - System parameters
-	- SYS_outputDir
+	- SYS_output_dir
 	- SYS_autostart
 - STS - Status parameters
-	- STS_sdrStatus
-	- STS_dirStatus
-	- STS_gpsStatus
-	- STS_sysStatus
-	- STS_swStatus
+	- STS_sdr_status
+	- STS_dir_status
+	- STS_gps_status
+	- STS_sys_status
+	- STS_sw_status
 
 Use the following member functions to configure the simulator:
 ```
-droneSim.setGain(gain:float)
-droneSim.setOutputDir(outputDir:str)
-droneSim.setPingParameters(DSP_pingWidth:int, DSP_pingSNR:float, DSP_pingMax:float, DSP_pingMin:float)
-droneSim.setGPSParameters(GPS_device:str, GPS_baud:int, GPS_mode:bool)
-dromeSim.setAutostart(SYS_autostart:bool)
-droneSim.setSystemState(system:str, state:int)
-droneSim.setFrequencies(frequencies:list)
-droneSim.setCenterFrequency(centerFreq:int)
-droneSim.setSamplingFrequency(samplingFreq:int)
+DroneSim.set_gain(gain:float)
+DroneSim.set_output_dir(output_dir:str)
+DroneSim.set_ping_parameters(DSP_ping_width:int, DSP_ping_snr:float, DSP_ping_max:float, DSP_ping_min:float)
+DroneSim.set_gps_parameters(GPS_device:str, GPS_baud:int, GPS_mode:bool)
+dromeSim.set_autostart(SYS_autostart:bool)
+DroneSim.set_system_state(system:str, state:int)
+DroneSim.set_frequencies(frequencies:list)
+DroneSim.set_center_frequency(center_freq:int)
+DroneSim.set_sampling_frequency(sampling_freq:int)
 ```
 
 Use the following member functions to run the simulator
 ```
-droneSim.start()
-droneSim.stop()
-droneSim.restart()
-droneSim.gotPing(dronePing:ping.rctPing)
-droneSim.setException(exception:str, traceback:str)
-droneSim.getFrequencies()
-droneSim.transmitPosition()
-droneSim.doMission(returnOnEnd:bool)
-droneSim.calculatePingMeasurement()
+DroneSim.start()
+DroneSim.stop()
+DroneSim.restart()
+DroneSim.got_ping(drone_ping:ping.rctPing)
+DroneSim.set_exception(exception:str, traceback:str)
+DroneSim.get_frequencies()
+DroneSim.transmit_position()
+DroneSim.do_mission(return_on_end:bool)
+DroneSim.calculate_ping_measurement()
 ```
 
-Use the following functions when using multiple clients (only available in towerMode)
+Use the following function when using multiple clients (only available in tower mode)
 ```
-addClient()
-doAll(action:str, args:[])
+add_client()
 ```
 
 ###Executing a Mission
 ```
 bash$ ipython -i droneSimulator.py -- --protocol tcp
 ipython>>> sim.start()
-ipython>>> sim.doMission()
+ipython>>> sim.do_mission()
 ```

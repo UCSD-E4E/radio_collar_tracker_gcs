@@ -94,6 +94,7 @@ def configSetup() -> Path:
                 user_pops = UserPopups()
                 user_pops.show_warning("Warning, incorrect file chosen. Map tools may not function as expected")
             config.qgis_prefix_path = qgis_path
+            config.qgis_prefix_set = True
             return qgis_path
         else:
             return config.qgis_prefix_path
@@ -120,7 +121,7 @@ if __name__ == '__main__':
 
     prefix_path = configSetup()
 
-    QgsApplication.setPrefixPath(str(prefix_path))
+    QgsApplication.setPrefixPath(str(prefix_path), True)
 
     app.initQgis()
 

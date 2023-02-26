@@ -176,9 +176,9 @@ class MAVModel:
     CACHE_INVALID = 1
     CACHE_DIRTY = 2
 
-    __baseOptionKeywords = ['SDR_centerFreq', 'SDR_samplingFreq', 'SDR_gain']
-    __expOptionKeywords = ['DSP_pingWidth', 'DSP_pingSNR',
-                           'DSP_pingMax', 'DSP_pingMin', 'SYS_outputDir']
+    __baseOptionKeywords = ['SDR_center_freq', 'SDR_sampling_freq', 'SDR_gain']
+    __expOptionKeywords = ['DSP_ping_width', 'DSP_ping_snr',
+                           'DSP_ping_max', 'DSP_ping_min', 'SYS_output_dir']
     __engOptionKeywords = ['GPS_mode',
                            'GPS_baud', 'GPS_device', 'SYS_autostart']
 
@@ -197,11 +197,11 @@ class MAVModel:
                                    self.TGT_PARAMS: self.CACHE_INVALID}
 
         self.state = {
-            'STS_sdrStatus': 0,
-            'STS_dirStatus': 0,
-            'STS_gpsStatus': 0,
-            'STS_sysStatus': 0,
-            'STS_swStatus': 0,
+            'STS_sdr_status': 0,
+            'STS_dir_status': 0,
+            'STS_gps_status': 0,
+            'STS_sys_status': 0,
+            'STS_sw_status': 0,
             "UPG_state": -1,
             "UPG_msg": "",
             "VCL_track": {},
@@ -210,17 +210,17 @@ class MAVModel:
 
         self.PP_options = {
             "TGT_frequencies": [],
-            "SDR_centerFreq": 0,
-            "SDR_samplingFreq": 0,
+            "SDR_center_freq": 0,
+            "SDR_sampling_freq": 0,
             "SDR_gain": 0,
-            "DSP_pingWidth": 0,
-            "DSP_pingSNR": 0,
-            "DSP_pingMax": 0,
-            "DSP_pingMin": 0,
+            "DSP_ping_width": 0,
+            "DSP_ping_snr": 0,
+            "DSP_ping_max": 0,
+            "DSP_ping_min": 0,
             "GPS_mode": 0,
             "GPS_device": "",
             "GPS_baud": 0,
-            "SYS_outputDir": "",
+            "SYS_output_dir": "",
             "SYS_autostart": False,
         }
 
@@ -308,12 +308,12 @@ class MAVModel:
             addr: Source of packet
         '''
         self.__log.info("Received heartbeat")
-        self.state['STS_sdrStatus'] = SDR_INIT_STATES(packet.sdrState)
-        self.state['STS_dirStatus'] = OUTPUT_DIR_STATES(
+        self.state['STS_sdr_status'] = SDR_INIT_STATES(packet.sdrState)
+        self.state['STS_dir_status'] = OUTPUT_DIR_STATES(
             packet.storageState)
-        self.state['STS_gpsStatus'] = EXTS_STATES(packet.sensorState)
-        self.state['STS_sysStatus'] = RCT_STATES(packet.systemState)
-        self.state['STS_swStatus'] = packet.switchState
+        self.state['STS_gps_status'] = EXTS_STATES(packet.sensorState)
+        self.state['STS_sys_status'] = RCT_STATES(packet.systemState)
+        self.state['STS_sw_status'] = packet.switchState
         for callback in self.__callbacks[Events.Heartbeat]:
             callback()
 
@@ -354,10 +354,7 @@ class MAVModel:
             callback:    Callback to call
         '''
         assert(isinstance(event, Events))
-        if event not in self.__callbacks:
-            self.__callbacks[event] = [callback]
-        else:
-            self.__callbacks[event].append(callback)
+        self.__callbacks[event].append(callback)
 
     def startMission(self, timeout:int):
         '''
