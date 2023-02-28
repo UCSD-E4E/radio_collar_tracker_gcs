@@ -4,16 +4,16 @@ import logging
 import queue as q
 from functools import partial
 from pathlib import Path
-import config
+import RctGcs.config as config
 
-import rctCore
+import RctGcs.rctCore
 import utm
-from config import get_instance
+from RctGcs.config import get_instance
 from PyQt5.QtWidgets import (QFileDialog, QGridLayout, QLabel, QMainWindow,
                              QPushButton, QScrollArea, QVBoxLayout, QWidget)
 from RCTComms.transport import RCTTCPServer
-from ui.controls import *
-from ui.map import *
+from RctGcs.ui.controls import *
+from RctGcs.ui.map import *
 from functools import partial
 from RCTComms.transport import RCTTCPServer, RCTAbstractTransport
 
@@ -31,7 +31,7 @@ class GCS(QMainWindow):
     connect_signal = pyqtSignal(int)
     disconnect_signal = pyqtSignal(int)
 
-    mav_event_signal = pyqtSignal(rctCore.Events, int)
+    mav_event_signal = pyqtSignal(RctGcs.rctCore.Events, int)
 
     def __init__(self):
         '''
@@ -57,7 +57,7 @@ class GCS(QMainWindow):
         self.test_frame = None
         self.ping_sheet_created = False
         self.user_popups = UserPopups()
-        self.config = config.Configuration(Path('gcsConfig.ini'))
+        self.config = RctGcs.config.Configuration(Path('gcsConfig.ini'))
         self.config.load()
 
         self.__create_widgets()
@@ -102,7 +102,7 @@ class GCS(QMainWindow):
         if self._transport is not None and self._transport.isOpen():
             self._transport.close()
         self.mav_event_signal.connect(self.__mav_event_handler)
-        if self.config.connection_mode == config.ConnectionMode.TOWER:
+        if self.config.connection_mode == RctGcs.config.ConnectionMode.TOWER:
             self._transport = RCTTCPServer(self.port_val, self.connection_handler)
             self._transport.open()
         else:

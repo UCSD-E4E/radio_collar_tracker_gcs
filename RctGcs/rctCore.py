@@ -48,7 +48,7 @@ from enum import Enum, auto
 import RCTComms.comms
 import logging
 import threading
-import ping
+import RctGcs.ping
 import copy
 
 

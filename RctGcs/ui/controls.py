@@ -2,7 +2,7 @@ import time
 from PyQt5.QtCore import Qt, pyqtSlot
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QIntValidator
-from ui.popups import *
+from RctGcs.ui.popups import *
 
 class CollapseFrame(QWidget):
     '''

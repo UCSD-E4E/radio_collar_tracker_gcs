@@ -33,17 +33,18 @@
 #
 ###############################################################################
 
+import csv
 import datetime as dt
+import math
+import time
+
 import numpy as np
+import utm
+from osgeo import gdal, osr
+from RCTComms.comms import rctPingPacket
 from scipy.optimize import least_squares
 from scipy.stats import norm, zscore
-import utm
-import time
-from RCTComms.comms import rctPingPacket
-from osgeo import gdal
-from osgeo import osr
-import csv
-import math
+
 
 class rctCone:
     def __init__(self, lat: float, lon: float, amplitude: float, freq: int, alt: float, heading:float, time: float):

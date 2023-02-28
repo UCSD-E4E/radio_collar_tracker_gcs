@@ -69,17 +69,18 @@ import os.path
 import sys
 from pathlib import Path
 
-from config import get_instance
 from PyQt5.QtWidgets import QFileDialog
-from pathlib import Path
+
+from RctGcs.config import get_instance
+from RctGcs.ui.display import GCS
+from RctGcs.ui.popups import UserPopups
+
 if 'CONDA_PREFIX' in os.environ:
     sys.path.insert(0, Path(sys.executable).parent.joinpath("Library", "python", "plugins").as_posix())
     sys.path.insert(0, Path(sys.executable).parent.joinpath("Library", "python").as_posix())
-from qgis.core import *    
-from qgis.gui import *  
+from qgis.core import *
+from qgis.gui import *
 from qgis.utils import *
-from ui.display import GCS
-from ui.popups import UserPopups
 
 
 def configSetup() -> Path:
@@ -100,7 +101,7 @@ def configSetup() -> Path:
             return config.qgis_prefix_path
 
 
-if __name__ == '__main__':
+def main():
     logName = dt.datetime.now().strftime('%Y.%m.%d.%H.%M.%S_gcs.log')
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
@@ -131,3 +132,6 @@ if __name__ == '__main__':
     exitcode = app.exec_()
     app.exitQgis()
     sys.exit(exitcode)
+
+if __name__ == '__main__':
+    main()
