@@ -25,6 +25,7 @@ setup(
             'coverage',
             'pylint',
             'wheel',
+            'pyautogui',
         ]
     },
 )
