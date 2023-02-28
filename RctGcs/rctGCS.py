@@ -129,9 +129,8 @@ def main():
     ex = GCS()
     ex.show()
 
-    exitcode = app.exec_()
+    app.exec_()
     app.exitQgis()
-    sys.exit(exitcode)
 
 if __name__ == '__main__':
     main()
