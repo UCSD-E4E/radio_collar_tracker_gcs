@@ -6,8 +6,9 @@ from v1.0.  Working branch v1.0a, becomes v2.0 on release
 1.  [Install Miniconda](https://docs.conda.io/en/latest/miniconda.html)
 2.  Download this repository
 3.  Navigate to the `radio_collar_tracker_gcs` project in a python capable terminal
-4.  Run `conda env create -f environment.yml`
+4.  Run `conda env create -f conda-{os}.lock`
 5.  Run `conda activate rctGCS`
+6.  Run `python -m pip install git+https://github.com/UCSD-E4E/radio_collar_tracker_comms.git@v0.0.0.9`
 
 ## Running `rctGCS`
 -   Windows:

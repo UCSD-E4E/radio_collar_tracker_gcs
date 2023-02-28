@@ -10,8 +10,8 @@ dependencies:
   - pip
   - scipy
   - pip:
-    - utm==0.5.0
+    - utm
     - xlwt
-    - appdirs==1.4.4
+    - appdirs
     - ipython
-    - RCTComms @ git+https://github.com/UCSD-E4E/radio_collar_tracker_comms.git
+    # - RCTComms @ git+https://github.com/UCSD-E4E/radio_collar_tracker_comms.git@v0.0.0.9

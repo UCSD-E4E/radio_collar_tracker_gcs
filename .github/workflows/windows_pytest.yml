@@ -11,11 +11,16 @@ jobs:
       uses: conda-incubator/setup-miniconda@v2
       with:
           miniconda-version: "latest"
-          environment-file: environment.yml
+          environment-file: conda-win-64.lock
           activate-environment: rctGCS
           python-version: 3.9
           auto-activate-base: false
     - name: Install dependencies
       shell: powershell
       run: |
-        cd scripts
+        python -m pip install git+https://github.com/UCSD-E4E/radio_collar_tracker_comms.git@v0.0.0.9
+        python -m pip install pytest
+    - name: Execute tests
+      shell: powershell
+      run: |
+        python -m pytest tests
