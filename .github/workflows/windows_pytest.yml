@@ -13,7 +13,6 @@ jobs:
           miniconda-version: "latest"
           environment-file: conda-win-64.lock
           activate-environment: rctGCS
-          python-version: 3.9
           auto-activate-base: false
     - name: Install dependencies
       shell: powershell
