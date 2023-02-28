@@ -23,8 +23,8 @@ metadata:
     osx-64: 369b5f26f650de0c0a92263cd53865fa1383287e5c45df0541596a5840f28b5b
     win-64: 88f1d20be1124e737e36a4b02a30cf9b14ea08056875c3ed28794edd6ed0c857
   platforms:
-  - osx-64
   - linux-64
+  - osx-64
   - win-64
   sources:
   - D:\workspace\e4e\rct\radio_collar_tracker_gcs\environment.yml
@@ -935,19 +935,20 @@ package:
   version: 1.2.3
 - category: main
   dependencies:
-    libgcc-ng: '>=9.3.0'
-    libxcb: 1.*
+    libgcc-ng: '>=12'
+    libxcb: '>=1.13,<1.14.0a0'
     xorg-kbproto: ''
+    xorg-xextproto: '>=7.3.0,<8.0a0'
     xorg-xproto: ''
   hash:
-    md5: 12a61e640b8894504326aadafccbb790
-    sha256: ec4641131e3afcb4b34614a5fa298efb34f54c2b2960bf9a73a8d202140d47c4
+    md5: ea8fbfeb976ac49cbeb594e985393514
+    sha256: 3c6862a01a39cdea3870b132706ad7256824299947a3a94ae361d863d402d704
   manager: conda
   name: xorg-libx11
   optional: false
   platform: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/xorg-libx11-1.7.2-h7f98852_0.tar.bz2
-  version: 1.7.2
+  url: https://conda.anaconda.org/conda-forge/linux-64/xorg-libx11-1.8.4-h0b41bf4_0.conda
+  version: 1.8.4
 - category: main
   dependencies:
     libgcc-ng: '>=12'
@@ -1480,14 +1481,14 @@ package:
   dependencies:
     python: '>=3.9,<3.10.0a0'
   hash:
-    md5: 789620902cfd2e0b60633cbd63887f83
-    sha256: f84faae1b4ce0e1b4285c1bdd0f2e9aa5925e35edf289f5785752ddc25608cef
+    md5: ea4ecba8f223fff9fadcf120fb41d8c0
+    sha256: 76ee12dc5703be99cc8dd6617f9b3f7589d51f710560e4f158ce02d76b3b41d9
   manager: conda
   name: future
   optional: false
   platform: linux-64
-  url: https://repo.anaconda.com/pkgs/main/linux-64/future-0.18.2-py39h06a4308_1.conda
-  version: 0.18.2
+  url: https://repo.anaconda.com/pkgs/main/linux-64/future-0.18.3-py39h06a4308_0.conda
+  version: 0.18.3
 - category: main
   dependencies:
     libcurl: '>=7.81.0,<8.0a0'
@@ -2123,14 +2124,14 @@ package:
     openssl: ''
     python: '>=3.9,<3.10.0a0'
   hash:
-    md5: 38eea02c5f2ff123ddfa0b706482d0d3
-    sha256: cf174b6091e45be3923cc4f32fb8512208e12056d14b3aed354f50c1db86a9fd
+    md5: 52136f55ebc78ad10354df15ddaa581a
+    sha256: 5b9e8a738436302fd283c23377b21e03587705885e41acb7492f3c9c7bdcfaa0
   manager: conda
   name: cryptography
   optional: false
   platform: linux-64
-  url: https://repo.anaconda.com/pkgs/main/linux-64/cryptography-39.0.1-py39h9ce1e76_0.conda
-  version: 39.0.1
+  url: https://repo.anaconda.com/pkgs/main/linux-64/cryptography-38.0.4-py39h9ce1e76_0.conda
+  version: 38.0.4
 - category: main
   dependencies:
     gettext: '>=0.19.8.1,<1.0a0'
@@ -2825,7 +2826,6 @@ package:
 - category: main
   dependencies:
     blas: 1.0 mkl
-    fftw: '>=3.3.9,<4.0a0'
     intel-openmp: '>=2021.4.0,<2022.0a0'
     libgcc-ng: '>=11.2.0'
     libgfortran-ng: ''
@@ -2833,17 +2833,17 @@ package:
     libstdcxx-ng: '>=11.2.0'
     mkl: '>=2021.4.0,<2022.0a0'
     mkl-service: '>=2.3.0,<3.0a0'
-    numpy: '>=1.19,<1.27.0'
+    numpy: '>=1.19.5,<1.27.0'
     pooch: ''
     python: '>=3.9,<3.10.0a0'
   hash:
-    md5: fec3f1470f726222a8915ce8eb5450a5
-    sha256: 2525ed094afe3bff372d5d41ceb2d1298319ec0e5b7d113c70535ac35ac81e52
+    md5: 095478dec2ad3fca52b1743d740cead3
+    sha256: e7e53c1a9d6ccd13da735e7abcad3df3fc53f4214f7edc84d2d8c9d26f5bc24b
   manager: conda
   name: scipy
   optional: false
   platform: linux-64
-  url: https://repo.anaconda.com/pkgs/main/linux-64/scipy-1.10.0-py39h14f4228_0.conda
+  url: https://repo.anaconda.com/pkgs/main/linux-64/scipy-1.10.0-py39h14f4228_1.conda
   version: 1.10.0
 - category: main
   dependencies: {}
@@ -4155,14 +4155,14 @@ package:
   dependencies:
     python: '>=3.9,<3.10.0a0'
   hash:
-    md5: 965636e275f00f66bf4746c8df7455ca
-    sha256: 4789bbef1933fa259a9b25781a9594e300cd6fc927628a4ef309057c1a1257f3
+    md5: a9552c19c963f2bb07136fe432d5d100
+    sha256: fea6e91d1bc8f36d7dc3f2289047408c159b50ad9113a5550c59d493ec564324
   manager: conda
   name: future
   optional: false
   platform: osx-64
-  url: https://repo.anaconda.com/pkgs/main/osx-64/future-0.18.2-py39hecd8cb5_1.conda
-  version: 0.18.2
+  url: https://repo.anaconda.com/pkgs/main/osx-64/future-0.18.3-py39hecd8cb5_0.conda
+  version: 0.18.3
 - category: main
   dependencies:
     libcurl: '>=7.81.0,<8.0a0'
@@ -4823,14 +4823,14 @@ package:
     openssl: ''
     python: '>=3.9,<3.10.0a0'
   hash:
-    md5: 47eae0abc1b7f4c285ab4a4b49e34f4b
-    sha256: bdc29aa21a52f6aa986d3670b99c11e5715b8d92260bc6f812a22ca0c4881af0
+    md5: 60f85eabbcadcab133178381076a53cb
+    sha256: 80b13c9ee432b52526d0d1867f3889839037da2bf979dd50694906825c08962f
   manager: conda
   name: cryptography
   optional: false
   platform: osx-64
-  url: https://repo.anaconda.com/pkgs/main/osx-64/cryptography-39.0.1-py39hf6deb26_0.conda
-  version: 39.0.1
+  url: https://repo.anaconda.com/pkgs/main/osx-64/cryptography-38.0.4-py39hf6deb26_0.conda
+  version: 38.0.4
 - category: main
   dependencies:
     gettext: '>=0.19.8.1,<1.0a0'
@@ -5361,24 +5361,23 @@ package:
 - category: main
   dependencies:
     blas: 1.0 mkl
-    fftw: '>=3.3.9,<4.0a0'
     intel-openmp: '>=2021.4.0,<2022.0a0'
     libcxx: '>=14.0.6'
     libgfortran: 5.*
     libgfortran5: '>=11.3.0'
     mkl: '>=2021.4.0,<2022.0a0'
     mkl-service: '>=2.3.0,<3.0a0'
-    numpy: '>=1.19,<1.27.0'
+    numpy: '>=1.19.5,<1.27.0'
     pooch: ''
     python: '>=3.9,<3.10.0a0'
   hash:
-    md5: 262986f0d7fca9fa46f726a165fa1e91
-    sha256: bbbfade2cd61c4def2caa1ec82f1deb4a970712feabba25433b1f4b3068c424e
+    md5: 517710e1e02bcaff317d317d73455939
+    sha256: 2ff2c2bf106574527cfca066fc409a4e6f2d1eb69437d938688d1ef0103edcf8
   manager: conda
   name: scipy
   optional: false
   platform: osx-64
-  url: https://repo.anaconda.com/pkgs/main/osx-64/scipy-1.10.0-py39h91c6ef4_0.conda
+  url: https://repo.anaconda.com/pkgs/main/osx-64/scipy-1.10.0-py39h91c6ef4_1.conda
   version: 1.10.0
 - category: main
   dependencies: {}
@@ -6327,14 +6326,14 @@ package:
   dependencies:
     python: '>=3.9,<3.10.0a0'
   hash:
-    md5: 5c348f4d079f2cf374d3fb31ec08b3af
-    sha256: 03f45b96aa7fd3909abecdd3d2b0f16ee0761f435244003d6e64a9b0761de025
+    md5: 696f50df8dd6966a3fc402d49a703282
+    sha256: 0f1c66b9b78be04eb6acdc25938ed58356c4428f10aa36c752705ed4b769e6af
   manager: conda
   name: future
   optional: false
   platform: win-64
-  url: https://repo.anaconda.com/pkgs/main/win-64/future-0.18.2-py39haa95532_1.conda
-  version: 0.18.2
+  url: https://repo.anaconda.com/pkgs/main/win-64/future-0.18.3-py39haa95532_0.conda
+  version: 0.18.3
 - category: main
   dependencies:
     jpeg: '>=9e,<10a'
@@ -7005,14 +7004,14 @@ package:
     vc: '>=14.1,<15.0a0'
     vs2015_runtime: '>=14.16.27012,<15.0a0'
   hash:
-    md5: 1b54a38cb1b2488597fad236b49b9b9c
-    sha256: a85c84d756e08d8ba9d3bcb15abd0d632098bdcd1524e5e617759394834363e8
+    md5: 8eb842b52029946f436beaec77a8dd1c
+    sha256: 4b48ad1c647d07079d41546b6a36f9cdf3a0335822d4163494d5e7a92ff16288
   manager: conda
   name: cryptography
   optional: false
   platform: win-64
-  url: https://repo.anaconda.com/pkgs/main/win-64/cryptography-39.0.1-py39h21b164f_0.conda
-  version: 39.0.1
+  url: https://repo.anaconda.com/pkgs/main/win-64/cryptography-38.0.4-py39h21b164f_0.conda
+  version: 38.0.4
 - category: main
   dependencies:
     expat: '>=2.4.9,<3.0a0'
@@ -7819,24 +7818,23 @@ package:
 - category: main
   dependencies:
     blas: 1.0 mkl
-    fftw: '>=3.3.9,<4.0a0'
     icc_rt: '>=2022.1.0'
     intel-openmp: '>=2021.4.0,<2022.0a0'
     mkl: '>=2021.4.0,<2022.0a0'
     mkl-service: '>=2.3.0,<3.0a0'
-    numpy: '>=1.19,<1.27.0'
+    numpy: '>=1.19.5,<1.27.0'
     pooch: ''
     python: '>=3.9,<3.10.0a0'
     vc: '>=14.2,<15.0a0'
     vs2015_runtime: '>=14.27.29016,<15.0a0'
   hash:
-    md5: 4ef0ddfedcd7bf55353b251863be906b
-    sha256: 0503eab2995115280474a95a6169c54122c170dfea5f0529eeba48bd138523df
+    md5: 6f69f603c9db5ee8d41f4bdd362e2432
+    sha256: b2f965321442cd8311f760901946419d3e5d53290e63e614fe9ded69c93dfd03
   manager: conda
   name: scipy
   optional: false
   platform: win-64
-  url: https://repo.anaconda.com/pkgs/main/win-64/scipy-1.10.0-py39h321e85e_0.conda
+  url: https://repo.anaconda.com/pkgs/main/win-64/scipy-1.10.0-py39h321e85e_1.conda
   version: 1.10.0
 - category: main
   dependencies: {}
