@@ -11,7 +11,7 @@ jobs:
       uses: conda-incubator/setup-miniconda@v2
       with:
           miniconda-version: "latest"
-          environment-file: conda-lock.yml
+          environment-file: conda-win-64.lock
           activate-environment: rctGCS
           auto-activate-base: false
     - name: Install dependencies
