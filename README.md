@@ -6,9 +6,9 @@ from v1.0.  Working branch v1.0a, becomes v2.0 on release
 1.  [Install Miniconda](https://docs.conda.io/en/latest/miniconda.html)
 2.  Download this repository
 3.  Navigate to the `radio_collar_tracker_gcs` project in a python capable terminal
-4.  Run `conda env create -f conda-lock.yml`
+4.  Run `conda create --name rctGCS --file conda-[os].lock`
 5.  Run `conda activate rctGCS`
-6.  Run `python -m pip install git+https://github.com/UCSD-E4E/radio_collar_tracker_comms.git@v0.0.0.9`
+6.  Run `poetry install`
 
 ## Running `rctGCS`
 -   Windows:
@@ -34,17 +34,15 @@ from v1.0.  Working branch v1.0a, becomes v2.0 on release
 # For Developers
 ## Prerequisites:
 - [VSCode](https://code.visualstudio.com/download)
-- [Python 3.6](https://www.python.org/downloads/)
-- [Anaconda 2020.02 or later](https://www.anaconda.com/products/individual)
+- [Miniconda 2023.1.0 or later](https://docs.conda.io/en/latest/miniconda.html)
 
 ### Configuration
 1.  Download this repository and check out the appropriate branch
-2.  Download the [comms directory](https://github.com/UCSD-E4E/radio_collar_tracker_comms/tree/communications_HG) and checkout the appropriate branch
-3.  Navigate to the `radio_collar_tracker_comms` project in a python capable terminal
-4.  Run `python -m pip install .`
-5.  Navigate to the `radio_collar_tracker_gcs` project in a python capable terminal
-6.  Run `conda env create -f environment.yml`
-7.  Open VSCode. Naviagate to the `Extensions` tab and download `Python Extension Pack`.
-8.  Restart VSCode. Open the `radio_collar_tracker_gcs` project
-9.  Open the command palette (`Ctrl`+`Shift`+`P`)
-10.  Select `Python: Select Interpreter`/`Python 3.6.13 ('rctGCS')`
+2.  Navigate to the `radio_collar_tracker_gcs` project in a python capable terminal
+3.  Run `conda create --name rctGCS --file conda-[os].lock`
+4.  Run `conda activate rctGCS`
+5.  Run `poetry install`
+6.  Open VSCode. Open the `radio_collar_tracker_gcs` project
+7.  Open the command palette (`Ctrl`+`Shift`+`P`)
+8.  Select `Python: Select Interpreter`/`Python 3.9.16 ('rctGCS')`
+9.  Install recommended extensions
