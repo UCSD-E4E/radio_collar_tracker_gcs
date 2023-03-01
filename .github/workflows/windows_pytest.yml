@@ -21,4 +21,5 @@ jobs:
     - name: Execute tests
       shell: powershell
       run: |
+        conda activate rctGCS
         python -m pytest tests
