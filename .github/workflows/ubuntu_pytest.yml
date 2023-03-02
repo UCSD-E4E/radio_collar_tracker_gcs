@@ -1,0 +1,23 @@
+name: ubuntu pytest
+
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python 3.9
+      uses: conda-incubator/setup-miniconda@v2
+      with:
+          miniconda-version: "latest"
+          environment-file: conda-linux-64.lock
+          activate-environment: rctGCS
+          auto-activate-base: false
+    - name: Install dependencies
+      run: |
+        poetry install
+    - name: Execute tests
+      run: |
+        conda activate rctGCS
+        python -m pytest tests
