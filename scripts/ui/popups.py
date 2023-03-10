@@ -3,7 +3,7 @@ from typing import Any, List
 import config
 import rctCore
 from config import ConnectionMode
-from PyQt5.QtCore import QRegExp, Qt
+from PyQt5.QtCore import QRegExp, Qt, QTimer
 from PyQt5.QtGui import QRegExpValidator
 from PyQt5.QtWidgets import *
 from RCTComms.comms import gcsComms
@@ -82,6 +82,26 @@ class UserPopups:
         msg.setIcon(QMessageBox.Critical)
         msg.addButton(QMessageBox.Ok)
         msg.exec_()
+
+    def show_timed_warning(self, text: str, timeout: int, title: str ="Warning"):
+        '''
+        Creates timed warning popups
+        Args:
+            title: message header
+            timeout: timeout in seconds
+            text: message body
+        '''
+        
+        msg = QMessageBox()
+        QTimer.singleShot(timeout*1000, lambda : msg.done(0))
+        msg.setText(title)
+        msg.setWindowTitle("Alert")
+        msg.setInformativeText(text)
+        msg.setIcon(QMessageBox.Critical)
+        msg.addButton(QMessageBox.Ok)
+        msg.exec_()
+
+
 
 class ExpertSettingsDialog(QWizard):
     '''
