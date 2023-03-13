@@ -29,7 +29,7 @@ from v1.0.  Working branch v1.0a, becomes v2.0 on release
     - `ipython>>> sim.start()`
 3. From the rctGCS UI, navigate to the "System: No Connection" tab --> "Connect" --> "Done"
 4. Switch back to the `ipython` terminal window
-    - `ipython>>> sim.doMission()`
+    - `ipython>>> sim.do_mission()`
 
 # For Developers
 ## Prerequisites:
