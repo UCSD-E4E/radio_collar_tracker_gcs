@@ -15,7 +15,8 @@ from RCTComms.transport import RCTTCPServer
 from RctGcs.ui.controls import *
 from RctGcs.ui.map import *
 from functools import partial
-from RCTComms.transport import RCTTCPServer, RCTAbstractTransport
+from RCTComms import RCTTCPServer, RCTAbstractTransport,RCTSERIALServer
+
 
 class GCS(QMainWindow):
     '''
@@ -107,7 +108,10 @@ class GCS(QMainWindow):
             self._transport.open()
         else:
             try:
-                self._transport = RCTTCPClient(addr=self.addr_val, port=self.port_val)
+                if serial_checked:
+                    self._transport = RCTSERIALCLIENT(port = self.port_val)
+                else:
+                    self._transport = RCTTCPClient(addr=self.addr_val, port=self.port_val)
                 self.connection_handler(self._transport, 0)
             except ConnectionRefusedError:
                 self.user_popups.show_warning("Failure to connect:\nPlease ensure server is running.")
