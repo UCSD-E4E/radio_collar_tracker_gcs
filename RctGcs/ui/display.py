@@ -15,7 +15,7 @@ from RCTComms.transport import RCTTCPServer
 from RctGcs.ui.controls import *
 from RctGcs.ui.map import *
 from functools import partial
-from RCTComms import RCTTCPServer, RCTAbstractTransport,RCTSERIALServer
+from RCTComms.transport import RCTTCPServer, RCTAbstractTransport,RCTSERIALServer
 
 
 class GCS(QMainWindow):

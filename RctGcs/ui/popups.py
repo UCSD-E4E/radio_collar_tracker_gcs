@@ -352,8 +352,8 @@ class ConnectionDialogPage(QWizardPage):
         lbl_con_type = QLabel('Connection Type:')
         frm_con_type.addWidget(lbl_con_type)
 
-        btn_tcp = QCheckBox('TCP')
-        frm_con_type.addWidget(btn_tcp)
+        btn_serial = QCheckBox('Serial')
+        frm_con_type.addWidget(btn_serial)
         #-----
         frm_port = QHBoxLayout()
         frm_port.addStretch(1)
