@@ -99,6 +99,7 @@ class GCS(QMainWindow):
             partial(self.mav_event_signal.emit, event_type, id))
 
     def __start_transport(self):
+
         if self._transport is not None and self._transport.isOpen():
             self._transport.close()
         self.mav_event_signal.connect(self.__mav_event_handler)
@@ -106,13 +107,19 @@ class GCS(QMainWindow):
             self._transport = RCTTCPServer(self.port_val, self.connection_handler)
             self._transport.open()
         else:
-            try:
-                self._transport = RCTTCPClient(addr=self.addr_val, port=self.port_val)
-                self.connection_handler(self._transport, 0)
-            except ConnectionRefusedError:
-                self.user_popups.show_warning("Failure to connect:\nPlease ensure server is running.")
-                self._transport.close()
-                return
+            attempts = 5
+            retry_time = 2
+            for i in range(attempts):
+                try:
+                    self._transport = RCTTCPClient(addr=self.addr_val, port=self.port_val)
+                    self.connection_handler(self._transport, 0)
+                except ConnectionRefusedError:
+                    self.user_popups.show_timed_warning(text="Trying to reconnect. Attempt {} out of 5.\
+                                                        \nRetrying after {} seconds.".format(str(i), retry_time), timeout=retry_time)
+                    self._transport.close()
+
+            self.user_popups.show_warning("Failure to connect:\nPlease ensure server is running.")
+            return
 
     def connection_handler(self, connection, id):
         comms = gcsComms(connection, partial(self.__disconnect_handler, id))
