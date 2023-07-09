@@ -5,18 +5,22 @@ on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python 3.9
       uses: conda-incubator/setup-miniconda@v2
       with:
-          miniconda-version: "latest"
-          environment-file: conda-linux-64-lock.yml
+        auto-update-conda: false
+        activate-environment: rctGCS
+        environment-file: conda-linux-64-lock.yml
     - name: Install dependencies
       run: |
-        conda activate test
+        conda activate rctGCS
         python -m poetry install
     - name: Execute tests
       run: |
-        conda activate test
+        conda activate rctGCS
         python -m pytest tests
