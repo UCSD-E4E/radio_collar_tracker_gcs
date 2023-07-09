@@ -291,7 +291,6 @@ class DroneSim:
                             (478170.62177826493, 3638696.0, 30),
                             (478145.0, 3638721.621778265, 30),
                             (478110.0, 3638731.0, 30)]
-
         OG
         self.SM_waypoints = [(477974.06988529314, 3638776.3039655555, 30),
                              (477974.06988529314, 3638776.3039655555, 30),
@@ -836,7 +835,6 @@ class DroneSim:
         '''
         if abs(self.SP_tx_freq - self.PP_options['SDR_center_freq']) > self.PP_options['SDR_sampling_freq']:
             return None
-
         if self.SP_tx_freq not in self.PP_options['TGT_frequencies']:
             return None
         '''

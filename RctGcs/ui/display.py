@@ -7,6 +7,7 @@ from pathlib import Path
 import RctGcs.config as config
 
 import RctGcs.rctCore
+
 import utm
 from RctGcs.config import get_instance
 from PyQt5.QtWidgets import (QFileDialog, QGridLayout, QLabel, QMainWindow,
