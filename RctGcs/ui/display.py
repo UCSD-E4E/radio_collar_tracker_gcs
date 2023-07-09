@@ -55,8 +55,7 @@ class GCS(QMainWindow):
         self.test_frame = None
         self.ping_sheet_created = False
         self.user_popups = UserPopups()
-        self.config = RctGcs.config.Configuration(get_config_path())
-        self.config.load()
+        self.config = get_instance(get_config_path())
 
         self.__create_widgets()
         for button in self._buttons:

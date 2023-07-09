@@ -7,8 +7,7 @@ from PyQt5.QtWidgets import *
 from RCTComms.comms import gcsComms
 from RCTComms.transport import RCTTCPClient, RCTTCPServer
 
-import RctGcs.config as config
-from RctGcs.config import ConnectionMode, get_config_path
+from RctGcs.config import ConnectionMode, get_config_path, get_instance
 
 
 class UserPopups:
@@ -414,8 +413,7 @@ class ConfigDialog(QWizard):
             parent: The parent widget of this ConfigDialog widget
         '''
         super(ConfigDialog, self).__init__()
-        self.config = config.Configuration(get_config_path())
-        self.config.load()
+        self.config = get_instance(get_config_path())
 
         self.parent = parent
         self.setWindowTitle('Edit Configuration Settings')
