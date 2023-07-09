@@ -12,12 +12,9 @@ jobs:
       with:
           miniconda-version: "latest"
           environment-file: conda-osx-64-lock.yml
-          activate-environment: rctGCS
-          auto-activate-base: false
     - name: Install dependencies
       run: |
         poetry install
     - name: Execute tests
       run: |
-        conda activate rctGCS
         python -m pytest tests

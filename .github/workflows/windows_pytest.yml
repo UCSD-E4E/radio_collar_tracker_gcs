@@ -12,8 +12,6 @@ jobs:
       with:
           miniconda-version: "latest"
           environment-file: conda-win-64-lock.yml
-          activate-environment: rctGCS
-          auto-activate-base: false
     - name: Install dependencies
       shell: powershell
       run: |
@@ -21,5 +19,4 @@ jobs:
     - name: Execute tests
       shell: powershell
       run: |
-        conda activate rctGCS
         python -m pytest tests
