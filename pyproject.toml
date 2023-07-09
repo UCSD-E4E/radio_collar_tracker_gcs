@@ -29,6 +29,9 @@ pylint = "^2.16.2"
 wheel = "^0.38.4"
 PyAutoGUI = "^0.9.53"
 
+[tool.poetry.scripts]
+RCTGcs = 'RctGcs.rctGCS:main'
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
