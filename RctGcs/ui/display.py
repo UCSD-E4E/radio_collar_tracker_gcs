@@ -108,11 +108,12 @@ class GCS(QMainWindow):
             self._transport.open()
         else:
             attempts = 5
-            retry_time = 2
+            retry_time = 5
             for i in range(attempts):
                 try:
                     self._transport = RCTTCPClient(addr=self.addr_val, port=self.port_val)
                     self.connection_handler(self._transport, 0)
+                    return
                 except ConnectionRefusedError:
                     self.user_popups.show_timed_warning(text="Trying to reconnect. Attempt {} out of 5.\
                                                         \nRetrying after {} seconds.".format(str(i), retry_time), timeout=retry_time)
