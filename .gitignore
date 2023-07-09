@@ -266,3 +266,4 @@ scripts/gcsConfig.ini
 *.xls
 
 .venv
+gcsConfig.ini

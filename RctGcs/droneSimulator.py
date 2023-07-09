@@ -53,13 +53,13 @@ from pathlib import Path
 from time import sleep
 from typing import List
 
-import config
 import numpy as np
 import RCTComms.comms
 import RCTComms.transport
 import utm
-from config import ConnectionMode
-from ping import rctPing
+
+from RctGcs.config import ConnectionMode, Configuration
+from RctGcs.ping import rctPing
 
 
 def get_ips():
@@ -971,7 +971,7 @@ class DroneSimPack:
         :param protocol: transport protocol, tcp or udp
         :param clients: the number of clients to create if in tower mode
         '''
-        self.config_obj = config.Configuration(Path('gcsConfig.ini'))
+        self.config_obj = Configuration(Path('gcsConfig.ini'))
         self.config_obj.load()
         self.sim_list = []
 
@@ -1048,7 +1048,7 @@ class DroneSimPack:
         sim = DroneSim(comms)
         self.sim_list.append(sim)
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser(
         description='Radio Collar Tracker Payload Control Simulator')
     parser.add_argument('--port', type=int, default=9000)
@@ -1080,3 +1080,6 @@ if __name__ == '__main__':
         __IPYTHON__
     except NameError:
         sim.start()
+
+if __name__ == '__main__':
+    main()

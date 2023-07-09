@@ -1,23 +1,27 @@
+import csv
 import math
-import sys
 import os
 import os.path
+import sys
+from pathlib import Path
+from threading import Thread
+
 import requests
 from PyQt5.QtCore import *
-from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
-from pathlib import Path
+from PyQt5.QtWidgets import *
+
+from RctGcs.ui.controls import *
+from RctGcs.ui.popups import *
+
 if 'CONDA_PREFIX' in os.environ:
     sys.path.insert(0, Path(sys.executable).parent.joinpath("Library", "python", "plugins").as_posix())
     sys.path.insert(0, Path(sys.executable).parent.joinpath("Library", "python").as_posix())
-from qgis.core import *
 import qgis.gui
-from qgis.utils import *
+from qgis.core import *
 from qgis.core import QgsProject
-from threading import Thread
-import csv
-from ui.popups import *
-from ui.controls import *
+from qgis.utils import *
+
 
 class RectangleMapTool(qgis.gui.QgsMapToolEmitPoint):
     '''

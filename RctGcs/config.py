@@ -29,7 +29,7 @@ class Configuration:
         self.__map_extent_se: Tuple[float, float] = (-90., 180.)
 
         self.__qgis_prefix_path: Path = self.__get_qgis_path()
-        self.__qgis_prefix_set: bool = False
+        self.__qgis_prefix_set: bool = True
 
         self.__connection_addr: str = '127.0.0.1'
         self.__connection_port: int = 9000
@@ -67,6 +67,10 @@ class Configuration:
             self.__qgis_prefix_path = Path(parser['FilePaths']['PrefixPath'])
 
         self.__qgis_prefix_set = parser['FilePaths'].getboolean('PrefixSet')
+
+        if not self.__qgis_prefix_path.is_dir():
+            self.__qgis_prefix_path = self.__get_qgis_path()
+            self.__qgis_prefix_set = False
 
         self.__map_extent_nw = (
             parser['LastCoords'].getfloat('lat1'),

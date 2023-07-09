@@ -1,25 +1,23 @@
-name: windows pytest
+name: osx pytest
 
 on: [push, workflow_dispatch]
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: macos-latest
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python 3.9
       uses: conda-incubator/setup-miniconda@v2
       with:
           miniconda-version: "latest"
-          environment-file: conda-win-64.lock
+          environment-file: conda-osx-64.lock
           activate-environment: rctGCS
           auto-activate-base: false
     - name: Install dependencies
-      shell: powershell
       run: |
         poetry install
     - name: Execute tests
-      shell: powershell
       run: |
         conda activate rctGCS
         python -m pytest tests

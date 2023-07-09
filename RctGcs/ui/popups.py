@@ -1,8 +1,8 @@
 from pathlib import Path
 from typing import Any, List
-import config
-import rctCore
-from config import ConnectionMode
+import RctGcs.config as config
+import RctGcs.rctCore
+from RctGcs.config import ConnectionMode
 from PyQt5.QtCore import QRegExp, Qt, QTimer
 from PyQt5.QtGui import QRegExpValidator
 from PyQt5.QtWidgets import *

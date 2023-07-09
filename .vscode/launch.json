@@ -8,25 +8,28 @@
             "name": "RCT GCS",
             "request": "launch",
             "type": "python",
-            "program": "rctGCS.py",
+            "program": "RctGcs/rctGCS.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "cwd": "${workspaceFolder}/scripts",
+            "cwd": "${workspaceFolder}",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/scripts;"
+                "PYTHONPATH": "${workspaceFolder};"
             }
         },
         {
             "name": "Drone Simulator",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/scripts/droneSimulator.py",
+            "program": "RctGcs/droneSimulator.py",
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/scripts",
+            "cwd": "${workspaceFolder}",
             "args": [
                 "--protocol",
                 "tcp"
-            ]
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder};"
+            }
         }
     ]
 }
