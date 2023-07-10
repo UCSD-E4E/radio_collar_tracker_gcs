@@ -267,3 +267,4 @@ scripts/gcsConfig.ini
 
 .venv
 gcsConfig.ini
+symbology-style.db
