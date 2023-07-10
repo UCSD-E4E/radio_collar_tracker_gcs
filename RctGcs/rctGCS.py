@@ -71,7 +71,8 @@ from pathlib import Path
 
 from PyQt5.QtWidgets import QFileDialog
 
-from RctGcs.config import get_instance
+from RctGcs.config import (application_directories, get_config_path,
+                           get_instance)
 from RctGcs.ui.display import GCS
 from RctGcs.ui.popups import UserPopups
 
@@ -88,7 +89,8 @@ def configSetup() -> Path:
     Helper function to set up paths to QGIS lbrary files, and 
     config file
     '''    
-    with get_instance(Path('gcsConfig.ini')) as config:
+    gcs_config_path = get_config_path()
+    with get_instance(gcs_config_path) as config:
         if not config.qgis_prefix_set:
             qgis_path = Path(QFileDialog.getExistingDirectory(None, 'Select the Qgis directory', config.qgis_prefix_path.as_posix()))
             if 'qgis' not in qgis_path.as_posix():
@@ -102,7 +104,10 @@ def configSetup() -> Path:
 
 
 def main():
-    logName = dt.datetime.now().strftime('%Y.%m.%d.%H.%M.%S_gcs.log')
+    start_timestamp = dt.datetime.now()
+    log_file = start_timestamp.strftime('%Y.%m.%d.%H.%M.%S_gcs.log')
+    log_path = Path(application_directories.user_log_dir, log_file)
+    log_path.parent.mkdir(exist_ok=True, parents=True)
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
     ch = logging.StreamHandler(sys.stdout)
@@ -112,7 +117,7 @@ def main():
         datefmt='%Y-%M-%d %H:%m:%S')
     ch.setFormatter(formatter)
     logger.addHandler(ch)
-    ch = logging.FileHandler(logName)
+    ch = logging.FileHandler(log_path)
     ch.setLevel(logging.DEBUG)
     ch.setFormatter(formatter)
     logger.addHandler(ch)

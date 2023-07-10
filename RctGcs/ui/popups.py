@@ -1,13 +1,14 @@
 from pathlib import Path
 from typing import Any, List
-import RctGcs.config as config
-import RctGcs.rctCore
-from RctGcs.config import ConnectionMode
+
 from PyQt5.QtCore import QRegExp, Qt, QTimer
 from PyQt5.QtGui import QRegExpValidator
 from PyQt5.QtWidgets import *
 from RCTComms.comms import gcsComms
 from RCTComms.transport import RCTTCPClient, RCTTCPServer
+
+from RctGcs.config import ConnectionMode, get_config_path, get_instance
+
 
 class UserPopups:
     """
@@ -412,8 +413,7 @@ class ConfigDialog(QWizard):
             parent: The parent widget of this ConfigDialog widget
         '''
         super(ConfigDialog, self).__init__()
-        self.config = config.Configuration(Path('gcsConfig.ini'))
-        self.config.load()
+        self.config = get_instance(get_config_path())
 
         self.parent = parent
         self.setWindowTitle('Edit Configuration Settings')

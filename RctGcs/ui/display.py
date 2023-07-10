@@ -3,20 +3,17 @@ import json
 import logging
 import queue as q
 from functools import partial
-from pathlib import Path
-import RctGcs.config as config
-
-import RctGcs.rctCore
 
 import utm
-from RctGcs.config import get_instance
 from PyQt5.QtWidgets import (QFileDialog, QGridLayout, QLabel, QMainWindow,
                              QPushButton, QScrollArea, QVBoxLayout, QWidget)
 from RCTComms.transport import RCTTCPServer
+
+import RctGcs.rctCore
+from RctGcs.config import get_config_path, get_instance
 from RctGcs.ui.controls import *
 from RctGcs.ui.map import *
-from functools import partial
-from RCTComms.transport import RCTTCPServer, RCTAbstractTransport
+
 
 class GCS(QMainWindow):
     '''
@@ -58,8 +55,7 @@ class GCS(QMainWindow):
         self.test_frame = None
         self.ping_sheet_created = False
         self.user_popups = UserPopups()
-        self.config = RctGcs.config.Configuration(Path('gcsConfig.ini'))
-        self.config.load()
+        self.config = get_instance(get_config_path())
 
         self.__create_widgets()
         for button in self._buttons:
@@ -493,7 +489,7 @@ class GCS(QMainWindow):
             lon2 = ext.xMaximum()
 
 
-            with get_instance(Path('gcsConfig.ini')) as config:
+            with get_instance(get_config_path()) as config:
                 config.map_extent = (
                     (lat1, lon1),
                     (lat2, lon2)
@@ -1017,7 +1013,7 @@ class MapControl(CollapseFrame):
         Internal function to pull past coordinates from the config
         file if they exist
         '''
-        config_path = 'gcsConfig.ini'
+        config_path = get_config_path()
         config = configparser.ConfigParser()
         config.read(config_path)
         try:
@@ -1038,7 +1034,7 @@ class MapControl(CollapseFrame):
 
         if lat1 is None or lat2 is None or lon1 is None or lon2 is None or \
                 lat1 == '' or lon1 == '' or lat2 == '' or lon2 == '':
-            with get_instance(Path('gcsConfig.ini')) as config:
+            with get_instance(get_config_path()) as config:
                 nw_extent, se_extent = config.map_extent
 
             lat1 = str(nw_extent[0])

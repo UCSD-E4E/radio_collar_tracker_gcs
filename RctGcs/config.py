@@ -9,6 +9,9 @@ from pathlib import Path
 from socket import gaierror, gethostbyname
 from typing import Any, Dict, Tuple
 
+from appdirs import AppDirs
+
+application_directories = AppDirs('RCTGcs')
 
 class ConnectionMode(Enum):
     """GCS Connection Modes
@@ -238,3 +241,13 @@ def get_instance(path: Path) -> Configuration:
     if path not in __config_instance:
         __config_instance[path] = Configuration(path)
     return __config_instance[path]
+
+def get_config_path() -> Path:
+    """Retrieves the application configuration path
+
+    Returns:
+        Path: Path to configuration file
+    """
+    config_path = Path(application_directories.user_config_dir, 'gcsConfig.ini')
+    config_path.parent.mkdir(exist_ok=True, parents=True)
+    return config_path

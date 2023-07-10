@@ -58,7 +58,7 @@ import RCTComms.comms
 import RCTComms.transport
 import utm
 
-from RctGcs.config import ConnectionMode, Configuration
+from RctGcs.config import Configuration, ConnectionMode, get_config_path
 from RctGcs.ping import rctPing
 
 
@@ -971,7 +971,7 @@ class DroneSimPack:
         :param protocol: transport protocol, tcp or udp
         :param clients: the number of clients to create if in tower mode
         '''
-        self.config_obj = Configuration(Path('gcsConfig.ini'))
+        self.config_obj = Configuration(get_config_path())
         self.config_obj.load()
         self.sim_list = []
 
