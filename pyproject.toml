@@ -31,6 +31,7 @@ PyAutoGUI = "^0.9.53"
 
 [tool.poetry.scripts]
 RCTGcs = 'RctGcs.rctGCS:main'
+droneSimulator = 'RctGcs.droneSimulator:main'
 
 [build-system]
 requires = ["poetry-core"]

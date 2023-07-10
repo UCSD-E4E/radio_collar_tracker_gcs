@@ -15,13 +15,13 @@ from v1.0.  Working branch v1.0a, becomes v2.0 on release
 2.  Run `RCTGcs`
     
 ## Running the simulator for GCS
-1. Navigate to the `scripts` folder and run `rctGCS` with the following commands:
+1. Run `rctGCS` with the following commands:
     - `conda activate rctGCS`
     - `RCTGcs`
     This should open up the rctGCS UI
-2. Create a new terminal instance and naviagate to the `scripts` folder and run the following commands:
+2. Create a new terminal instance and run the following commands:
     - `conda activate rctGCS`
-    - `ipython -i droneSimulator.py -- --protocol tcp`
+    - `droneSimulator --protocol tcp`
     - `ipython>>> sim.start()`
 3. From the rctGCS UI, navigate to the "System: No Connection" tab --> "Connect" --> "Done"
 4. Switch back to the `ipython` terminal window
