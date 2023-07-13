@@ -73,24 +73,24 @@ class GCS(QMainWindow):
             fn(coord, frequency, num_pings)
 
     def __mav_event_handler(self, event, id):
-        if event == rctCore.Events.Heartbeat:
+        if event == RctGcs.rctCore.Events.Heartbeat:
             self.__heartbeat_callback(id)
-        if event == rctCore.Events.Exception:
+        if event == RctGcs.rctCore.Events.Exception:
             self.__handle_remote_exception(id)
-        if event == rctCore.Events.VehicleInfo:
+        if event == RctGcs.rctCore.Events.VehicleInfo:
             self.__handle_vehicle_info(id)
-        if event == rctCore.Events.NewPing:
+        if event == RctGcs.rctCore.Events.NewPing:
             self.__handle_new_ping(id)
-        if event == rctCore.Events.NewEstimate:
+        if event == RctGcs.rctCore.Events.NewEstimate:
             self.__handle_new_estimate(id)
-        if event == rctCore.Events.ConeInfo:
+        if event == RctGcs.rctCore.Events.ConeInfo:
             self.__handle_new_cone(id)
 
     def __register_model_callbacks(self, id):
         mav_model = self._mav_models[id]
-        event_types = [rctCore.Events.Heartbeat, rctCore.Events.Exception,
-                    rctCore.Events.VehicleInfo, rctCore.Events.NewPing,
-                    rctCore.Events.NewEstimate, rctCore.Events.ConeInfo]
+        event_types = [RctGcs.rctCore.Events.Heartbeat, RctGcs.rctCore.Events.Exception,
+                    RctGcs.rctCore.Events.VehicleInfo, RctGcs.rctCore.Events.NewPing,
+                    RctGcs.rctCore.Events.NewEstimate, RctGcs.rctCore.Events.ConeInfo]
         for event_type in event_types:
             mav_model.registerCallback(event_type,
             partial(self.mav_event_signal.emit, event_type, id))
@@ -121,7 +121,7 @@ class GCS(QMainWindow):
 
     def connection_handler(self, connection, id):
         comms = gcsComms(connection, partial(self.__disconnect_handler, id))
-        model = rctCore.MAVModel(comms)
+        model = RctGcs.rctCore.MAVModel(comms)
         model.start()
         self._mav_models[id] = model
         if self._mav_model is None:
@@ -780,24 +780,24 @@ class StatusDisplay(CollapseFrame):
         sys_status = var_dict["STS_sys_status"]
         sw_status = var_dict["STS_sw_status"]
 
-        if sys_status == rctCore.RCT_STATES.finish:
+        if sys_status == RctGcs.rctCore.RCT_STATES.finish:
             self.status_label.setText('Stopping')
             self.status_label.setStyleSheet("background-color: red")
-        elif sdr_status == rctCore.SDR_INIT_STATES.fail or \
-            dir_status == rctCore.OUTPUT_DIR_STATES.fail or \
-            gps_status == rctCore.EXTS_STATES.fail or \
-            sys_status == rctCore.RCT_STATES.fail or \
+        elif sdr_status == RctGcs.rctCore.SDR_INIT_STATES.fail or \
+            dir_status == RctGcs.rctCore.OUTPUT_DIR_STATES.fail or \
+            gps_status == RctGcs.rctCore.EXTS_STATES.fail or \
+            sys_status == RctGcs.rctCore.RCT_STATES.fail or \
             (sw_status != 0 and sw_status != 1):
             self.status_label.setText('Failed')
             self.status_label.setStyleSheet("background-color: red")
-        elif sys_status == rctCore.RCT_STATES.start or \
-            sys_status == rctCore.RCT_STATES.wait_end:
+        elif sys_status == RctGcs.rctCore.RCT_STATES.start or \
+            sys_status == RctGcs.rctCore.RCT_STATES.wait_end:
             self.status_label.setText('Running')
             self.status_label.setStyleSheet("background-color: green")
-        elif sdr_status == rctCore.SDR_INIT_STATES.rdy and \
-            dir_status == rctCore.OUTPUT_DIR_STATES.rdy and \
-            gps_status == rctCore.EXTS_STATES.rdy and \
-            sys_status == rctCore.RCT_STATES.wait_start and sw_status == 1:
+        elif sdr_status == RctGcs.rctCore.SDR_INIT_STATES.rdy and \
+            dir_status == RctGcs.rctCore.OUTPUT_DIR_STATES.rdy and \
+            gps_status == RctGcs.rctCore.EXTS_STATES.rdy and \
+            sys_status == RctGcs.rctCore.RCT_STATES.wait_start and sw_status == 1:
             self.status_label.setText('Idle')
             self.status_label.setStyleSheet("background-color: yellow")
         else:
