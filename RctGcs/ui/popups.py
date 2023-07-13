@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, List
+from typing import Any, List, Optional
 
 from PyQt5.QtCore import QRegExp, Qt, QTimer
 from PyQt5.QtGui import QRegExpValidator
@@ -319,45 +319,42 @@ class ConnectionDialog(QWizard):
     '''
     Custom Dialog widget to facilitate connecting to the drone
     '''
-    def __init__(self, port_val, parent):
+    def __init__(self, transport_spec: Optional[str] = None):
         '''
         Creates new ConnectionDialog widget
         Args:
             port_val: the port value used
         '''
         super(ConnectionDialog, self).__init__()
-        self.parent = parent
         self.setWindowTitle('Connect Settings')
-        self.page = ConnectionDialogPage(port_val, self)
-        self.port_val = port_val
-        self.addr_val = None
+        self.page = ConnectionDialogPage(transport_spec=transport_spec)
+        if not transport_spec:
+            transport_spec = ''
+        self.transport_spec = transport_spec
         self.addPage(self.page)
-        self.resize(640,480)
+        self.resize(320, 120)    # width, height
         self.button(QWizard.FinishButton).clicked.connect(self.submit)
 
     def submit(self):
         '''
         Internal Function to submit user inputted connection settings
         '''
-        self.port_val = int(self.page.port_entry.text())
-        if self.parent.config.connection_mode == ConnectionMode.DRONE:
-            self.addr_val = self.page.addr_entry.text()
+        self.transport_spec = self.page.port_entry.text()
 
 class ConnectionDialogPage(QWizardPage):
     '''
     Custom DialogPage widget - Allows the user to configure
     settings to connect to the drone
     '''
-    def __init__(self, port_val, parent):
+    def __init__(self, transport_spec: str):
         '''
         Creates a new ConnectionDialogPage
         Args:
             port_val: The port value used
         '''
         super(ConnectionDialogPage, self).__init__()
-        self.__port_entry_val = port_val # default value
+        self.__transport_spec_val = transport_spec # default value
         self.port_entry = None # default value
-        self.__parent = parent
         self.__create_widget()
 
     def __create_widget(self):
@@ -366,40 +363,18 @@ class ConnectionDialogPage(QWizardPage):
         '''
         frm_holder = QVBoxLayout()
         frm_holder.addStretch(1)
-        #-----
-        frm_con_type = QHBoxLayout()
-        frm_con_type.addStretch(1)
 
-        lbl_con_type = QLabel('Connection Type:')
-        frm_con_type.addWidget(lbl_con_type)
-
-        btn_tcp = QCheckBox('TCP')
-        frm_con_type.addWidget(btn_tcp)
-        #-----
         frm_port = QHBoxLayout()
         frm_port.addStretch(1)
 
-        lbl_port = QLabel('Port')
+        lbl_port = QLabel('Connection Specifier')
         frm_port.addWidget(lbl_port)
 
         self.port_entry = QLineEdit()
-        self.port_entry.setText(str(self.__port_entry_val))
+        self.port_entry.setText(self.__transport_spec_val)
         frm_port.addWidget(self.port_entry)
 
-        if self.__parent.parent.config.connection_mode == ConnectionMode.DRONE:
-            frm_addr = QHBoxLayout()
-            frm_addr.addStretch(1)
-
-            lbl_addr = QLabel('Address')
-            frm_addr.addWidget(lbl_addr)
-            self.addr_entry = QLineEdit()
-            self.addr_entry.setText('127.0.0.1')
-            frm_addr.addWidget(self.addr_entry)
-
-            frm_holder.addLayout(frm_addr)
-
         frm_holder.addLayout(frm_port)
-        frm_holder.addLayout(frm_con_type)
         self.setLayout(frm_holder)
 
 class ConfigDialog(QWizard):

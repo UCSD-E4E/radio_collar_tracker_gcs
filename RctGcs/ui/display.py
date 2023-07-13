@@ -3,11 +3,12 @@ import json
 import logging
 import queue as q
 from functools import partial
+from typing import Optional
 
 import utm
 from PyQt5.QtWidgets import (QFileDialog, QGridLayout, QLabel, QMainWindow,
                              QPushButton, QScrollArea, QVBoxLayout, QWidget)
-from RCTComms.transport import RCTTCPServer
+from RCTComms.transport import RCTTransportFactory
 
 import RctGcs.rctCore
 from RctGcs.config import get_config_path, get_instance
@@ -22,7 +23,6 @@ class GCS(QMainWindow):
 
     sb_width = 500
     default_timeout = 5
-    default_port_val = 9000
 
     sig = pyqtSignal()
 
@@ -37,7 +37,7 @@ class GCS(QMainWindow):
         '''
         super().__init__()
         self.__log = logging.getLogger('rctGCS.GCS')
-        self.port_val = self.default_port_val
+        self.transport_spec: Optional[str] = None
         self._transport = None
         self._mav_models = {}
         self._mav_model = None
@@ -101,19 +101,21 @@ class GCS(QMainWindow):
             self._transport.close()
         self.mav_event_signal.connect(self.__mav_event_handler)
         if self.config.connection_mode == RctGcs.config.ConnectionMode.TOWER:
-            self._transport = RCTTCPServer(self.port_val, self.connection_handler)
+            self._transport = RCTTCPServer(self.transport_spec, self.connection_handler)
             self._transport.open()
         else:
             attempts = 5
             retry_time = 5
             for i in range(attempts):
                 try:
-                    self._transport = RCTTCPClient(addr=self.addr_val, port=self.port_val)
+                    self._transport = RCTTransportFactory.create_transport(self.transport_spec)
                     self.connection_handler(self._transport, 0)
                     return
                 except ConnectionRefusedError:
-                    self.user_popups.show_timed_warning(text="Trying to reconnect. Attempt {} out of 5.\
-                                                        \nRetrying after {} seconds.".format(str(i), retry_time), timeout=retry_time)
+                    msg = (f"Trying to reconnect. Attempt {i} of 5.\nRetrying after "
+                          f"{retry_time} seconds")
+                    self.user_popups.show_timed_warning(text=msg,
+                                                        timeout=retry_time)
                     self._transport.close()
 
             self.user_popups.show_warning("Failure to connect:\nPlease ensure server is running.")
@@ -509,17 +511,15 @@ class GCS(QMainWindow):
         '''
         Internal callback to connect GCS to drone
         '''
-        connection_dialog = ConnectionDialog(self.port_val, self)
+        connection_dialog = ConnectionDialog(transport_spec=self.transport_spec)
         connection_dialog.exec_()
 
-        if connection_dialog.port_val is None or \
-            (connection_dialog.port_val == self.port_val and \
+        if connection_dialog.transport_spec is None or \
+            (connection_dialog.transport_spec == self.transport_spec and \
             len(self._mav_models) > 1):
             return
 
-        self.port_val = connection_dialog.port_val
-        if self.config.connection_mode == ConnectionMode.DRONE:
-            self.addr_val = connection_dialog.addr_val
+        self.transport_spec = connection_dialog.transport_spec
         self.__start_transport()
 
     def __handle_config_input(self):
