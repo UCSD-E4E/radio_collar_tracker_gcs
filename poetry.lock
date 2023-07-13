@@ -4320,7 +4320,7 @@ files = [
 
 [[package]]
 name = "RCTComms"
-version = "0.0.0.12"
+version = "0.0.0.13"
 description = "Radio Collar Tracker Comms Library"
 category = "main"
 optional = false
@@ -4339,7 +4339,7 @@ dev = ["coverage", "pylint", "pytest", "pytest-timeout", "wheel"]
 type = "git"
 url = "https://github.com/UCSD-E4E/radio_collar_tracker_comms.git"
 reference = "HEAD"
-resolved_reference = "87bc2e6b308e99f8feb57128cd7c60b020db7674"
+resolved_reference = "819640c1e1e0feac58eaf7b707671ba2d229703a"
 
 [[package]]
 name = "requests"
