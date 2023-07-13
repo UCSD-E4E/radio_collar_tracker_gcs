@@ -44,12 +44,14 @@
 #
 ###############################################################################
 
-from enum import Enum, auto
-import RCTComms.comms
+import copy
 import logging
 import threading
-import RctGcs.ping
-import copy
+from enum import Enum, auto
+
+import RCTComms.comms
+
+from RctGcs.ping import DataManager
 
 
 class SDR_INIT_STATES(Enum):
@@ -224,7 +226,7 @@ class MAVModel:
             "SYS_autostart": False,
         }
 
-        self.EST_mgr = ping.DataManager()
+        self.EST_mgr = DataManager()
 
         self.__callbacks = {}
         for event in Events:
