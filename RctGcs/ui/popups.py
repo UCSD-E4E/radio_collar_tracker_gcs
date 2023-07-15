@@ -3,9 +3,9 @@ from typing import Any, List, Optional
 
 from PyQt5.QtCore import QRegExp, Qt, QTimer
 from PyQt5.QtGui import QRegExpValidator
-from PyQt5.QtWidgets import *
-from RCTComms.comms import gcsComms
-from RCTComms.transport import RCTTCPClient, RCTTCPServer
+from PyQt5.QtWidgets import (QButtonGroup, QGridLayout, QHBoxLayout, QLabel,
+                             QLineEdit, QMessageBox, QPushButton, QRadioButton,
+                             QVBoxLayout, QWizard, QWizardPage)
 
 from RctGcs.config import ConnectionMode, get_config_path, get_instance
 
