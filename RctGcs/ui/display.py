@@ -1,4 +1,3 @@
-import configparser
 import json
 import logging
 import queue as q
@@ -1007,24 +1006,6 @@ class MapControl(CollapseFrame):
         control_panel.addLayout(lay_load_web_map)
 
         self.set_content_layout(control_panel)
-
-    def __coords_from_config(self):
-        '''
-        Internal function to pull past coordinates from the config
-        file if they exist
-        '''
-        config_path = get_config_path()
-        config = configparser.ConfigParser()
-        config.read(config_path)
-        try:
-            lat1 = config['LastCoords']['lat1']
-            lon1 = config['LastCoords']['lon1']
-            lat2 = config['LastCoords']['lat2']
-            lon2 = config['LastCoords']['lon2']
-            return lat1, lon1, lat2, lon2
-        except KeyError:
-            self.user_pops.show_warning("Could not read config path", config_path)
-            return None, None, None, None
 
     def __init_lat_lon(self):
         lat1 = self.__p1_lat_entry.text()
