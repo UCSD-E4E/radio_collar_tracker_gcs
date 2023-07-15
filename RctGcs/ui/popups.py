@@ -328,9 +328,7 @@ class ConnectionDialog(QWizard):
         super(ConnectionDialog, self).__init__()
         self.setWindowTitle('Connect Settings')
         self.page = ConnectionDialogPage(transport_spec=transport_spec)
-        if not transport_spec:
-            transport_spec = ''
-        self.transport_spec = transport_spec
+        self.transport_spec = None
         self.addPage(self.page)
         self.resize(320, 120)    # width, height
         self.button(QWizard.FinishButton).clicked.connect(self.submit)
@@ -346,7 +344,7 @@ class ConnectionDialogPage(QWizardPage):
     Custom DialogPage widget - Allows the user to configure
     settings to connect to the drone
     '''
-    def __init__(self, transport_spec: str):
+    def __init__(self, transport_spec: Optional[str] = None):
         '''
         Creates a new ConnectionDialogPage
         Args:

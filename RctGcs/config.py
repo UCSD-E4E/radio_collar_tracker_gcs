@@ -6,8 +6,7 @@ import os
 from configparser import ConfigParser
 from enum import Enum
 from pathlib import Path
-from socket import gaierror, gethostbyname
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from appdirs import AppDirs
 
@@ -34,9 +33,8 @@ class Configuration:
         self.__qgis_prefix_path: Path = self.__get_qgis_path()
         self.__qgis_prefix_set: bool = True
 
-        self.__connection_addr: str = '127.0.0.1'
-        self.__connection_port: int = 9000
         self.__connection_mode: ConnectionMode = ConnectionMode.DRONE
+        self.__connection_spec: str = ''
 
     def __create_dict(self):
         return {
@@ -51,8 +49,7 @@ class Configuration:
                 'lon2': self.__map_extent_se[1]
             },
             "Connection": {
-                'addr': self.__connection_addr,
-                'port': self.__connection_port,
+                'spec': self.__connection_spec,
                 'mode': self.__connection_mode.value
             }
         }
@@ -84,8 +81,7 @@ class Configuration:
             parser['LastCoords'].getfloat('lon2')
             )
 
-        self.__connection_port = parser['Connection'].getint('port')
-        self.__connection_addr = parser['Connection'].get('addr')
+        self.__connection_spec = parser['Connection'].get('spec')
         self.__connection_mode = ConnectionMode(parser['Connection']['mode'])
 
     def write(self) -> None:
@@ -97,40 +93,19 @@ class Configuration:
             parser.write(handle)
 
     @property
-    def connection_port(self) -> int:
-        """Last connection port
+    def connection_spec(self) -> int:
+        """Last connection spec
 
         Returns:
-            int: Connection port
+            int: Connection spec
         """
-        return self.__connection_port
+        return self.__connection_spec
 
-    @connection_port.setter
-    def connection_port(self, value: Any) -> None:
-        if not isinstance(value, int):
-            raise TypeError
-        if not 0 <= value < 65536:
-            raise ValueError
-        self.__connection_port = value
-
-    @property
-    def connection_addr(self) -> str:
-        """Last connection address
-
-        Returns:
-            str: Connection address
-        """
-        return self.__connection_addr
-
-    @connection_addr.setter
-    def connection_addr(self, value: Any) -> None:
+    @connection_spec.setter
+    def connection_spec(self, value: Any) -> None:
         if not isinstance(value, str):
             raise TypeError
-        try:
-            gethostbyname(value)
-        except gaierror as exc:
-            raise ValueError from exc
-        self.__connection_addr = value
+        self.__connection_spec = value
 
     @property
     def connection_mode(self) -> ConnectionMode:
@@ -229,7 +204,7 @@ class Configuration:
 
 
 __config_instance: Dict[Path, Configuration] = {}
-def get_instance(path: Path) -> Configuration:
+def get_instance(path: Optional[Path] = None) -> Configuration:
     """Retrieves the corresponding configuration instance singleton
 
     Args:
@@ -238,6 +213,8 @@ def get_instance(path: Path) -> Configuration:
     Returns:
         Configuration: Configuration singleton
     """
+    if path is None:
+        path = get_config_path()
     if path not in __config_instance:
         __config_instance[path] = Configuration(path)
     return __config_instance[path]

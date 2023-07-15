@@ -2,7 +2,6 @@ import json
 import logging
 import queue as q
 from functools import partial
-from typing import Optional
 
 import utm
 from PyQt5.QtWidgets import (QFileDialog, QGridLayout, QLabel, QMainWindow,
@@ -36,7 +35,6 @@ class GCS(QMainWindow):
         '''
         super().__init__()
         self.__log = logging.getLogger('rctGCS.GCS')
-        self.transport_spec: Optional[str] = None
         self._transport = None
         self._mav_models = {}
         self._mav_model = None
@@ -107,7 +105,8 @@ class GCS(QMainWindow):
             retry_time = 5
             for i in range(attempts):
                 try:
-                    self._transport = RCTTransportFactory.create_transport(self.transport_spec)
+                    transport_spec = get_instance().connection_spec
+                    self._transport = RCTTransportFactory.create_transport(transport_spec)
                     self.connection_handler(self._transport, 0)
                     return
                 except ConnectionRefusedError:
@@ -510,16 +509,17 @@ class GCS(QMainWindow):
         '''
         Internal callback to connect GCS to drone
         '''
-        connection_dialog = ConnectionDialog(transport_spec=self.transport_spec)
+        current_spec = get_instance().connection_spec
+        connection_dialog = ConnectionDialog(transport_spec=current_spec)
         connection_dialog.exec_()
 
         if connection_dialog.transport_spec is None or \
-            (connection_dialog.transport_spec == self.transport_spec and \
+            (connection_dialog.transport_spec == current_spec and \
             len(self._mav_models) > 1):
             return
 
-        self.transport_spec = connection_dialog.transport_spec
         self.__start_transport()
+        get_instance().connection_spec = connection_dialog.transport_spec
 
     def __handle_config_input(self):
         '''
