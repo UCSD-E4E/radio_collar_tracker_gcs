@@ -6,6 +6,7 @@ from functools import partial
 import utm
 from PyQt5.QtWidgets import (QFileDialog, QGridLayout, QLabel, QMainWindow,
                              QPushButton, QScrollArea, QVBoxLayout, QWidget)
+from RCTComms.comms import gcsComms
 from RCTComms.transport import RCTTransportFactory
 
 import RctGcs.rctCore
