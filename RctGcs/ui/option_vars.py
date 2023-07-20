@@ -1,11 +1,11 @@
 '''GCS Option Vars
 '''
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Tuple, Type, TypeVar, NewType, Any
+from typing import Callable, Dict, List, NewType, Tuple, Type, TypeVar
 
-from PyQt5 import QtWidgets, QtCore
+from PyQt5 import QtCore, QtWidgets
 
-from RctGcs.rctCore import ALL_OPTIONS, MAVModel, NoActiveModel, Options
+from RctGcs.rctCore import ENG_OPTIONS, MAVModel, NoActiveModel, Options
 from RctGcs.ui.widgets import IntArrayEdit
 
 T = TypeVar('T')
@@ -75,6 +75,7 @@ class OptionVar:
         for widget in self.widgets:
             self.set_fn(widget, value)
             widget.repaint()
+            widget.setEnabled(True)
         self.changed = False
 
     def set_modified(self, *args) -> None:
@@ -213,7 +214,7 @@ option_var_table: Dict[Options, OptionVar] = {
     )
 }
 
-def update_widgets(model_idx: int = None):
+def update_option_var_widgets(model_idx: int = None):
     """Overwrites all widget values with values from the specified MAVModel
 
     Args:
@@ -228,10 +229,11 @@ def update_widgets(model_idx: int = None):
                 widget.repaint()
         return
 
-    option_values = model.get_options(scope=ALL_OPTIONS, timeout=1)
+    option_values = model.get_options(scope=ENG_OPTIONS, timeout=1)
     for option, value in option_values.items():
-        if option not in option_var_table:
-            continue
         widget_params = option_var_table[option]
         widget_params.set_all(value)
+
+    target_freqs = model.get_frequencies(timeout=1)
+    option_var_table[Options.TGT_FREQUENCIES].set_all(target_freqs)
             
