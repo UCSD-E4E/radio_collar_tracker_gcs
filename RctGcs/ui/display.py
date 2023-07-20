@@ -10,7 +10,7 @@ from RCTComms.transport import RCTAbstractTransport, RCTTransportFactory
 
 from RctGcs.config import ConnectionMode, get_config_path, get_instance
 from RctGcs.rctCore import (EXTS_STATES, OUTPUT_DIR_STATES, RCT_STATES,
-                            SDR_INIT_STATES, Events, MAVModel)
+                            SDR_INIT_STATES, Events, MAVModel, NoActiveModel)
 from RctGcs.ui.controls import CollapseFrame, SystemSettingsControl
 from RctGcs.ui.map import MapOptions, StaticMap, WebMap
 from RctGcs.ui.popups import ConnectionDialog
@@ -153,6 +153,7 @@ class GCS(QtWidgets.QMainWindow):
         remaining connection work
         '''
         self.update_connections_label()
+        self.status_widget.update_gui_option_vars()
         self.system_settings_widget.connection_made()
         self.__mission_status_btn.setEnabled(True)
         self.__btn_export_all.setEnabled(True)
@@ -337,11 +338,11 @@ class GCS(QtWidgets.QMainWindow):
         sw_status = self._mav_model.STS_sw_status
 
         sdr_map = {
-            self._mav_model.SDR_INIT_STATES.find_devices: ('SDR: Searching for devices', 'yellow'),
-            self._mav_model.SDR_INIT_STATES.wait_recycle: ('SDR: Recycling!', 'yellow'),
-            self._mav_model.SDR_INIT_STATES.usrp_probe: ('SDR: Initializing SDR', 'yellow'),
-            self._mav_model.SDR_INIT_STATES.rdy: ('SDR: Ready', 'green'),
-            self._mav_model.SDR_INIT_STATES.fail: ('SDR: Failed!', 'red')
+            SDR_INIT_STATES.find_devices: ('SDR: Searching for devices', 'yellow'),
+            SDR_INIT_STATES.wait_recycle: ('SDR: Recycling!', 'yellow'),
+            SDR_INIT_STATES.usrp_probe: ('SDR: Initializing SDR', 'yellow'),
+            SDR_INIT_STATES.rdy: ('SDR: Ready', 'green'),
+            SDR_INIT_STATES.fail: ('SDR: Failed!', 'red')
         }
 
         try:
@@ -352,12 +353,12 @@ class GCS(QtWidgets.QMainWindow):
                 text='SDR: NULL', bg='red')
 
         dir_map = {
-            self._mav_model.OUTPUT_DIR_STATES.get_output_dir: ('DIR: Searching', 'yellow'),
-            self._mav_model.OUTPUT_DIR_STATES.check_output_dir: ('DIR: Checking for mount', 'yellow'),
-            self._mav_model.OUTPUT_DIR_STATES.check_space: ('DIR: Checking for space', 'yellow'),
-            self._mav_model.OUTPUT_DIR_STATES.wait_recycle: ('DIR: Recycling!', 'yellow'),
-            self._mav_model.OUTPUT_DIR_STATES.rdy: ('DIR: Ready', 'green'),
-            self._mav_model.OUTPUT_DIR_STATES.fail: ('DIR: Failed!', 'red'),
+            OUTPUT_DIR_STATES.get_output_dir: ('DIR: Searching', 'yellow'),
+            OUTPUT_DIR_STATES.check_output_dir: ('DIR: Checking for mount', 'yellow'),
+            OUTPUT_DIR_STATES.check_space: ('DIR: Checking for space', 'yellow'),
+            OUTPUT_DIR_STATES.wait_recycle: ('DIR: Recycling!', 'yellow'),
+            OUTPUT_DIR_STATES.rdy: ('DIR: Ready', 'green'),
+            OUTPUT_DIR_STATES.fail: ('DIR: Failed!', 'red'),
         }
 
         try:
@@ -367,11 +368,11 @@ class GCS(QtWidgets.QMainWindow):
             self.dir_status_label.config(text='DIR: NULL', bg='red')
 
         gps_map = {
-            self._mav_model.GPS_STATES.get_tty: {'text': 'GPS: Getting TTY Device', 'bg': 'yellow'},
-            self._mav_model.GPS_STATES.get_msg: {'text': 'GPS: Waiting for message', 'bg': 'yellow'},
-            self._mav_model.GPS_STATES.wait_recycle: {'text': 'GPS: Recycling', 'bg': 'yellow'},
-            self._mav_model.GPS_STATES.rdy: {'text': 'GPS: Ready', 'bg': 'green'},
-            self._mav_model.GPS_STATES.fail: {
+            EXTS_STATES.get_tty: {'text': 'GPS: Getting TTY Device', 'bg': 'yellow'},
+            EXTS_STATES.get_msg: {'text': 'GPS: Waiting for message', 'bg': 'yellow'},
+            EXTS_STATES.wait_recycle: {'text': 'GPS: Recycling', 'bg': 'yellow'},
+            EXTS_STATES.rdy: {'text': 'GPS: Ready', 'bg': 'green'},
+            EXTS_STATES.fail: {
                 'text': 'GPS: Failed!', 'bg': 'red'}
         }
 
@@ -381,13 +382,13 @@ class GCS(QtWidgets.QMainWindow):
             self.gps_status_label.config(text='GPS: NULL', bg='red')
 
         sys_map = {
-            self._mav_model.RCT_STATES.init: {'text': 'SYS: Initializing', 'bg': 'yellow'},
-            self._mav_model.RCT_STATES.wait_init: {'text': 'SYS: Initializing', 'bg': 'yellow'},
-            self._mav_model.RCT_STATES.wait_start: {'text': 'SYS: Ready for start', 'bg': 'green'},
-            self._mav_model.RCT_STATES.start: {'text': 'SYS: Starting', 'bg': 'blue'},
-            self._mav_model.RCT_STATES.wait_end: {'text': 'SYS: Running', 'bg': 'blue'},
-            self._mav_model.RCT_STATES.finish: {'text': 'SYS: Stopping', 'bg': 'blue'},
-            self._mav_model.RCT_STATES.fail: {'text': 'SYS: Failed!', 'bg': 'red'},
+            RCT_STATES.init: {'text': 'SYS: Initializing', 'bg': 'yellow'},
+            RCT_STATES.wait_init: {'text': 'SYS: Initializing', 'bg': 'yellow'},
+            RCT_STATES.wait_start: {'text': 'SYS: Ready for start', 'bg': 'green'},
+            RCT_STATES.start: {'text': 'SYS: Starting', 'bg': 'blue'},
+            RCT_STATES.wait_end: {'text': 'SYS: Running', 'bg': 'blue'},
+            RCT_STATES.finish: {'text': 'SYS: Stopping', 'bg': 'blue'},
+            RCT_STATES.fail: {'text': 'SYS: Failed!', 'bg': 'red'},
         }
 
         try:
