@@ -369,7 +369,11 @@ class MAVModel:
         if not self.__ackVectors.pop(0x09)[1]:
             raise RuntimeError('STOP NACKED')
 
+    @deprecated
     def getFrequencies(self, timeout) -> List[int]:
+        return self.get_frequencies(timeout=timeout)
+
+    def get_frequencies(self, timeout) -> List[int]:
         '''
         Retrieves the PRX_frequencies from the payload
         Args:
