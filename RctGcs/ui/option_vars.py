@@ -52,7 +52,7 @@ class OptionVar:
         modified_signal.connect(self.set_modified)
         self.widgets.append(new_widget)
         return new_widget
-    
+
     def make_pair(self, parent: QtWidgets.QWidget) -> Tuple[QtWidgets.QLabel, Widget]:
         """Convenience function to create a label and widget pair
 
@@ -74,6 +74,7 @@ class OptionVar:
             value = self.tf_fns[0](value)
         for widget in self.widgets:
             self.set_fn(widget, value)
+            widget.repaint()
         self.changed = False
 
     def set_modified(self, *args) -> None:
@@ -224,6 +225,7 @@ def update_widgets(model_idx: int = None):
         for option, params in option_var_table.items():
             for widget in params.widgets:
                 widget.setEnabled(False)
+                widget.repaint()
         return
 
     option_values = model.get_options(scope=ALL_OPTIONS, timeout=1)

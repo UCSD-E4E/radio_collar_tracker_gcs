@@ -1,20 +1,22 @@
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from PyQt5.QtCore import QRegExp, Qt, QTimer
 from PyQt5.QtGui import QRegExpValidator
 from PyQt5.QtWidgets import (QButtonGroup, QGridLayout, QHBoxLayout, QLabel,
                              QLineEdit, QMessageBox, QPushButton, QRadioButton,
-                             QVBoxLayout, QWizard, QWizardPage)
+                             QVBoxLayout, QWizard, QWizardPage, QCheckBox)
 
 from RctGcs.config import ConnectionMode, get_config_path, get_instance
+from RctGcs.rctCore import Options
 
 
 class UserPopups:
     """
     Creates popup boxes for user display
     """
-    def create_text_box(self, name: str, text: str) -> Any:
+    @classmethod
+    def create_text_box(cls, name: str, text: str) -> Any:
         '''
         Params:
             name: takes a sting that is the name of the text box
@@ -37,7 +39,8 @@ class UserPopups:
         form.addWidget(line,0,1)
         return form, line
 
-    def create_binary_radio_button(self, name: str, labels_list: List[str], condition: bool):
+    @classmethod
+    def create_binary_radio_button(cls, name: str, labels_list: List[str], condition: bool):
         '''
         Creates a binary radio button box. The box will only have two
             options to select and will check according to a boolean condition
@@ -69,7 +72,8 @@ class UserPopups:
         form.addWidget(false_event,0,0,Qt.AlignCenter)
         return form, true_event
 
-    def show_warning(self, text: str, title: str ="Warning"):
+    @classmethod
+    def show_warning(cls, text: str, title: str ="Warning"):
         '''
         Creates warning popups
         Args:
@@ -84,7 +88,8 @@ class UserPopups:
         msg.addButton(QMessageBox.Ok)
         msg.exec_()
 
-    def show_timed_warning(self, text: str, timeout: int, title: str ="Warning"):
+    @classmethod
+    def show_timed_warning(cls, text: str, timeout: int, title: str ="Warning"):
         '''
         Creates timed warning popups
         Args:
@@ -109,14 +114,14 @@ class ExpertSettingsDialog(QWizard):
     A Custom Dialog Widget to facilitate user input for expert
     settings
     '''
-    def __init__(self, parent, option_vars):
+    def __init__(self, parent, option_vars: Dict[Options, Any]):
         '''
         Creates a new ExpertSettingsDialog
         Args:
             parent: the parent widget of the dialog
             optionVars: Dictionary object of option variables
         '''
-        super(ExpertSettingsDialog, self).__init__(parent)
+        super().__init__(parent)
         self.parent = parent
         self.addPage(ExpertSettingsDialogPage(self, option_vars))
         self.setWindowTitle('Expert/Engineering Settings')
@@ -127,14 +132,14 @@ class ExpertSettingsDialogPage(QWizardPage):
     Custom DialogPage widget to facilitate user configured
     expert settings.
     '''
-    def __init__(self, parent=None, option_vars=None):
+    def __init__(self, parent, option_vars: Dict[Options, Any]):
         '''
         Creates a new ExpertSettingsDialogPage object
         Args:
             parent: An ExpertSettingsDialog object
             optionVars: Dictionary object of option variables
         '''
-        super(ExpertSettingsDialogPage, self).__init__(parent)
+        super().__init__(parent)
         self.__parent = parent
         self.option_vars = option_vars
         self.user_pops = UserPopups()
@@ -175,32 +180,32 @@ class ExpertSettingsDialogPage(QWizardPage):
         lbl_sys_auto_start = QLabel("SYS Autostart")
         exp_settings_frame.addWidget(lbl_sys_auto_start, 8, 0)
 
-        self.option_vars['DSP_pingWidth'] = QLineEdit()
-        exp_settings_frame.addWidget(self.option_vars['DSP_pingWidth'], 0, 1)
+        self.option_vars[Options.DSP_PING_WIDTH] = QLineEdit()
+        exp_settings_frame.addWidget(self.option_vars[Options.DSP_PING_WIDTH], 0, 1)
 
-        self.option_vars['DSP_pingMin'] = QLineEdit()
-        exp_settings_frame.addWidget(self.option_vars['DSP_pingMin'], 1, 1)
+        self.option_vars[Options.DSP_PING_MIN] = QLineEdit()
+        exp_settings_frame.addWidget(self.option_vars[Options.DSP_PING_MIN], 1, 1)
 
-        self.option_vars['DSP_pingMax'] = QLineEdit()
-        exp_settings_frame.addWidget(self.option_vars['DSP_pingMax'], 2, 1)
+        self.option_vars[Options.DSP_PING_MAX] = QLineEdit()
+        exp_settings_frame.addWidget(self.option_vars[Options.DSP_PING_MAX], 2, 1)
 
-        self.option_vars['DSP_pingSNR'] = QLineEdit()
-        exp_settings_frame.addWidget(self.option_vars['DSP_pingSNR'], 3, 1)
+        self.option_vars[Options.DSP_PING_SNR] = QLineEdit()
+        exp_settings_frame.addWidget(self.option_vars[Options.DSP_PING_SNR], 3, 1)
 
-        self.option_vars['GPS_device'] = QLineEdit()
-        exp_settings_frame.addWidget(self.option_vars['GPS_device'], 4, 1)
+        self.option_vars[Options.GPS_DEVICE] = QLineEdit()
+        exp_settings_frame.addWidget(self.option_vars[Options.GPS_DEVICE], 4, 1)
 
-        self.option_vars['GPS_baud'] = QLineEdit()
-        exp_settings_frame.addWidget(self.option_vars['GPS_baud'], 5, 1)
+        self.option_vars[Options.GPS_BAUD] = QLineEdit()
+        exp_settings_frame.addWidget(self.option_vars[Options.GPS_BAUD], 5, 1)
 
-        self.option_vars['SYS_outputDir'] = QLineEdit()
-        exp_settings_frame.addWidget(self.option_vars['SYS_outputDir'], 6, 1)
+        self.option_vars[Options.SYS_OUTPUT_DIR] = QLineEdit()
+        exp_settings_frame.addWidget(self.option_vars[Options.SYS_OUTPUT_DIR], 6, 1)
 
-        self.option_vars['GPS_mode'] = QLineEdit()
-        exp_settings_frame.addWidget(self.option_vars['GPS_mode'], 7, 1)
+        self.option_vars[Options.GPS_MODE] = QCheckBox()
+        exp_settings_frame.addWidget(self.option_vars[Options.GPS_MODE], 7, 1)
 
-        self.option_vars['SYS_autostart'] = QLineEdit()
-        exp_settings_frame.addWidget(self.option_vars['SYS_autostart'], 8, 1)
+        self.option_vars[Options.SYS_AUTOSTART] = QLineEdit()
+        exp_settings_frame.addWidget(self.option_vars[Options.SYS_AUTOSTART], 8, 1)
 
         btn_submit = QPushButton('submit')
         btn_submit.clicked.connect(self.submit)

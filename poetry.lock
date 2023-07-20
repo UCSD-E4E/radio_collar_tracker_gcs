@@ -4155,6 +4155,21 @@ files = [
 ]
 
 [[package]]
+name = "pyqt5-stubs"
+version = "5.15.6.0"
+description = "PEP561 stub files for the PyQt5 framework"
+category = "dev"
+optional = false
+python-versions = ">= 3.5"
+files = [
+    {file = "PyQt5-stubs-5.15.6.0.tar.gz", hash = "sha256:91270ac23ebf38a1dc04cd97aa852cd08af82dc839100e5395af1447e3e99707"},
+    {file = "PyQt5_stubs-5.15.6.0-py3-none-any.whl", hash = "sha256:7fb8177c72489a8911f021b7bd7c33f12c87f6dba92dcef3fdcdb5d9400f0f3f"},
+]
+
+[package.extras]
+dev = ["mypy (==0.930)", "pytest", "pytest-xvfb"]
+
+[[package]]
 name = "pyrect"
 version = "0.2.0"
 description = "PyRect is a simple module with a Rect class for Pygame-like rectangular areas."
@@ -4339,7 +4354,7 @@ dev = ["coverage", "pylint", "pytest", "pytest-timeout", "wheel"]
 type = "git"
 url = "https://github.com/UCSD-E4E/radio_collar_tracker_comms.git"
 reference = "HEAD"
-resolved_reference = "819640c1e1e0feac58eaf7b707671ba2d229703a"
+resolved_reference = "984d4138cbd39956e718b2c37d84862541b835e5"
 
 [[package]]
 name = "requests"
@@ -4814,4 +4829,4 @@ testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more
 [metadata]
 lock-version = "2.0"
 python-versions = "~3.9"
-content-hash = "e3a6d69fb55e4fe2697901da8301a4f2df2087b61a3aea875a565ba9628cc59a"
+content-hash = "48427996abf915e356c9a18267885c0ba419e8d2f01ca85860ba4826dbc94974"
