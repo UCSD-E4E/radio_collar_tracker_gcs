@@ -284,13 +284,16 @@ class MAVModel:
             packet: Heartbeat packet payload
             addr: Source of packet
         '''
-        self.__log.info("Received heartbeat")
         self.state['STS_sdr_status'] = SDR_INIT_STATES(packet.sdrState)
-        self.state['STS_dir_status'] = OUTPUT_DIR_STATES(
-            packet.storageState)
+        self.state['STS_dir_status'] = OUTPUT_DIR_STATES(packet.storageState)
         self.state['STS_gps_status'] = EXTS_STATES(packet.sensorState)
         self.state['STS_sys_status'] = RCT_STATES(packet.systemState)
         self.state['STS_sw_status'] = packet.switchState
+        self.__log.info("Received heartbeat %s %s %s %s", 
+                        SDR_INIT_STATES(packet.sdrState),
+                        OUTPUT_DIR_STATES(packet.storageState),
+                        EXTS_STATES(packet.sensorState),
+                        RCT_STATES(packet.systemState))
         for callback in self.__callbacks[Events.Heartbeat]:
             callback()
 
