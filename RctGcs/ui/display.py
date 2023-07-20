@@ -4,10 +4,10 @@ import queue as q
 from functools import partial
 
 import utm
-from PyQt5.QtWidgets import (QFileDialog, QGridLayout, QLabel, QMainWindow,
-                             QPushButton, QScrollArea, QVBoxLayout, QWidget)
+from PyQt5 import QtCore
+from PyQt5 import QtWidgets
 from RCTComms.comms import gcsComms
-from RCTComms.transport import RCTTransportFactory
+from RCTComms.transport import RCTTransportFactory, RCTAbstractTransport
 
 import RctGcs.rctCore
 from RctGcs.config import get_config_path, get_instance
@@ -15,7 +15,7 @@ from RctGcs.ui.controls import *
 from RctGcs.ui.map import *
 
 
-class GCS(QMainWindow):
+class GCS(QtWidgets.QMainWindow):
     '''
     Ground Control Station GUI
     '''
@@ -23,12 +23,12 @@ class GCS(QMainWindow):
     sb_width = 500
     default_timeout = 5
 
-    sig = pyqtSignal()
+    sig = QtCore.pyqtSignal()
 
-    connect_signal = pyqtSignal(int)
-    disconnect_signal = pyqtSignal(int)
+    connect_signal = QtCore.pyqtSignal(int)
+    disconnect_signal = QtCore.pyqtSignal(int)
 
-    mav_event_signal = pyqtSignal(RctGcs.rctCore.Events, int)
+    mav_event_signal = QtCore.pyqtSignal(RctGcs.rctCore.Events, int)
 
     def __init__(self):
         '''
@@ -99,8 +99,9 @@ class GCS(QMainWindow):
             self._transport.close()
         self.mav_event_signal.connect(self.__mav_event_handler)
         if self.config.connection_mode == RctGcs.config.ConnectionMode.TOWER:
-            self._transport = RCTTCPServer(self.transport_spec, self.connection_handler)
-            self._transport.open()
+            # self._transport = RCTTCPServer(self.transport_spec, self.connection_handler)
+            # self._transport.open()
+            raise NotImplementedError
         else:
             attempts = 5
             retry_time = 5
@@ -120,16 +121,16 @@ class GCS(QMainWindow):
             self.user_popups.show_warning("Failure to connect:\nPlease ensure server is running.")
             return
 
-    def connection_handler(self, connection, id):
-        comms = gcsComms(connection, partial(self.__disconnect_handler, id))
-        model = RctGcs.rctCore.MAVModel(comms)
+    def connection_handler(self, connection: RCTAbstractTransport, idx: int):
+        comms = gcsComms(connection, partial(self.__disconnect_handler, idx))
+        model = RctGcs.rctCore.MAVModel(comms, idx)
         model.start()
-        self._mav_models[id] = model
+        self._mav_models[idx] = model
         if self._mav_model is None:
             self._mav_model = model
-            self.__register_model_callbacks(id)
+            self.__register_model_callbacks(idx)
 
-        self.connect_signal.emit(id)
+        self.connect_signal.emit(idx)
 
     def connection_slot(self, id):
         '''
