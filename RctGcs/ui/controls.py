@@ -1,18 +1,14 @@
-import time
-from typing import Dict
 
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import Qt, pyqtSlot
-from PyQt5.QtGui import QIntValidator
 
-from RctGcs.rctCore import (ALL_OPTIONS, BASE_OPTIONS, ENG_OPTIONS,
-                            EXP_OPTIONS, MAVModel, NoActiveModel, Options,
-                            base_options_keywords,
+from RctGcs.rctCore import (BASE_OPTIONS, ENG_OPTIONS, EXP_OPTIONS, MAVModel,
+                            NoActiveModel, Options, base_options_keywords,
                             engineering_options_keywords,
-                            expert_options_keywords, option_param_table)
-from RctGcs.ui.popups import ExpertSettingsDialog, UserPopups, AddTargetDialog
-from RctGcs.ui.option_vars import option_var_table, update_widgets
-from RctGcs.ui.widgets import IntArrayEdit
+                            expert_options_keywords)
+from RctGcs.ui.option_vars import option_var_table, update_option_var_widgets
+from RctGcs.ui.popups import AddTargetDialog, ExpertSettingsDialog, UserPopups
+
 
 class CollapseFrame(QtWidgets.QWidget):
     '''
@@ -127,7 +123,7 @@ class SystemSettingsControl(CollapseFrame):
         Function to facilitate the updating of internal widget
         displays
         '''
-        update_widgets()
+        update_option_var_widgets()
 
         #CollapseFrame.repaint(self) // causes thread problems?
         self.__inner_frame.activate()
@@ -170,7 +166,7 @@ class SystemSettingsControl(CollapseFrame):
 
         self.set_content_layout(self.__inner_frame)
 
-        update_widgets()
+        update_option_var_widgets()
 
 
     def __advanced_settings(self):
@@ -202,9 +198,17 @@ class SystemSettingsControl(CollapseFrame):
         Internal callback to be called when the update button is
         pressed
         '''
+        try:
+            model = MAVModel.get_model()
+        except NoActiveModel:
+            return
+        
         cntr_freq = option_var_table[Options.SDR_CENTER_FREQ]
-        samp_freq = int(self.option_vars[Options.SDR_SAMPLING_FREQ].text())
+        samp_freq = option_var_table[Options.SDR_SAMPLING_FREQ]
+        sdr_gain = option_var_table[Options.SDR_GAIN]
+        
 
+        tgt_freq = option_var_table[Options.TGT_FREQUENCIES]
         target_frequencies = []
         for target_name in self.targ_entries:
             if not self.validate_frequency(self.targ_entries[target_name][0]):
@@ -215,10 +219,6 @@ class SystemSettingsControl(CollapseFrame):
             target_freq = self.targ_entries[target_name][0]
             target_frequencies.append(target_freq)
 
-        try:
-            model = MAVModel.get_model()
-        except NoActiveModel:
-            return
 
         model.setFrequencies(target_frequencies, self.__root.default_timeout)
 
@@ -303,6 +303,7 @@ class SystemSettingsControl(CollapseFrame):
         '''
         self.update()
         self.btn_adv_settings.setEnabled(True)
+        self.__submit_btn.setEnabled(True)
         self.__root.status_widget.update_gui_option_vars()
 
     def disconnected(self):
