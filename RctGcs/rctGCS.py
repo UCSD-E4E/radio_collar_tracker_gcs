@@ -114,7 +114,7 @@ def main():
     ch.setLevel(logging.WARNING)
     formatter = logging.Formatter(
         '%(asctime)s.%(msecs)03d: %(levelname)s:%(name)s: %(message)s', 
-        datefmt='%Y-%M-%d %H:%m:%S')
+        datefmt='%Y-%m-%d %H:%M:%S')
     ch.setFormatter(formatter)
     logger.addHandler(ch)
     ch = logging.FileHandler(log_path)
