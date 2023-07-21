@@ -13,7 +13,7 @@ from RctGcs.rctCore import (EXTS_STATES, OUTPUT_DIR_STATES, RCT_STATES,
                             SDR_INIT_STATES, Events, MAVModel, NoActiveModel)
 from RctGcs.ui.controls import CollapseFrame, SystemSettingsControl
 from RctGcs.ui.map import MapOptions, StaticMap, WebMap
-from RctGcs.ui.popups import ConnectionDialog
+from RctGcs.ui.popups import ConnectionDialog, UserPopups
 from RctGcs.utils import fix_conda_path
 
 fix_conda_path()
@@ -309,7 +309,7 @@ class GCS(QtWidgets.QMainWindow):
         Internal callback for an exception message
         '''
         mav_model = MAVModel.get_model(idx=idx)
-        self.user_popups.show_warning('An exception has occured!\n%s\n%s' % (
+        UserPopups.show_warning('An exception has occured!\n%s\n%s' % (
             mav_model.lastException[0], mav_model.lastException[1]))
 
     def __start_stop_mission(self):
