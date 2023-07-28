@@ -189,7 +189,13 @@ class Configuration:
 
     @classmethod
     def __get_qgis_path(cls) -> Path:
-        pkgs_dir = Path.home().joinpath('miniconda3', 'pkgs')
+        if Path.home().joinpath('miniconda3').exists():
+            conda_root = Path.home().joinpath('miniconda3')
+        elif Path.home().joinpath('anaconda3').exists():
+            conda_root = Path.home().joinpath('anaconda3')
+        else:
+            raise RuntimeError('Not a conda environment')
+        pkgs_dir = conda_root.joinpath('pkgs')
         qgis_dirs = [qgis_dir for qgis_dir in pkgs_dir.glob('qgis*') if qgis_dir.is_dir()]
         return sorted(qgis_dirs)[-1].joinpath('Library')
 
