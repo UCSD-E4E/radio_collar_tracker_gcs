@@ -981,7 +981,7 @@ class WebMap(MapWidget):
         vehicle_path_layer = QgsVectorLayer(uri_line, 'vehicle_path', "memory")
 
         # Set drone image for marker symbol
-        path = QDir().filePath('../resources/vehicleSymbol.svg')
+        path = QDir().filePath('resources/vehicleSymbol.svg')
         symbol_svg = QgsSvgMarkerSymbolLayer(path)
         symbol_svg.setSize(4)
         symbol_svg.setFillColor(QColor('#0000ff'))
@@ -999,7 +999,7 @@ class WebMap(MapWidget):
     def set_up_cone_layer(self):
         uri = "Point?crs=epsg:3857"
         cone_layer = QgsVectorLayer(uri, 'Cone', "memory")
-        path = QDir().filePath('../resources/searchingTriangle.svg')
+        path = QDir().filePath('resources/searchingTriangle.svg')
         symbol_svg = QgsSvgMarkerSymbolLayer(path)
         symbol_svg.setSize(4)
         symbol_svg.setFillColor(QColor('#ff0000'))
