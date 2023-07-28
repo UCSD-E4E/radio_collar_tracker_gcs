@@ -559,7 +559,7 @@ class DroneSim:
         '''
         scope = packet.scope
         print(self.PP_options)
-        packet = RCTComms.comms.rctOptionsPacket(scope, **self.PP_options)
+        packet = RCTComms.comms.rctOptionsPacket(scope, self.PP_options)
         self.port.sendToGCS(packet)
 
     def __do_set_options(self, packet: RCTComms.comms.rctSETOPTCommand, addr: str):
