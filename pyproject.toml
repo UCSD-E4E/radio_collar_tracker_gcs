@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "rctgcs"
+name = "RctGcs"
 version = "0.1.0"
 description = ""
 authors = ["Nathan Hui <nthui@eng.ucsd.edu>"]

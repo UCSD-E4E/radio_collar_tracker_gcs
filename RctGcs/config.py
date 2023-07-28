@@ -2,7 +2,6 @@
 '''
 from __future__ import annotations
 
-import os
 from configparser import ConfigParser
 from enum import Enum
 from pathlib import Path
@@ -190,9 +189,7 @@ class Configuration:
 
     @classmethod
     def __get_qgis_path(cls) -> Path:
-        if "CONDA_ROOT" not in os.environ:
-            raise RuntimeError("Not a conda environment")
-        pkgs_dir = Path(os.environ['CONDA_ROOT']).joinpath('pkgs')
+        pkgs_dir = Path.home().joinpath('miniconda3', 'pkgs')
         qgis_dirs = [qgis_dir for qgis_dir in pkgs_dir.glob('qgis*') if qgis_dir.is_dir()]
         return sorted(qgis_dirs)[-1].joinpath('Library')
 
