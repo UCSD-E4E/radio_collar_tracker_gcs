@@ -247,7 +247,7 @@ class GCS(QtWidgets.QMainWindow):
             zone, let = mav_model.EST_mgr.getUTMZone()
             coord = utm.to_latlon(params[0], params[1], zone, let)
 
-            num_pings = mav_model.EST_mgr.getnum_pings(frequency)
+            num_pings = mav_model.EST_mgr.getNumPings(frequency)
 
             if self.map_display is not None:
                 self.map_display.plot_estimate(coord, frequency)
