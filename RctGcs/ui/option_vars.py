@@ -81,6 +81,14 @@ class OptionVar:
     def set_modified(self, *args) -> None:
         self.changed = True
 
+    def get_value(self, *, idx: int = None) -> V:
+        if idx is None:
+            idx = 0
+        widget = self.widgets[idx]
+        value = self.get_fn(widget)
+        if self.tf_fns:
+            value = self.tf_fns[1](value)
+        return value
 
 option_var_table: Dict[Options, OptionVar] = {
     Options.DSP_PING_WIDTH: OptionVar(

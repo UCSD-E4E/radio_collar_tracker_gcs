@@ -210,22 +210,14 @@ class SystemSettingsControl(CollapseFrame):
         
 
         tgt_freq = option_var_table[Options.TGT_FREQUENCIES]
-        target_frequencies = []
-        for target_name in self.targ_entries:
-            if not self.validate_frequency(self.targ_entries[target_name][0]):
-                msg = (f'Target frequency {self.targ_entries[target_name][0]} is invalid. Please '
-                       'enter another value.')
-                UserPopups.show_warning(msg)
-                return
-            target_freq = self.targ_entries[target_name][0]
-            target_frequencies.append(target_freq)
+        target_frequencies = tgt_freq.get_value()
 
-
-        model.setFrequencies(target_frequencies, self.__root.default_timeout)
+        default_timeout = get_instance().default_timeout
+        model.setFrequencies(target_frequencies, default_timeout)
 
         self.submit_gui_option_vars(0x00)
 
-        self.update_gui_option_vars()
+        update_option_var_widgets()
 
 
     def submit_gui_option_vars(self, scope: int):
