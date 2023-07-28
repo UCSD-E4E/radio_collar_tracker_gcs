@@ -1,5 +1,6 @@
 '''GCS Option Vars
 '''
+import logging
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, NewType, Tuple, Type, TypeVar
 
@@ -25,6 +26,9 @@ class OptionVar:
     tf_fns: Tuple[Callable[[V], T], Callable[[T], V]] = None
     widgets: List[Widget] = field(default_factory=list)
     changed: bool = False
+
+    def __post_init__(self):
+        self.__log = logging.getLogger(f'Option Var {self.label}')
 
     def make_label(self, parent: QtWidgets.QWidget) -> QtWidgets.QLabel:
         """Convenience function to create a label widget
@@ -72,6 +76,7 @@ class OptionVar:
         """
         if self.tf_fns:
             value = self.tf_fns[0](value)
+        self.__log.info('setting %s to %s', self.label, value)
         for widget in self.widgets:
             self.set_fn(widget, value)
             widget.repaint()
@@ -237,11 +242,11 @@ def update_option_var_widgets(model_idx: int = None):
                 widget.repaint()
         return
 
-    option_values = model.get_options(scope=ENG_OPTIONS, timeout=1)
+    option_values = model.get_options(scope=ENG_OPTIONS, timeout=5)
     for option, value in option_values.items():
         widget_params = option_var_table[option]
         widget_params.set_all(value)
 
-    target_freqs = model.get_frequencies(timeout=1)
+    target_freqs = model.get_frequencies(timeout=5)
     option_var_table[Options.TGT_FREQUENCIES].set_all(target_freqs)
             
