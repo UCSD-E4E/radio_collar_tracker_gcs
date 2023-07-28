@@ -26,4 +26,5 @@ jobs:
         conda list
         conda info
         conda info --envs
+        printenv
         python -m pytest tests
