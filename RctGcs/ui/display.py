@@ -314,15 +314,19 @@ class GCS(QtWidgets.QMainWindow):
 
     def __start_stop_mission(self):
         # State machine for start recording -> stop recording
-        if self._mav_model == None:
+        try:
+            mav_model = MAVModel.get_model()
+        except NoActiveModel:
             return
+
+        self.__log.info('Start/Stop Recording pressed')
 
         if self.__mission_status_btn.text() == 'Start Recording':
             self.__mission_status_btn.setText('Stop Recording')
-            self._mav_model.startMission(timeout=self.default_timeout)
+            mav_model.startMission(timeout=self.default_timeout)
         else:
             self.__mission_status_btn.setText('Start Recording')
-            self._mav_model.stopMission(timeout=self.default_timeout)
+            mav_model.stopMission(timeout=self.default_timeout)
 
     def __update_status(self): # TODO: this isn't getting used and doesn't seem to work???
         '''
