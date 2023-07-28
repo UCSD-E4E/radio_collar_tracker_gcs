@@ -103,9 +103,7 @@ def configSetup() -> Path:
 
 
 def main():
-    start_timestamp = dt.datetime.now()
-    log_file = start_timestamp.strftime('%Y.%m.%d.%H.%M.%S_gcs.log')
-    log_file = '0gcs.log'
+    log_file = 'gcs.log'
     log_path = Path(application_directories.user_log_dir, log_file)
     log_path.parent.mkdir(exist_ok=True, parents=True)
     logger = logging.getLogger()
