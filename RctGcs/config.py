@@ -24,6 +24,7 @@ class ConnectionMode(Enum):
 class Configuration:
     """Configuration file interface object
     """
+    default_timeout = 5
     def __init__(self, config_path: Path) -> None:
         self.__config_path = config_path
 

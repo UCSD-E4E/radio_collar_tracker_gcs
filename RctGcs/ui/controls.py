@@ -2,6 +2,7 @@
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import Qt, pyqtSlot
 
+from RctGcs.config import get_instance
 from RctGcs.rctCore import (BASE_OPTIONS, ENG_OPTIONS, EXP_OPTIONS, MAVModel,
                             NoActiveModel, Options, base_options_keywords,
                             engineering_options_keywords,
@@ -253,8 +254,9 @@ class SystemSettingsControl(CollapseFrame):
                     options[keyword] = int(self.option_vars[keyword].text())
                 except ValueError:
                     options[keyword] = float(self.option_vars[keyword].text())
-        self.__root._mav_model.setOptions(
-            timeout=self.__root.default_timeout, **options)
+        mav_model = MAVModel.get_model()
+        default_timeout = get_instance().default_timeout
+        mav_model.setOptions(timeout=default_timeout, **options)
 
     def add_target(self):
         '''
