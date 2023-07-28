@@ -13,7 +13,7 @@ from RctGcs.rctCore import (EXTS_STATES, OUTPUT_DIR_STATES, RCT_STATES,
                             SDR_INIT_STATES, Events, MAVModel, NoActiveModel)
 from RctGcs.ui.controls import CollapseFrame, SystemSettingsControl
 from RctGcs.ui.map import MapOptions, StaticMap, WebMap
-from RctGcs.ui.popups import ConnectionDialog, UserPopups
+from RctGcs.ui.popups import ConfigDialog, ConnectionDialog, UserPopups
 from RctGcs.utils import fix_conda_path
 
 fix_conda_path()
