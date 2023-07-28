@@ -190,9 +190,9 @@ class Configuration:
 
     @classmethod
     def __get_qgis_path(cls) -> Path:
-        if "_CONDA_ROOT" not in os.environ:
+        if "CONDA_ROOT" not in os.environ:
             raise RuntimeError("Not a conda environment")
-        pkgs_dir = Path(os.environ['_CONDA_ROOT']).joinpath('pkgs')
+        pkgs_dir = Path(os.environ['CONDA_ROOT']).joinpath('pkgs')
         qgis_dirs = [qgis_dir for qgis_dir in pkgs_dir.glob('qgis*') if qgis_dir.is_dir()]
         return sorted(qgis_dirs)[-1].joinpath('Library')
 
