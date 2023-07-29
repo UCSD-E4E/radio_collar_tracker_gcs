@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import (QButtonGroup, QGridLayout, QHBoxLayout, QLabel,
 
 from RctGcs.config import ConnectionMode, get_config_path, get_instance
 from RctGcs.rctCore import Options
+from RctGcs.ui.option_vars import update_option_var_widgets
 
 
 class UserPopups:
@@ -145,7 +146,7 @@ class ExpertSettingsDialogPage(QWizardPage):
         self.user_pops = UserPopups()
         self.create_widget()
         # Configure member vars here
-        self.__parent.parent.updateGUIOptionVars(0xFF, self.option_vars)
+        update_option_var_widgets()
 
     def create_widget(self):
         '''
