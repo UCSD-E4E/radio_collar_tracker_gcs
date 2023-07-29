@@ -213,7 +213,11 @@ class SystemSettingsControl(CollapseFrame):
         target_frequencies = tgt_freq.get_value()
 
         default_timeout = get_instance().default_timeout
-        model.setFrequencies(target_frequencies, default_timeout)
+        try:
+            model.setFrequencies(target_frequencies, default_timeout)
+        except Exception:
+            UserPopups.show_warning('Failed to set frequencies')
+            return
 
         self.submit_gui_option_vars(0x00)
 
