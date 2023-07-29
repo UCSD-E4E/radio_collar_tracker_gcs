@@ -127,7 +127,7 @@ class GCS(QtWidgets.QMainWindow):
                                                         timeout=retry_time)
                     self._transport.close()
 
-            self.user_popups.show_warning("Failure to connect:\nPlease ensure node(s) are running.")
+            UserPopups.show_warning("Failure to connect:\nPlease ensure node(s) are running.")
             return
 
     def connection_handler(self, connection: RCTAbstractTransport, idx: int):
