@@ -123,7 +123,7 @@ class GCS(QtWidgets.QMainWindow):
                     # retry until fail
                     msg = (f"Trying to reconnect. Attempt {i} of 5.\nRetrying after "
                           f"{retry_time} seconds")
-                    self.user_popups.show_timed_warning(text=msg,
+                    UserPopups.show_timed_warning(text=msg,
                                                         timeout=retry_time)
                     self._transport.close()
 
