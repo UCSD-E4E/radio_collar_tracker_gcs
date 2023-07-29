@@ -57,6 +57,10 @@ import numpy as np
 import RCTComms.comms
 import RCTComms.transport
 import utm
+from RCTComms.options import (ALL_OPTIONS, BASE_OPTIONS, ENG_OPTIONS,
+                              EXP_OPTIONS, Options, base_options_keywords,
+                              engineering_options_keywords,
+                              expert_options_keywords, option_param_table)
 
 from RctGcs.config import Configuration, ConnectionMode, get_config_path
 from RctGcs.ping import rctPing
@@ -113,21 +117,8 @@ class DroneSim:
         self.__tx_thread = None
 
         # PP - Payload parameters
-        self.PP_options = {
-            "TGT_frequencies": [],
-            "SDR_center_freq": 173500000,
-            "SDR_sampling_freq": 2000000,
-            "SDR_gain": 20.0,
-            "DSP_ping_width": 15,
-            "DSP_ping_snr": 4.0,
-            "DSP_ping_max": 1.5,
-            "DSP_ping_min": 0.5,
-            "GPS_mode": 0,
-            "GPS_device": "/dev/null",
-            "GPS_baud": 115200,
-            "SYS_output_dir": "/tmp",
-            "SYS_autostart": False,
-        }
+        self.PP_options = {option:param.default_value
+                               for option, param in option_param_table.items()}
 
         # SM - Simulator Mission parameters
         self.SM_mission_run = True
@@ -228,21 +219,8 @@ class DroneSim:
         }
 
         # PP - Payload parameters
-        self.PP_options = {
-            "TGT_frequencies": [],
-            "SDR_center_freq": 173500000,
-            "SDR_sampling_freq": 2000000,
-            "SDR_gain": 20.0,
-            "DSP_ping_width": 15,
-            "DSP_ping_snr": 4.0,
-            "DSP_ping_max": 1.5,
-            "DSP_ping_min": 0.5,
-            "GPS_mode": 0,
-            "GPS_device": "/dev/null",
-            "GPS_baud": 115200,
-            "SYS_output_dir": "/tmp",
-            "SYS_autostart": False,
-        }
+        self.PP_options = {option:param.default_value
+                               for option, param in option_param_table.items()}
 
         # SM - Simulator Mission parameters
         self.SM_mission_run = True
@@ -379,14 +357,14 @@ class DroneSim:
         Sets the SDR_gain parameter to the specified value
         :param gain:
         '''
-        self.PP_options['SDR_gain'] = gain
+        self.PP_options[Options.SDR_GAIN] = gain
 
     def set_output_dir(self, output_dir: str):
         '''
         Sets the output directory to the specified value
         :param output_dir:
         '''
-        self.PP_options['SYS_output_dir'] = output_dir
+        self.PP_options[Options.SYS_OUTPUT_DIR] = output_dir
 
     def set_ping_parameters(self, DSP_ping_width: int = None, DSP_ping_snr: float = None, DSP_ping_max: float = None, DSP_ping_min: float = None):
         '''
@@ -397,16 +375,16 @@ class DroneSim:
         :param DSP_ping_min:
         '''
         if DSP_ping_width is not None:
-            self.PP_options['DSP_ping_width'] = DSP_ping_width
+            self.PP_options[Options.DSP_PING_WIDTH] = DSP_ping_width
 
         if DSP_ping_snr is not None:
-            self.PP_options['DSP_ping_snr'] = DSP_ping_snr
+            self.PP_options[Options.DSP_PING_SNR] = DSP_ping_snr
 
         if DSP_ping_max is not None:
-            self.PP_options['DSP_ping_max'] = DSP_ping_max
+            self.PP_options[Options.DSP_PING_MAX] = DSP_ping_max
 
         if DSP_ping_min is not None:
-            self.PP_options['DSP_ping_min'] = DSP_ping_min
+            self.PP_options[Options.DSP_PING_MIN] = DSP_ping_min
 
     def set_gps_parameters(self, GPS_device: str = None, GPS_baud: int = None, GPS_mode: bool = None):
         '''
@@ -416,20 +394,20 @@ class DroneSim:
         :param GPS_mode:
         '''
         if GPS_device is not None:
-            self.PP_options['GPS_device'] = GPS_device
+            self.PP_options[Options.GPS_DEVICE] = GPS_device
 
         if GPS_baud is not None:
-            self.PP_options['GPS_baud'] = GPS_baud
+            self.PP_options[Options.GPS_BAUD] = GPS_baud
 
         if GPS_mode is not None:
-            self.PP_options['GPS_mode'] = GPS_mode
+            self.PP_options[Options.GPS_MODE] = GPS_mode
 
     def set_autostart(self, SYS_autostart: bool):
         '''
         Sets the autostart parameter
         :param SYS_autostart:
         '''
-        self.PP_options['SYS_autostart'] = SYS_autostart
+        self.PP_options[Options.SYS_AUTOSTART] = SYS_autostart
 
     def start(self):
         '''
@@ -500,27 +478,27 @@ class DroneSim:
         Sets the simulator's frequencies to the specified frequencies
         :param frequencies:
         '''
-        self.PP_options['TGT_frequencies'] = frequencies
+        self.PP_options[Options.TGT_FREQUENCIES] = frequencies
 
     def get_frequencies(self):
         '''
         Retrieves the simulator's frequencies
         '''
-        return self.PP_options['TGT_frequencies']
+        return self.PP_options[Options.TGT_FREQUENCIES]
 
     def set_center_frequency(self, center_freq: int):
         '''
         Sets the simulator's center frequency
         :param center_freq:
         '''
-        self.PP_options['SDR_center_freq'] = center_freq
+        self.PP_options[Options.SDR_CENTER_FREQ] = center_freq
 
     def set_sampling_frequency(self, sampling_freq: int):
         '''
         Sets the simulator's sampling frequency
         :param sampling_freq:
         '''
-        self.PP_options['SDR_sampling_freq'] = sampling_freq
+        self.PP_options[Options.SDR_SAMPLING_FREQ] = sampling_freq
 
     def __ack_command(self, command: RCTComms.comms.rctBinaryPacket):
         '''
@@ -536,7 +514,7 @@ class DroneSim:
         :param addr:
         '''
         self.port.sendToGCS(RCTComms.comms.rctFrequenciesPacket(
-            self.PP_options['TGT_frequencies']))
+            self.PP_options[Options.TGT_FREQUENCIES]))
 
     def __do_start_mission(self, packet: RCTComms.comms.rctSTARTCommand, addr: str):
         '''
@@ -566,10 +544,10 @@ class DroneSim:
 
         # Nyquist check
         for freq in frequencies:
-            if abs(freq - self.PP_options['SDR_center_freq']) > self.PP_options['SDR_sampling_freq']:
+            if abs(freq - self.PP_options[Options.SDR_CENTER_FREQ]) > self.PP_options[Options.SDR_SAMPLING_FREQ]:
                 raise RuntimeError("Invalid frequency")
 
-        self.PP_options['TGT_frequencies'] = frequencies
+        self.PP_options[Options.TGT_FREQUENCIES] = frequencies
         self.__ack_command(packet)
         self.__do_get_frequency(packet, addr)
 
@@ -581,7 +559,7 @@ class DroneSim:
         '''
         scope = packet.scope
         print(self.PP_options)
-        packet = RCTComms.comms.rctOptionsPacket(scope, **self.PP_options)
+        packet = RCTComms.comms.rctOptionsPacket(scope, self.PP_options)
         self.port.sendToGCS(packet)
 
     def __do_set_options(self, packet: RCTComms.comms.rctSETOPTCommand, addr: str):
@@ -963,7 +941,7 @@ class DroneSim:
             json.dump(e, outfile)
 
 class DroneSimPack:
-    def __init__(self, port: int, addr: str, protocol: str, clients: int):
+    def __init__(self, spec: str, clients: int):
         '''
         Creates a pack of multiple DroneSim object
         :param port: port through which to connect
@@ -975,35 +953,11 @@ class DroneSimPack:
         self.config_obj.load()
         self.sim_list = []
 
-        self.addr = addr
-        self.port = port
-        self.protocol = protocol
-
-        if protocol == 'udp':
-            if self.config_obj.connection_mode == ConnectionMode.TOWER:
-                for i in range(clients):
-                    tsport = RCTComms.transport.RCTUDPClient(port=port, addr=addr)
-                    sim = DroneSim(RCTComms.comms.mavComms(tsport))
-                    self.sim_list.append(sim)
-            else:
-                tsport = RCTComms.transport.RCTUDPServer(port=args.port)
-                sim = DroneSim(RCTComms.comms.mavComms(tsport))
-                self.sim_list.append(sim)
-
-        elif protocol == 'tcp':
-            if self.config_obj.connection_mode == ConnectionMode.TOWER:
-                for i in range(args.clients):
-                    tsport = RCTComms.transport.RCTTCPClient(port=port, addr=addr)
-                    sim = DroneSim(RCTComms.comms.mavComms(tsport))
-                    self.sim_list.append(sim)
-            else:
-                connected = False
-                tsport = RCTComms.transport.RCTTCPServer(port, self.__connection_handler, addr=addr)
-                tsport.open()
-                while len(tsport.simList) == 0:
-                    continue
-                sim = DroneSim(RCTComms.comms.mavComms(tsport.simList[0]))
-                self.sim_list.append(sim)
+        self.spec = spec
+        for _ in range(clients):
+            transport = RCTComms.transport.RCTTransportFactory.create_transport(spec)
+            sim = DroneSim(RCTComms.comms.mavComms(transport))
+            self.sim_list.append(sim)
 
     def start(self):
         '''
@@ -1035,11 +989,8 @@ class DroneSimPack:
             print("Must be in tower mode to run multiple clients")
             return
 
-        if self.protocol == 'udp':
-            port = RCTComms.transport.RCTUDPClient(port=self.port, addr=self.addr)
-        elif self.protocol == 'tcp':
-            port = RCTComms.transport.RCTTCPClient(port=self.port, addr=self.addr)
-        sim = DroneSim(RCTComms.comms.mavComms(port))
+        transport = RCTComms.transport.RCTTransportFactory.create_transport(self.spec)
+        sim = DroneSim(RCTComms.comms.mavComms(transport))
         self.sim_list.append(sim)
 
     def __connection_handler(self, connection, id):
@@ -1051,11 +1002,7 @@ class DroneSimPack:
 def main():
     parser = argparse.ArgumentParser(
         description='Radio Collar Tracker Payload Control Simulator')
-    parser.add_argument('--port', type=int, default=9000)
-    parser.add_argument('--protocol', type=str,
-                        choices=['udp', 'tcp'], required=True)
-    parser.add_argument('--target', type=str, default='127.0.0.1',
-                        help='Target IP Address.  Use 255.255.255.255 for broadcast, 127.0.0.1 for local')
+    parser.add_argument('--spec', type=str, required=True)
     parser.add_argument('--clients', type=int, default=1)
     args = parser.parse_args()
     logName = dt.datetime.now().strftime('%Y.%m.%d.%H.%M.%S_sim.log')
@@ -1072,7 +1019,7 @@ def main():
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
-    sim = DroneSimPack(args.port, args.target, args.protocol, args.clients);
+    sim = DroneSimPack(args.spec, args.clients);
     if sim.config_obj.connection_mode == ConnectionMode.DRONE:
         sim = sim.sim_list[0]; # Just have a single simulator
 

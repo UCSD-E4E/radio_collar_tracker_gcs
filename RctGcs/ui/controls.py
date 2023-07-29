@@ -1,10 +1,17 @@
-import time
-from PyQt5.QtCore import Qt, pyqtSlot
-from PyQt5.QtWidgets import *
-from PyQt5.QtGui import QIntValidator
-from RctGcs.ui.popups import *
 
-class CollapseFrame(QWidget):
+from PyQt5 import QtWidgets
+from PyQt5.QtCore import Qt, pyqtSlot
+
+from RctGcs.config import get_instance
+from RctGcs.rctCore import (BASE_OPTIONS, ENG_OPTIONS, EXP_OPTIONS, MAVModel,
+                            NoActiveModel, Options, base_options_keywords,
+                            engineering_options_keywords,
+                            expert_options_keywords)
+from RctGcs.ui.option_vars import option_var_table, update_option_var_widgets
+from RctGcs.ui.popups import AddTargetDialog, ExpertSettingsDialog, UserPopups
+
+
+class CollapseFrame(QtWidgets.QWidget):
     '''
     Custom Collapsible Widget - used to aid in
     creating a collapsible field attached to a button
@@ -20,7 +27,7 @@ class CollapseFrame(QWidget):
         super(CollapseFrame, self).__init__(parent)
 
         self.content_height = 0
-        self.toggle_button = QToolButton(
+        self.toggle_button = QtWidgets.QToolButton(
             text=title, checkable=True, checked=False
         )
         self.toggle_button.setStyleSheet("QToolButton { border: none; }")
@@ -30,10 +37,10 @@ class CollapseFrame(QWidget):
         self.toggle_button.setArrowType(Qt.RightArrow)
         self.toggle_button.pressed.connect(self.on_pressed)
 
-        self.content_area = QWidget()
+        self.content_area = QtWidgets.QWidget()
         self.content_area.setVisible(False)
 
-        lay = QVBoxLayout(self)
+        lay = QtWidgets.QVBoxLayout(self)
         lay.setSpacing(0)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(self.toggle_button)
@@ -96,19 +103,19 @@ class SystemSettingsControl(CollapseFrame):
         self.targ_entries = {}
 
         self.option_vars = {
-            "TGT_frequencies": [],
-            "SDR_center_freq": None,
-            "SDR_sampling_freq": None,
-            "SDR_gain": None,
-            "SDR_ping_width": None,
-            "SDR_ping_snr": None,
-            "SDR_ping_max": None,
-            "SDR_ping_min": None,
-            "GPS_mode": None,
-            "GPS_device": None,
-            "GPS_baud": None,
-            "SYS_output_dir": None,
-            "SYS_autostart": None
+            Options.TGT_FREQUENCIES: [],
+            Options.SDR_CENTER_FREQ: None,
+            Options.SDR_SAMPLING_FREQ: None,
+            Options.SDR_GAIN: None,
+            Options.DSP_PING_WIDTH: None,
+            Options.DSP_PING_SNR: None,
+            Options.DSP_PING_MAX: None,
+            Options.DSP_PING_MIN: None,
+            Options.GPS_MODE: None,
+            Options.GPS_DEVICE: None,
+            Options.GPS_BAUD: None,
+            Options.SYS_OUTPUT_DIR: None,
+            Options.SYS_AUTOSTART: None
         }
         self.__create_widget()
 
@@ -117,143 +124,51 @@ class SystemSettingsControl(CollapseFrame):
         Function to facilitate the updating of internal widget
         displays
         '''
-        self.__update_widget() #add updated values
+        update_option_var_widgets()
 
-        # Repaint widgets and layouts
-        self.widg_targ_holder.repaint()
-        self.scroll_targ_holder.repaint()
-        self.frm_targ_holder.activate()
         #CollapseFrame.repaint(self) // causes thread problems?
         self.__inner_frame.activate()
-
-
-    def __update_widget(self):
-        '''
-        Function to update displayed values of target widgets
-        '''
-        if self.frm_targ_holder:
-            while (self.frm_targ_holder.count() > 0):
-                child = self.frm_targ_holder.takeAt(0)
-                if child.widget():
-                    child.widget().deleteLater()
-        row_idx = 0
-        self.targ_entries = {}
-        if self.__root._mav_model is not None:
-            cntr_freq = self.__root._mav_model.getOption('SDR_center_freq')
-            samp_freq = self.__root._mav_model.getOption('SDR_sampling_freq')
-            self.option_vars["SDR_center_freq"].setText(str(cntr_freq))
-            self.option_vars["SDR_sampling_freq"].setText(str(samp_freq))
-            self.frm_targ_holder.setVerticalSpacing(0)
-            time.sleep(0.5)
-            for freq in self.__root._mav_model.getFrequencies(self.__root.default_timeout):
-                #Put in frm_targ_holder
-                new = QHBoxLayout()
-                freq_label = QLabel('Target %d' % (row_idx + 1))
-                freq_variable = freq
-                freq_entry = QLineEdit()
-                val = QIntValidator(cntr_freq-samp_freq, cntr_freq+samp_freq)
-                freq_entry.setValidator(val)
-                freq_entry.setText(str(freq_variable))
-
-                # Add new target to layout
-                new.addWidget(freq_label)
-                new.addWidget(freq_entry)
-                new_widg = QWidget()
-                new_widg.setLayout(new)
-                self.frm_targ_holder.addRow(new_widg)
-
-
-                self.targ_entries[freq] = [freq]
-                row_idx += 1
 
     def __create_widget(self):
         '''
         Inner function to create widgets in the System Settings tab
         '''
-        self.__inner_frame = QGridLayout()
-
-        lbl_cntr_freq = QLabel('Center Frequency')
-
-        lbl_samp_freq = QLabel('Sampling Frequency')
-
-        lbl_sdr_gain = QLabel('SDR Gain')
-
-        self.option_vars['SDR_center_freq'] = QLineEdit()
+        self.__inner_frame = QtWidgets.QGridLayout()
 
 
-        self.option_vars['SDR_sampling_freq'] = QLineEdit()
+        label, entry = option_var_table[Options.SDR_CENTER_FREQ].make_pair(None)
+        self.__inner_frame.addWidget(label, 1, 0)
+        self.__inner_frame.addWidget(entry, 1, 1)
 
-        self.option_vars['SDR_gain'] = QLineEdit()
 
-        self.frm_targ_holder = QFormLayout() # Layout that holds target widgets
-        self.widg_targ_holder = QWidget()
-        self.scroll_targ_holder = QScrollArea()
-        self.scroll_targ_holder.setWidgetResizable(True)
-        self.scroll_targ_holder.setWidget(self.widg_targ_holder)
-        self.widg_targ_holder.setLayout(self.frm_targ_holder)
+        label, entry = option_var_table[Options.SDR_SAMPLING_FREQ].make_pair(None)
+        self.__inner_frame.addWidget(label, 2, 0)
+        self.__inner_frame.addWidget(entry, 2, 1)
 
-        row_idx = 0
-        self.targ_entries = {}
-        if self.__root._mav_model is not None:
-            for freq in self.__root._mav_model.getFrequencies(self.__root.default_timeout):
-                #Put in frm_targ_holder
-                new = QHBoxLayout()
-                freq_label = QLabel('Target %d' % (row_idx + 1))
-                freq_variable = freq
-                freq_entry = QLineEdit()
-                cntr_freq = self.__root._mav_model.getOption('SDR_center_freq')
-                samp_freq = self.__root._mav_model.getOption('SDR_sampling_freq')
-                val = QIntValidator(cntr_freq-samp_freq, cntr_freq+samp_freq)
-                freq_entry.setValidator(val)
-                freq_entry.setText(freq_variable)
+        label, entry = option_var_table[Options.SDR_GAIN].make_pair(None)
+        self.__inner_frame.addWidget(label, 3, 0)
+        self.__inner_frame.addWidget(entry, 3, 1)
+        
+        label, entry = option_var_table[Options.TGT_FREQUENCIES].make_pair(None)
+        self.__inner_frame.addWidget(label, 4, 0, 1, 2)
+        self.__inner_frame.addWidget(entry, 5, 0, 1, 2)
 
-                new.addWidget(freq_label)
-                new.addWidget(freq_entry)
-                new_widg = QWidget()
-                new_widg.setLayout(new)
-                self.frm_targ_holder.addRow(new_widg)
-                self.targ_entries[freq] = [freq]
-                row_idx += 1
+        self.__submit_btn = QtWidgets.QPushButton(self)
+        self.__submit_btn.setText('Update Settings')
+        self.__submit_btn.clicked.connect(self.__update_button_callback)
+        self.__submit_btn.setEnabled(False)
+        self.__inner_frame.addWidget(self.__submit_btn, 6, 0, 1, 2)
 
-        # Add widgets to main layout: self.__inner_frame
-        self.__inner_frame.addWidget(self.scroll_targ_holder, 4, 0, 1, 2)
-        self.__inner_frame.addWidget(lbl_cntr_freq, 1, 0)
-        self.__inner_frame.addWidget(lbl_samp_freq, 2, 0)
-        self.__inner_frame.addWidget(lbl_sdr_gain, 3, 0)
-        self.__inner_frame.addWidget(self.option_vars['SDR_center_freq'], 1, 1)
-        self.__inner_frame.addWidget(self.option_vars['SDR_sampling_freq'], 2, 1)
-        self.__inner_frame.addWidget(self.option_vars['SDR_gain'], 3, 1)
-
-        self.btn_add_target = QPushButton('Add Target')
-        self.btn_add_target.clicked.connect(self.add_target)
-        self.btn_add_target.setEnabled(False)
-        self.__inner_frame.addWidget(self.btn_add_target, 0, 0, 1, 2)
-        self.btn_clear_targs = QPushButton('Clear Targets')
-        self.btn_clear_targs.clicked.connect(self.clear_targets)
-        self.btn_clear_targs.setEnabled(False)
-        self.__inner_frame.addWidget(self.btn_clear_targs, 5, 0)
-
-        self.btn_submit = QPushButton('Update')
-        self.btn_submit.clicked.connect(self.__update_button_callback)
-        self.btn_submit.setEnabled(False)
-        self.__inner_frame.addWidget(self.btn_submit, 5, 1)
-
-        self.btn_adv_settings = QPushButton('Expert & Debug Configuration')
+        self.btn_adv_settings = QtWidgets.QPushButton('Expert & Debug Configuration')
         self.btn_adv_settings.clicked.connect(self.__advanced_settings)
         self.btn_adv_settings.setEnabled(False)
-        self.__inner_frame.addWidget(self.btn_adv_settings, 6, 0, 1, 2)
+        self.__inner_frame.addWidget(self.btn_adv_settings, 7, 0, 1, 2)
+
 
         self.set_content_layout(self.__inner_frame)
 
+        update_option_var_widgets()
 
-    def clear_targets(self):
-        '''
-        Helper function to clear target frequencies from UI and
-        MavMode
-        '''
-        self.__root._mav_model.setFrequencies(
-            [], timeout=self.__root.default_timeout)
-        self.update()
 
     def __advanced_settings(self):
         '''
@@ -262,16 +177,20 @@ class SystemSettingsControl(CollapseFrame):
         openSettings = ExpertSettingsDialog(self, self.option_vars)
         openSettings.exec_()
 
-    def validate_frequency(self, var: int):
+    def validate_frequency(self, value: int) -> bool:
         '''
         Helper function to ensure frequencies are within an appropriate
         range
         Args:
             var: An integer value that is the frequency to be validated
         '''
-        cntr_freq = self.__root._mav_model.getOption('SDR_center_freq')
-        samp_freq = self.__root._mav_model.getOption('SDR_sampling_freq')
-        if abs(var - cntr_freq) > samp_freq:
+        try:
+            model = MAVModel.get_model()
+        except NoActiveModel:
+            return
+        cntr_freq = model.getOption(Options.SDR_CENTER_FREQ)
+        samp_freq = model.getOption(Options.SDR_SAMPLING_FREQ)
+        if abs(value - cntr_freq) > samp_freq:
             return False
         return True
 
@@ -280,69 +199,47 @@ class SystemSettingsControl(CollapseFrame):
         Internal callback to be called when the update button is
         pressed
         '''
-        cntr_freq = int(self.option_vars['SDR_center_freq'].text())
-        samp_freq = int(self.option_vars['SDR_sampling_freq'].text())
+        try:
+            model = MAVModel.get_model()
+        except NoActiveModel:
+            return
+        
+        cntr_freq = option_var_table[Options.SDR_CENTER_FREQ]
+        samp_freq = option_var_table[Options.SDR_SAMPLING_FREQ]
+        sdr_gain = option_var_table[Options.SDR_GAIN]
+        
 
-        target_frequencies = []
-        for target_name in self.targ_entries:
-            if not self.validate_frequency(self.targ_entries[target_name][0]):
-                UserPopups.show_warning("Target frequency " + str(self.targ_entries[target_name][0]) + " is invalid. Please enter another value.")
-                return
-            target_freq = self.targ_entries[target_name][0]
-            target_frequencies.append(target_freq)
+        tgt_freq = option_var_table[Options.TGT_FREQUENCIES]
+        target_frequencies = tgt_freq.get_value()
 
-        self.__root._mav_model.setFrequencies(
-            target_frequencies, self.__root.default_timeout)
+        default_timeout = get_instance().default_timeout
+        try:
+            model.setFrequencies(target_frequencies, default_timeout)
+        except Exception:
+            UserPopups.show_warning('Failed to set frequencies')
+            return
 
         self.submit_gui_option_vars(0x00)
 
-        self.update_gui_option_vars()
+        update_option_var_widgets()
 
-    def update_gui_option_vars(self, scope=0, options=None):
-        if options is not None:
-            self.option_vars = options
-        option_dict = self.__root._mav_model.getOptions(
-            scope, timeout=self.__root.default_timeout)
-        for option_name, option_value in option_dict.items():
-            if option_name == 'GPS_mode' or option_name == 'SYS_autostart':
-                try:
-                    if option_value:
-                        self.option_vars[option_name].setText('true')
-                    else:
-                        self.option_vars[option_name].setText('false')
-                except AttributeError:
-                    UserPopups.show_warning("Failed to update GUI option vars", "Unexpected Error")
-                    print(option_name)
-            else:
-                try:
-                    self.option_vars[option_name].setText(str(option_value))
-                except AttributeError:
-                    UserPopups.show_warning("Failed to update GUI option vars", "Unexpected Error")
-                    print(option_name)
-        self.update()
 
     def submit_gui_option_vars(self, scope: int):
-        __base_option_keywords = ['SDR_center_freq',
-                                'SDR_sampling_freq', 'SDR_gain']
-        __exp_option_keywords = ['SDR_ping_width', 'SDR_ping_snr',
-                               'SDR_ping_max', 'SDR_ping_min', 'SYS_output_dir']
-        __eng_option_keywords = ['GPS_mode',
-                               'GPS_baud', 'GPS_device', 'SYS_autostart']
 
         accepted_keywords = []
-        if scope >= 0x00:
-            accepted_keywords.extend(__base_option_keywords)
-        if scope >= 0x01:
-            accepted_keywords.extend(__exp_option_keywords)
-        if scope >= 0xFF:
-            accepted_keywords.extend(__eng_option_keywords)
+        if scope >= BASE_OPTIONS:
+            accepted_keywords.extend(base_options_keywords)
+        if scope >= EXP_OPTIONS:
+            accepted_keywords.extend(expert_options_keywords)
+        if scope >= ENG_OPTIONS:
+            accepted_keywords.extend(engineering_options_keywords)
 
         options = {}
 
         for keyword in accepted_keywords:
-            if keyword == 'SYS_output_dir' or keyword == 'GPS_device':
+            if keyword == Options.SYS_OUTPUT_DIR or keyword == Options.GPS_DEVICE:
                 options[keyword] = self.option_vars[keyword].text()
-            elif keyword == 'GPS_mode' or keyword == 'SYS_autostart':
+            elif keyword == Options.GPS_MODE or keyword == Options.SYS_AUTOSTART:
                 val = self.option_vars[keyword].text()
                 if val == 'true':
                     options[keyword] = True
@@ -353,17 +250,18 @@ class SystemSettingsControl(CollapseFrame):
                     options[keyword] = int(self.option_vars[keyword].text())
                 except ValueError:
                     options[keyword] = float(self.option_vars[keyword].text())
-        self.__root._mav_model.setOptions(
-            timeout=self.__root.default_timeout, **options)
+        mav_model = MAVModel.get_model()
+        default_timeout = get_instance().default_timeout
+        mav_model.setOptions(timeout=default_timeout, **options)
 
     def add_target(self):
         '''
         Internal function to facilitate users adding target frequencies
         '''
         try:
-            cntr_freq = int(self.option_vars['SDR_center_freq'].text())
-            samp_freq = int(self.option_vars['SDR_sampling_freq'].text())
-            sdr_gain = float(self.option_vars['SDR_gain'].text())
+            cntr_freq = int(self.option_vars[Options.SDR_CENTER_FREQ].text())
+            samp_freq = int(self.option_vars[Options.SDR_SAMPLING_FREQ].text())
+            sdr_gain = float(self.option_vars[Options.SDR_GAIN].text())
         except ValueError:
             UserPopups.show_warning("Please enter center and sampling frequences and SDR gain settings.")
             return
@@ -401,11 +299,9 @@ class SystemSettingsControl(CollapseFrame):
         '''
         Helper method to enable system settings buttons once connection is made
         '''
-        self.update_gui_option_vars()
-        self.btn_add_target.setEnabled(True)
-        self.btn_clear_targs.setEnabled(True)
-        self.btn_submit.setEnabled(True)
+        self.update()
         self.btn_adv_settings.setEnabled(True)
+        self.__submit_btn.setEnabled(True)
         self.__root.status_widget.update_gui_option_vars()
 
     def disconnected(self):

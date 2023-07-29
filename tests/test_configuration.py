@@ -13,7 +13,7 @@ from qgis.core import QgsApplication, QgsStyle
 
 
 def test_configuration():
-    with get_instance(get_config_path) as config:
+    with get_instance(get_config_path()) as config:
         prefix_path = config.qgis_prefix_path
     QgsApplication.setPrefixPath(str(prefix_path), True)
     default_styles = QgsStyle.defaultStyle()

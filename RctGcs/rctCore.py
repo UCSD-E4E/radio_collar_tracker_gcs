@@ -1,55 +1,22 @@
-#!/usr/bin/env python3
-###############################################################################
-#     Radio Collar Tracker Ground Control Software
-#     Copyright (C) 2020  Nathan Hui
-#
-#     This program is free software: you can redistribute it and/or modify
-#     it under the terms of the GNU General Public License as published by
-#     the Free Software Foundation, either version 3 of the License, or
-#     (at your option) any later version.
-#
-#     This program is distributed in the hope that it will be useful,
-#     but WITHOUT ANY WARRANTY; without even the implied warranty of
-#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#     GNU General Public License for more details.
-#
-#     You should have received a copy of the GNU General Public License
-#     along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-###############################################################################
-#
-# DATE      WHO Description
-# -----------------------------------------------------------------------------
-# 08/06/20  NH  Fixed syntax and variable masking
-# 07/30/20  NH  Updated rctCore.MAVModel docstrings
-# 05/25/20  NH  Added docstring to new events, added callback to process pings,
-#                 added type hint to setFrequencies
-# 05/20/20  NH  Fixed logging message in MAVmodel.setOptions
-# 05/19/20  NH  Removed rctOptions skeleton, added cache bits for options,
-#                 renamed rctCore.__options to rctCore.PP_options, fixed
-#                 NO_HEARTBEAT name, added incremental frequency modifiers,
-#                 added single option getter
-# 05/18/20  NH  Updated to use binary interface and dictionary options
-# 05/01/20  AG  Added __processOptions, getOptions, and setOptions methods
-# 04/27/20  NH  Fixed getFrequencies callback
-# 04/26/20  NH  Fixed getFrequencies name, added sleep hack to getFrequencies,
-#                 added object for options, removed builtins import
-# 04/20/20  NH  Updated docstrings and imports
-# 04/19/20  NH  Added event clear for frequency packet event
-# 04/17/20  NH  Fixed callback map, added timeout to getFreqs
-# 04/16/20  NH  Added auto enum, moved enums to module scope, updated comms
-#               eventing, added event for no heartbeat, added start and
-#               stop mission functions, implemented setFrequencies
-# 04/14/20  NH  Initial commit
-#
-###############################################################################
+'''GCS Core Model
+'''
+from __future__ import annotations
 
-from enum import Enum, auto
-import RCTComms.comms
+import copy
 import logging
 import threading
-import RctGcs.ping
-import copy
+from enum import Enum, auto
+from typing import Any, Dict, List, Optional
+
+import RCTComms.comms
+from deprecated import deprecated
+from RCTComms.options import (ALL_OPTIONS, BASE_OPTIONS, ENG_OPTIONS,
+                              EXP_OPTIONS, Options, base_options_keywords,
+                              engineering_options_keywords,
+                              expert_options_keywords, option_param_table)
+
+from RctGcs import ping
+from RctGcs.ping import DataManager
 
 
 class SDR_INIT_STATES(Enum):
@@ -160,6 +127,9 @@ class Events(Enum):
     VehicleInfo = auto(),
     ConeInfo = auto()
 
+class NoActiveModel(RuntimeError):
+    """Raised when no active model is present
+    """
 
 class MAVModel:
     '''
@@ -167,34 +137,54 @@ class MAVModel:
     vehicle state
     '''
 
-    BASE_OPTIONS = 0x00
-    EXP_OPTIONS = 0x01
-    ENG_OPTIONS = 0xFF
-    TGT_PARAMS = 0x100
+    # This is a global map of active MAVModels
+    current_models: Dict[int, MAVModel] = {}
+    active_model: Optional[int] = None
 
     CACHE_GOOD = 0
     CACHE_INVALID = 1
     CACHE_DIRTY = 2
 
-    __baseOptionKeywords = ['SDR_center_freq', 'SDR_sampling_freq', 'SDR_gain']
-    __expOptionKeywords = ['DSP_ping_width', 'DSP_ping_snr',
-                           'DSP_ping_max', 'DSP_ping_min', 'SYS_output_dir']
-    __engOptionKeywords = ['GPS_mode',
-                           'GPS_baud', 'GPS_device', 'SYS_autostart']
+    @classmethod
+    def get_model(cls, *, idx: int = None) -> MAVModel:
+        """Returns the active model, or the specified model
 
-    def __init__(self, receiver: RCTComms.comms.gcsComms):
+        Args:
+            idx (int, optional): Idx of model if different from active. Defaults to None.
+
+        Raises:
+            NoActiveModel: No active model
+
+        Returns:
+            MAVModel: Selected model
+        """
+        if idx is None:
+            idx = cls.active_model
+        if idx is None:
+            raise NoActiveModel
+        return cls.current_models[idx]
+
+    def __init__(self, receiver: RCTComms.comms.gcsComms, idx: int):
         '''
         Creates a new MAVModel
         Args:
             receiver: gcsComms Object
         '''
-        self.__log = logging.getLogger('rctGCS:MAVModel')
+        self.__log = logging.getLogger('MAVModel')
+        self.__idx = idx
+
+        if idx in MAVModel.current_models:
+            raise RuntimeError('Receiver already registered!')
+        MAVModel.current_models[idx] = self
+        # we will be greedy here and the newest model will be active.
+        MAVModel.active_model = idx
+        self.__log.info('Registered %d', idx)
         self.__rx = receiver
 
-        self.__optionCacheDirty = {self.BASE_OPTIONS: self.CACHE_INVALID,
-                                   self.EXP_OPTIONS: self.CACHE_INVALID,
-                                   self.ENG_OPTIONS: self.CACHE_INVALID,
-                                   self.TGT_PARAMS: self.CACHE_INVALID}
+        self.__option_cache_dirty = {BASE_OPTIONS: self.CACHE_INVALID,
+                                     EXP_OPTIONS: self.CACHE_INVALID,
+                                     ENG_OPTIONS: self.CACHE_INVALID,
+                                     ALL_OPTIONS: self.CACHE_INVALID}
 
         self.state = {
             'STS_sdr_status': 0,
@@ -208,23 +198,10 @@ class MAVModel:
             "CONE_track": {}
         }
 
-        self.PP_options = {
-            "TGT_frequencies": [],
-            "SDR_center_freq": 0,
-            "SDR_sampling_freq": 0,
-            "SDR_gain": 0,
-            "DSP_ping_width": 0,
-            "DSP_ping_snr": 0,
-            "DSP_ping_max": 0,
-            "DSP_ping_min": 0,
-            "GPS_mode": 0,
-            "GPS_device": "",
-            "GPS_baud": 0,
-            "SYS_output_dir": "",
-            "SYS_autostart": False,
-        }
+        self.remote_options = {option:param.default_value
+                               for option, param in option_param_table.items()}
 
-        self.EST_mgr = ping.DataManager()
+        self.EST_mgr = DataManager()
 
         self.__callbacks = {}
         for event in Events:
@@ -264,7 +241,7 @@ class MAVModel:
                              shall be a function with no parameters to be called
                              for progress
         '''
-        self.__rx.start()
+        self.__rx.start(gui=guiTickCallback)
         self.__log.info("MAVModel started")
 
     def __processFrequencies(self, packet: RCTComms.comms.rctFrequenciesPacket, addr: str):
@@ -275,8 +252,8 @@ class MAVModel:
             addr: Source of packet as a string
         '''
         self.__log.info("Received frequencies")
-        self.PP_options['TGT_frequencies'] = packet.frequencies
-        self.__optionCacheDirty[self.TGT_PARAMS] = self.CACHE_GOOD
+        self.remote_options[Options.TGT_FREQUENCIES] = packet.frequencies
+        self.__option_cache_dirty[ALL_OPTIONS] = self.CACHE_GOOD
         for callback in self.__callbacks[Events.GetFreqs]:
             callback()
 
@@ -289,13 +266,13 @@ class MAVModel:
         '''
         self.__log.info('Received options')
         for parameter in packet.options:
-            self.PP_options[parameter] = packet.options[parameter]
-        if packet.scope >= self.BASE_OPTIONS:
-            self.__optionCacheDirty[self.BASE_OPTIONS] = self.CACHE_GOOD
-        if packet.scope >= self.EXP_OPTIONS:
-            self.__optionCacheDirty[self.EXP_OPTIONS] = self.CACHE_GOOD
-        if packet.scope >= self.ENG_OPTIONS:
-            self.__optionCacheDirty[self.ENG_OPTIONS] = self.CACHE_GOOD
+            self.remote_options[parameter] = packet.options[parameter]
+        if packet.scope >= BASE_OPTIONS:
+            self.__option_cache_dirty[BASE_OPTIONS] = self.CACHE_GOOD
+        if packet.scope >= EXP_OPTIONS:
+            self.__option_cache_dirty[EXP_OPTIONS] = self.CACHE_GOOD
+        if packet.scope >= ENG_OPTIONS:
+            self.__option_cache_dirty[ENG_OPTIONS] = self.CACHE_GOOD
 
         for callback in self.__callbacks[Events.GetOptions]:
             callback()
@@ -307,13 +284,16 @@ class MAVModel:
             packet: Heartbeat packet payload
             addr: Source of packet
         '''
-        self.__log.info("Received heartbeat")
         self.state['STS_sdr_status'] = SDR_INIT_STATES(packet.sdrState)
-        self.state['STS_dir_status'] = OUTPUT_DIR_STATES(
-            packet.storageState)
+        self.state['STS_dir_status'] = OUTPUT_DIR_STATES(packet.storageState)
         self.state['STS_gps_status'] = EXTS_STATES(packet.sensorState)
         self.state['STS_sys_status'] = RCT_STATES(packet.systemState)
         self.state['STS_sw_status'] = packet.switchState
+        self.__log.info("Received heartbeat %s %s %s %s", 
+                        SDR_INIT_STATES(packet.sdrState),
+                        OUTPUT_DIR_STATES(packet.storageState),
+                        EXTS_STATES(packet.sensorState),
+                        RCT_STATES(packet.systemState))
         for callback in self.__callbacks[Events.Heartbeat]:
             callback()
 
@@ -334,9 +314,9 @@ class MAVModel:
             packet:    Upgrade Status packet
             addr:    Source address
         '''
-        self.PP_options['UPG_state'] = packet.state
-        self.PP_options['UPG_msg'] = packet.msg
-        for callback in self.__callback[Events.UpgradeStatus]:
+        # self.remote_options['UPG_state'] = packet.state
+        # self.remote_options['UPG_msg'] = packet.msg
+        for callback in self.__callbacks[Events.UpgradeStatus]:
             callback()
 
     def stop(self):
@@ -344,6 +324,9 @@ class MAVModel:
         Stops the MAVModel and underlying resources
         '''
         self.__rx.stop()
+        MAVModel.current_models.pop(self.__idx)
+        if self.__idx == MAVModel.active_model:
+            MAVModel.active_model = None
         self.__log.info("MAVModel stopped")
 
     def registerCallback(self, event: Events, callback):
@@ -386,13 +369,17 @@ class MAVModel:
         if not self.__ackVectors.pop(0x09)[1]:
             raise RuntimeError('STOP NACKED')
 
-    def getFrequencies(self, timeout):
+    @deprecated
+    def getFrequencies(self, timeout) -> List[int]:
+        return self.get_frequencies(timeout=timeout)
+
+    def get_frequencies(self, timeout) -> List[int]:
         '''
         Retrieves the PRX_frequencies from the payload
         Args:
             timeout:    Seconds to wait before timing out
         '''
-        if self.__optionCacheDirty[self.TGT_PARAMS] == self.CACHE_INVALID:
+        if self.__option_cache_dirty[ALL_OPTIONS] == self.CACHE_INVALID:
             frequencyPacketEvent = threading.Event()
             frequencyPacketEvent.clear()
             self.registerCallback(
@@ -402,7 +389,7 @@ class MAVModel:
             self.__log.info("Sent getF command")
 
             frequencyPacketEvent.wait(timeout=timeout)
-        return self.PP_options['TGT_frequencies']
+        return self.remote_options[Options.TGT_FREQUENCIES]
 
     def __handleRemoteException(self, packet: RCTComms.comms.rctExceptionPacket, addr):
         '''
@@ -431,7 +418,7 @@ class MAVModel:
         for freq in freqs:
             assert(isinstance(freq, int))
 
-        self.__optionCacheDirty[self.TGT_PARAMS] = self.CACHE_DIRTY
+        self.__option_cache_dirty[ALL_OPTIONS] = self.CACHE_DIRTY
 
         event = threading.Event()
         self.__ackVectors[0x03] = [event, 0]
@@ -452,11 +439,10 @@ class MAVModel:
             frequency:    Frequency to add
             timeout:    Timeout in seconds
         '''
-        if frequency in self.PP_options['TGT_frequencies']:
+        if frequency in self.remote_options[Options.TGT_FREQUENCIES]:
             return
-        else:
-            self.setFrequencies(
-                self.PP_options['TGT_frequencies'] + [frequency], timeout)
+        self.setFrequencies(
+            self.remote_options[Options.TGT_FREQUENCIES] + [frequency], timeout)
 
     def removeFrequency(self, frequency: int, timeout):
         '''
@@ -469,14 +455,17 @@ class MAVModel:
             frequency:    Frequency to remove
             timeout:    Timeout in seconds
         '''
-        if frequency not in self.PP_options['TGT_frequencies']:
+        if frequency not in self.remote_options[Options.TGT_FREQUENCIES]:
             raise RuntimeError('Invalid frequency')
-        else:
-            newFreqs = copy.deepcopy(self.PP_options['TGT_frequencies'])
-            newFreqs.remove(frequency)
-            self.setFrequencies(newFreqs, timeout)
+        new_freqs: List[int] = copy.deepcopy(self.remote_options[Options.TGT_FREQUENCIES])
+        new_freqs.remove(frequency)
+        self.setFrequencies(new_freqs, timeout)
 
+    @deprecated
     def getOptions(self, scope: int, timeout):
+        return self.get_options(scope=scope, timeout=timeout)
+
+    def get_options(self, scope: int, timeout: int) -> Dict[Options, Any]:
         '''
         Retrieves and returns the options as a dictionary from the remote.
 
@@ -496,33 +485,33 @@ class MAVModel:
 
         optionPacketEvent.wait(timeout=timeout)
 
-        acceptedKeywords = []
-        if scope >= self.BASE_OPTIONS:
-            acceptedKeywords.extend(self.__baseOptionKeywords)
-        if scope >= self.EXP_OPTIONS:
-            acceptedKeywords.extend(self.__expOptionKeywords)
-        if scope >= self.ENG_OPTIONS:
-            acceptedKeywords.extend(self.__engOptionKeywords)
+        acceptedKeywords: List[Options] = []
+        if scope >= BASE_OPTIONS:
+            acceptedKeywords.extend(base_options_keywords)
+        if scope >= EXP_OPTIONS:
+            acceptedKeywords.extend(expert_options_keywords)
+        if scope >= ENG_OPTIONS:
+            acceptedKeywords.extend(engineering_options_keywords)
 
-        return {key: self.PP_options[key] for key in acceptedKeywords}
+        return {key: self.remote_options[key] for key in acceptedKeywords}
 
-    def getOption(self, keyword, timeout=10):
+    def getOption(self, keyword: Options, timeout:int=10) -> Any:
         '''
         Retrieves the specific option by keyword
         Args:
             keyword:    Keyword of option to retrieve
             timeout:    Timeout in seconds
         '''
-        if keyword in self.__baseOptionKeywords:
-            if self.__optionCacheDirty[self.BASE_OPTIONS] == self.CACHE_INVALID:
-                return self.getOptions(self.BASE_OPTIONS, timeout)[keyword]
-        if keyword in self.__expOptionKeywords:
-            if self.__optionCacheDirty[self.EXP_OPTIONS] == self.CACHE_INVALID:
-                return self.getOptions(self.EXP_OPTIONS, timeout)[keyword]
-        if keyword in self.__engOptionKeywords:
-            if self.__optionCacheDirty[self.ENG_OPTIONS] == self.CACHE_INVALID:
-                return self.getOptions(self.ENG_OPTIONS, timeout)[keyword]
-        return copy.deepcopy(self.PP_options[keyword])
+        if keyword in base_options_keywords:
+            if self.__option_cache_dirty[BASE_OPTIONS] == self.CACHE_INVALID:
+                return self.getOptions(BASE_OPTIONS, timeout)[keyword]
+        if keyword in expert_options_keywords:
+            if self.__option_cache_dirty[EXP_OPTIONS] == self.CACHE_INVALID:
+                return self.getOptions(EXP_OPTIONS, timeout)[keyword]
+        if keyword in engineering_options_keywords:
+            if self.__option_cache_dirty[ENG_OPTIONS] == self.CACHE_INVALID:
+                return self.getOptions(ENG_OPTIONS, timeout)[keyword]
+        return copy.deepcopy(self.remote_options[keyword])
 
     def setOptions(self, timeout, **kwargs):
         '''
@@ -531,34 +520,34 @@ class MAVModel:
             timeout:    Timeout in seconds
             kwargs:    Options to set by keyword
         '''
-        scope = self.BASE_OPTIONS
+        scope = BASE_OPTIONS
         for keyword in kwargs:
-            if keyword in self.__baseOptionKeywords:
-                scope = max(scope, self.BASE_OPTIONS)
-            elif keyword in self.__expOptionKeywords:
-                scope = max(scope, self.EXP_OPTIONS)
-            elif keyword in self.__engOptionKeywords:
-                scope = max(scope, self.ENG_OPTIONS)
+            if keyword in base_options_keywords:
+                scope = max(scope, BASE_OPTIONS)
+            elif keyword in expert_options_keywords:
+                scope = max(scope, EXP_OPTIONS)
+            elif keyword in engineering_options_keywords:
+                scope = max(scope, ENG_OPTIONS)
             else:
                 raise KeyError
 
         print(scope)
-        self.PP_options.update(kwargs)
+        self.remote_options.update(kwargs)
         acceptedKeywords = []
-        if scope >= self.BASE_OPTIONS:
-            self.__optionCacheDirty[self.BASE_OPTIONS] = self.CACHE_DIRTY
-            acceptedKeywords.extend(self.__baseOptionKeywords)
-        if scope >= self.EXP_OPTIONS:
-            self.__optionCacheDirty[self.EXP_OPTIONS] = self.CACHE_DIRTY
-            acceptedKeywords.extend(self.__expOptionKeywords)
-        if scope >= self.ENG_OPTIONS:
-            self.__optionCacheDirty[self.ENG_OPTIONS] = self.CACHE_DIRTY
-            acceptedKeywords.extend(self.__engOptionKeywords)
+        if scope >= BASE_OPTIONS:
+            self.__option_cache_dirty[BASE_OPTIONS] = self.CACHE_DIRTY
+            acceptedKeywords.extend(base_options_keywords)
+        if scope >= EXP_OPTIONS:
+            self.__option_cache_dirty[EXP_OPTIONS] = self.CACHE_DIRTY
+            acceptedKeywords.extend(expert_options_keywords)
+        if scope >= ENG_OPTIONS:
+            self.__option_cache_dirty[ENG_OPTIONS] = self.CACHE_DIRTY
+            acceptedKeywords.extend(engineering_options_keywords)
 
         event = threading.Event()
         self.__ackVectors[0x05] = [event, 0]
         self.__rx.sendPacket(RCTComms.comms.rctSETOPTCommand(
-            scope, **{key: self.PP_options[key] for key in acceptedKeywords}))
+            scope, {key: self.remote_options[key] for key in acceptedKeywords}))
         self.__log.info('Sent SETOPT command with scope %d' % scope)
         event.wait(timeout=timeout)
         if not self.__ackVectors.pop(0x05)[1]:
@@ -620,3 +609,10 @@ class MAVModel:
             vector = self.__ackVectors[commandID]
             vector[1] = packet.ack
             vector[0].set()
+
+    @classmethod
+    def close_all(cls) -> None:
+        models = list(cls.current_models.values())
+        for model in models:
+            model.stop()
+        assert len(cls.current_models) == 0
