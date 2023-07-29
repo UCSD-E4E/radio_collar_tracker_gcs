@@ -111,7 +111,7 @@ class GCS(QtWidgets.QMainWindow):
             # self._transport.open()
             raise NotImplementedError
         else:
-            attempts = 5
+            attempts = 1
             retry_time = 5
             for i in range(attempts):
                 try:
