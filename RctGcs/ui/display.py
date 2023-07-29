@@ -119,8 +119,9 @@ class GCS(QtWidgets.QMainWindow):
                     self._transport = RCTTransportFactory.create_transport(transport_spec)
                     self.connection_handler(self._transport, 0)
                     return
-                except Exception:   # pylint: disable=broad-except
+                except Exception as exc:   # pylint: disable=broad-except
                     # retry until fail
+                    self.__log.exception('Failed to complete connection: %s', exc)
                     msg = (f"Trying to reconnect. Attempt {i} of 5.\nRetrying after "
                           f"{retry_time} seconds")
                     UserPopups.show_timed_warning(text=msg,
