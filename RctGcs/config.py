@@ -106,6 +106,7 @@ class Configuration:
         if not isinstance(value, str):
             raise TypeError
         self.__connection_spec = value
+        self.write()
 
     @property
     def connection_mode(self) -> ConnectionMode:
@@ -121,6 +122,7 @@ class Configuration:
         if not isinstance(value, ConnectionMode):
             raise TypeError
         self.__connection_mode = value
+        self.write()
 
     @property
     def map_extent(self) -> Tuple[Tuple[float, float], Tuple[float, float]]:
@@ -154,6 +156,7 @@ class Configuration:
                 raise ValueError
         self.__map_extent_nw = value[0]
         self.__map_extent_se = value[1]
+        self.write()
 
     @property
     def qgis_prefix_path(self) -> Path:
@@ -171,6 +174,7 @@ class Configuration:
         if not value.is_dir():
             raise ValueError
         self.__qgis_prefix_path = value
+        self.write()
 
     @property
     def qgis_prefix_set(self) -> bool:
@@ -186,6 +190,7 @@ class Configuration:
         if not isinstance(value, bool):
             raise TypeError
         self.__qgis_prefix_set = value
+        self.write()
 
     @classmethod
     def __get_qgis_path(cls) -> Path:
