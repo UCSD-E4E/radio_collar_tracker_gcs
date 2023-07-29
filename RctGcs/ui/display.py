@@ -119,14 +119,15 @@ class GCS(QtWidgets.QMainWindow):
                     self._transport = RCTTransportFactory.create_transport(transport_spec)
                     self.connection_handler(self._transport, 0)
                     return
-                except ConnectionRefusedError:
+                except Exception:   # pylint: disable=broad-except
+                    # retry until fail
                     msg = (f"Trying to reconnect. Attempt {i} of 5.\nRetrying after "
                           f"{retry_time} seconds")
                     self.user_popups.show_timed_warning(text=msg,
                                                         timeout=retry_time)
                     self._transport.close()
 
-            self.user_popups.show_warning("Failure to connect:\nPlease ensure server is running.")
+            self.user_popups.show_warning("Failure to connect:\nPlease ensure node(s) are running.")
             return
 
     def connection_handler(self, connection: RCTAbstractTransport, idx: int):
