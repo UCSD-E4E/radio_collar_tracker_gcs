@@ -3,13 +3,13 @@ from typing import Any, Dict, List, Optional
 
 from PyQt5.QtCore import QRegExp, Qt, QTimer
 from PyQt5.QtGui import QRegExpValidator
-from PyQt5.QtWidgets import (QButtonGroup, QGridLayout, QHBoxLayout, QLabel,
-                             QLineEdit, QMessageBox, QPushButton, QRadioButton,
-                             QVBoxLayout, QWizard, QWizardPage, QCheckBox)
+from PyQt5.QtWidgets import (QButtonGroup, QCheckBox, QGridLayout, QHBoxLayout,
+                             QLabel, QLineEdit, QMessageBox, QPushButton,
+                             QRadioButton, QVBoxLayout, QWizard, QWizardPage)
 
 from RctGcs.config import ConnectionMode, get_config_path, get_instance
 from RctGcs.rctCore import Options
-from RctGcs.ui.option_vars import update_option_var_widgets
+from RctGcs.ui.option_vars import option_var_table, update_option_var_widgets
 
 
 class UserPopups:
@@ -154,63 +154,27 @@ class ExpertSettingsDialogPage(QWizardPage):
         '''
         exp_settings_frame = QGridLayout()
 
-        lbl_ping_width = QLabel('Expected Ping Width(ms)')
-        exp_settings_frame.addWidget(lbl_ping_width, 0, 0)
+        option_list = [
+            Options.DSP_PING_WIDTH,
+            Options.DSP_PING_MIN,
+            Options.DSP_PING_MAX,
+            Options.DSP_PING_SNR,
+            Options.GPS_DEVICE,
+            Options.GPS_BAUD,
+            Options.GPS_MODE,
+            Options.SYS_OUTPUT_DIR,
+            Options.SYS_AUTOSTART,
+        ]
 
-        lbl_min_width_mult = QLabel('Min. Width Multiplier')
-        exp_settings_frame.addWidget(lbl_min_width_mult, 1, 0)
+        for idx, opt in enumerate(option_list):
+            label, widget = option_var_table[opt].make_pair(self)
+            exp_settings_frame.addWidget(label, idx, 0)
+            exp_settings_frame.addWidget(widget, idx, 1)
 
-        lbl_max_width_mult = QLabel('Max. Width Multiplier')
-        exp_settings_frame.addWidget(lbl_max_width_mult, 2, 0)
-
-        lbl_min_ping_snr = QLabel('Min. Ping SNR(dB)')
-        exp_settings_frame.addWidget(lbl_min_ping_snr, 3, 0)
-
-        lbl_gps_port = QLabel('GPS Port')
-        exp_settings_frame.addWidget(lbl_gps_port, 4, 0)
-
-        lbl_gps_baud_rate = QLabel('GPS Baud Rate')
-        exp_settings_frame.addWidget(lbl_gps_baud_rate, 5, 0)
-
-        lbl_output_dir = QLabel('Output Directory')
-        exp_settings_frame.addWidget(lbl_output_dir, 6, 0)
-
-        lbl_gps_mode = QLabel('GPS Mode')
-        exp_settings_frame.addWidget(lbl_gps_mode, 7, 0)
-
-        lbl_sys_auto_start = QLabel("SYS Autostart")
-        exp_settings_frame.addWidget(lbl_sys_auto_start, 8, 0)
-
-        self.option_vars[Options.DSP_PING_WIDTH] = QLineEdit()
-        exp_settings_frame.addWidget(self.option_vars[Options.DSP_PING_WIDTH], 0, 1)
-
-        self.option_vars[Options.DSP_PING_MIN] = QLineEdit()
-        exp_settings_frame.addWidget(self.option_vars[Options.DSP_PING_MIN], 1, 1)
-
-        self.option_vars[Options.DSP_PING_MAX] = QLineEdit()
-        exp_settings_frame.addWidget(self.option_vars[Options.DSP_PING_MAX], 2, 1)
-
-        self.option_vars[Options.DSP_PING_SNR] = QLineEdit()
-        exp_settings_frame.addWidget(self.option_vars[Options.DSP_PING_SNR], 3, 1)
-
-        self.option_vars[Options.GPS_DEVICE] = QLineEdit()
-        exp_settings_frame.addWidget(self.option_vars[Options.GPS_DEVICE], 4, 1)
-
-        self.option_vars[Options.GPS_BAUD] = QLineEdit()
-        exp_settings_frame.addWidget(self.option_vars[Options.GPS_BAUD], 5, 1)
-
-        self.option_vars[Options.SYS_OUTPUT_DIR] = QLineEdit()
-        exp_settings_frame.addWidget(self.option_vars[Options.SYS_OUTPUT_DIR], 6, 1)
-
-        self.option_vars[Options.GPS_MODE] = QCheckBox()
-        exp_settings_frame.addWidget(self.option_vars[Options.GPS_MODE], 7, 1)
-
-        self.option_vars[Options.SYS_AUTOSTART] = QLineEdit()
-        exp_settings_frame.addWidget(self.option_vars[Options.SYS_AUTOSTART], 8, 1)
 
         btn_submit = QPushButton('submit')
         btn_submit.clicked.connect(self.submit)
-        exp_settings_frame.addWidget(btn_submit, 9, 0, 1, 2)
+        exp_settings_frame.addWidget(btn_submit, len(option_list) + 1, 0, 1, 2)
 
         self.setLayout(exp_settings_frame)
 
