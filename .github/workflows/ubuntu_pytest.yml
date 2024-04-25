@@ -23,4 +23,8 @@ jobs:
     - name: Execute tests
       run: |
         conda activate rctGCS
+        conda list
+        conda info
+        conda info --envs
+        printenv
         python -m pytest tests

@@ -21,8 +21,16 @@ from v1.0.  Working branch v1.0a, becomes v2.0 on release
     This should open up the rctGCS UI
 2. Create a new terminal instance and run the following commands:
     - `conda activate rctGCS`
-    - `droneSimulator --protocol tcp`
+    - `droneSimulator --spec {spec}`
     - `ipython>>> sim.start()`
+
+The transport spec is a string specification of the connection type:
+
+| Type          | Resulting Object      | Syntax                            |
+|---------------|-----------------------|-----------------------------------|
+| Serial        | RCTSerialTransport    | serial:{device}?baud={baudrate}   |
+| TCP Client    | RCTTCPClient          | tcpc://{hostname}:{port}          |
+
 3. From the rctGCS UI, navigate to the "System: No Connection" tab --> "Connect" --> "Done"
 4. Switch back to the `ipython` terminal window
     - `ipython>>> sim.do_mission()`

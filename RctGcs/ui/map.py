@@ -1,4 +1,5 @@
 import csv
+import logging
 import math
 import os
 import os.path
@@ -13,10 +14,10 @@ from PyQt5.QtWidgets import *
 
 from RctGcs.ui.controls import *
 from RctGcs.ui.popups import *
+from RctGcs.utils import fix_conda_path
 
-if 'CONDA_PREFIX' in os.environ:
-    sys.path.insert(0, Path(sys.executable).parent.joinpath("Library", "python", "plugins").as_posix())
-    sys.path.insert(0, Path(sys.executable).parent.joinpath("Library", "python").as_posix())
+fix_conda_path()
+
 import qgis.gui
 from qgis.core import *
 from qgis.core import QgsProject
@@ -921,6 +922,7 @@ class WebMap(MapWidget):
         '''
         # Initialize WebMapFrame
         MapWidget.__init__(self, root)
+        self.__log = logging.getLogger('WebMap')
         self.load_cached = load_cached
 
         self.add_layers()
@@ -979,7 +981,7 @@ class WebMap(MapWidget):
         vehicle_path_layer = QgsVectorLayer(uri_line, 'vehicle_path', "memory")
 
         # Set drone image for marker symbol
-        path = QDir().filePath('../resources/vehicleSymbol.svg')
+        path = QDir().filePath('resources/vehicleSymbol.svg')
         symbol_svg = QgsSvgMarkerSymbolLayer(path)
         symbol_svg.setSize(4)
         symbol_svg.setFillColor(QColor('#0000ff'))
@@ -997,7 +999,7 @@ class WebMap(MapWidget):
     def set_up_cone_layer(self):
         uri = "Point?crs=epsg:3857"
         cone_layer = QgsVectorLayer(uri, 'Cone', "memory")
-        path = QDir().filePath('../resources/searchingTriangle.svg')
+        path = QDir().filePath('resources/searchingTriangle.svg')
         symbol_svg = QgsSvgMarkerSymbolLayer(path)
         symbol_svg.setSize(4)
         symbol_svg.setFillColor(QColor('#ff0000'))
@@ -1171,10 +1173,10 @@ class WebMap(MapWidget):
             QgsProject.instance().addMapLayer(self.ping_layer)
             QgsProject.instance().addMapLayer(self.cones)
             #QgsProject.instance().add_map_layer(self.precision)
-            print('valid map_layer')
+            self.__log.info('Valid map_layer')
         else:
-            print('invalid map_layer')
-            raise RuntimeError
+            self.__log.error('Invalid map_layer')
+            raise RuntimeError('Invalid map_layer')
 
     def add_rect_tool(self):
         '''

@@ -1,35 +1,40 @@
-import configparser
 import json
 import logging
 import queue as q
 from functools import partial
 
 import utm
-from PyQt5.QtWidgets import (QFileDialog, QGridLayout, QLabel, QMainWindow,
-                             QPushButton, QScrollArea, QVBoxLayout, QWidget)
-from RCTComms.transport import RCTTCPServer
+from PyQt5 import QtCore, QtWidgets
+from RCTComms.comms import gcsComms
+from RCTComms.transport import RCTAbstractTransport, RCTTransportFactory
 
-import RctGcs.rctCore
-from RctGcs.config import get_config_path, get_instance
-from RctGcs.ui.controls import *
-from RctGcs.ui.map import *
+from RctGcs.config import ConnectionMode, get_config_path, get_instance
+from RctGcs.rctCore import (EXTS_STATES, OUTPUT_DIR_STATES, RCT_STATES,
+                            SDR_INIT_STATES, Events, MAVModel, NoActiveModel)
+from RctGcs.ui.controls import CollapseFrame, SystemSettingsControl
+from RctGcs.ui.map import MapOptions, StaticMap, WebMap
+from RctGcs.ui.popups import ConfigDialog, ConnectionDialog, UserPopups
+from RctGcs.utils import fix_conda_path
+
+fix_conda_path()
+from qgis.core import (QgsCoordinateReferenceSystem, QgsCoordinateTransform,
+                       QgsProject)
 
 
-class GCS(QMainWindow):
+class GCS(QtWidgets.QMainWindow):
     '''
     Ground Control Station GUI
     '''
 
     sb_width = 500
     default_timeout = 5
-    default_port_val = 9000
 
-    sig = pyqtSignal()
+    sig = QtCore.pyqtSignal()
 
-    connect_signal = pyqtSignal(int)
-    disconnect_signal = pyqtSignal(int)
+    connect_signal = QtCore.pyqtSignal(int)
+    disconnect_signal = QtCore.pyqtSignal(int)
 
-    mav_event_signal = pyqtSignal(RctGcs.rctCore.Events, int)
+    mav_event_signal = QtCore.pyqtSignal(Events, int)
 
     def __init__(self):
         '''
@@ -37,11 +42,9 @@ class GCS(QMainWindow):
         '''
         super().__init__()
         self.__log = logging.getLogger('rctGCS.GCS')
-        self.port_val = self.default_port_val
         self._transport = None
-        self._mav_models = {}
-        self._mav_model = None
         self._buttons = []
+        self._mav_model = None
         self._system_connection_tab = None
         self.system_settings_widget = None
         self.__mission_status_text = "Start Recording"
@@ -54,7 +57,6 @@ class GCS(QMainWindow):
         self.map_display = None
         self.test_frame = None
         self.ping_sheet_created = False
-        self.user_popups = UserPopups()
         self.config = get_instance(get_config_path())
 
         self.__create_widgets()
@@ -62,7 +64,7 @@ class GCS(QMainWindow):
             button.config(state='disabled')
 
         self.queue = q.Queue()
-        self.sig.connect(self.execute_inmain, Qt.QueuedConnection)
+        self.sig.connect(self.execute_inmain, QtCore.Qt.QueuedConnection)
 
         self.connect_signal.connect(self.connection_slot)
         self.disconnect_signal.connect(self.disconnect_slot)
@@ -73,62 +75,79 @@ class GCS(QMainWindow):
             fn(coord, frequency, num_pings)
 
     def __mav_event_handler(self, event, id):
-        if event == rctCore.Events.Heartbeat:
+        if event == Events.Heartbeat:
             self.__heartbeat_callback(id)
-        if event == rctCore.Events.Exception:
+        if event == Events.Exception:
             self.__handle_remote_exception(id)
-        if event == rctCore.Events.VehicleInfo:
+        if event == Events.VehicleInfo:
             self.__handle_vehicle_info(id)
-        if event == rctCore.Events.NewPing:
+        if event == Events.NewPing:
             self.__handle_new_ping(id)
-        if event == rctCore.Events.NewEstimate:
+        if event == Events.NewEstimate:
             self.__handle_new_estimate(id)
-        if event == rctCore.Events.ConeInfo:
+        if event == Events.ConeInfo:
             self.__handle_new_cone(id)
 
-    def __register_model_callbacks(self, id):
-        mav_model = self._mav_models[id]
-        event_types = [rctCore.Events.Heartbeat, rctCore.Events.Exception,
-                    rctCore.Events.VehicleInfo, rctCore.Events.NewPing,
-                    rctCore.Events.NewEstimate, rctCore.Events.ConeInfo]
+    def __register_model_callbacks(self, idx):
+        mav_model = MAVModel.get_model(idx=idx)
+        event_types = [
+            Events.Heartbeat,
+            Events.Exception,
+            Events.VehicleInfo,
+            Events.NewPing,
+            Events.NewEstimate,
+            Events.ConeInfo
+        ]
         for event_type in event_types:
             mav_model.registerCallback(event_type,
-            partial(self.mav_event_signal.emit, event_type, id))
+            partial(self.mav_event_signal.emit, event_type, idx))
 
-    def __start_transport(self):
-
+    def __start_transport(self, spec: str):
         if self._transport is not None and self._transport.isOpen():
             self._transport.close()
         self.mav_event_signal.connect(self.__mav_event_handler)
-        if self.config.connection_mode == RctGcs.config.ConnectionMode.TOWER:
-            self._transport = RCTTCPServer(self.port_val, self.connection_handler)
-            self._transport.open()
+        if self.config.connection_mode == ConnectionMode.TOWER:
+            # self._transport = RCTTCPServer(self.transport_spec, self.connection_handler)
+            # self._transport.open()
+            raise NotImplementedError
         else:
-            attempts = 5
+            attempts = 1
             retry_time = 5
             for i in range(attempts):
                 try:
-                    self._transport = RCTTCPClient(addr=self.addr_val, port=self.port_val)
+                    transport_spec = spec
+                    self._transport = RCTTransportFactory.create_transport(transport_spec)
                     self.connection_handler(self._transport, 0)
                     return
-                except ConnectionRefusedError:
-                    self.user_popups.show_timed_warning(text="Trying to reconnect. Attempt {} out of 5.\
-                                                        \nRetrying after {} seconds.".format(str(i), retry_time), timeout=retry_time)
+                except Exception as exc:   # pylint: disable=broad-except
+                    # retry until fail
+                    self.__log.exception('Failed to complete connection: %s', exc)
+                    msg = (f"Trying to reconnect. Attempt {i} of 5.\nRetrying after "
+                          f"{retry_time} seconds")
+                    UserPopups.show_timed_warning(text=msg,
+                                                        timeout=retry_time)
                     self._transport.close()
 
-            self.user_popups.show_warning("Failure to connect:\nPlease ensure server is running.")
+            UserPopups.show_warning("Failure to connect:\nPlease ensure node(s) are running.")
             return
 
-    def connection_handler(self, connection, id):
-        comms = gcsComms(connection, partial(self.__disconnect_handler, id))
-        model = rctCore.MAVModel(comms)
-        model.start()
-        self._mav_models[id] = model
-        if self._mav_model is None:
-            self._mav_model = model
-            self.__register_model_callbacks(id)
+    def connection_handler(self, connection: RCTAbstractTransport, idx: int):
+        progress_dialog = QtWidgets.QProgressDialog('Waiting for heartbeat', 'Cancel', 0, 30)
+        progress_dialog.setWindowModality(QtCore.Qt.WindowModal)
+        progress_time = 0
 
-        self.connect_signal.emit(id)
+        def increment():
+            nonlocal progress_time
+            progress_time += 1
+            progress_dialog.setValue(progress_time)
+
+        comms = gcsComms(connection, partial(self.__disconnect_handler, idx))
+        model = MAVModel(comms, idx)
+
+        model.start(guiTickCallback=increment)
+
+        self.__register_model_callbacks(idx)
+        self.connect_signal.emit(idx)
 
     def connection_slot(self, id):
         '''
@@ -136,6 +155,7 @@ class GCS(QMainWindow):
         remaining connection work
         '''
         self.update_connections_label()
+        self.status_widget.update_gui_option_vars()
         self.system_settings_widget.connection_made()
         self.__mission_status_btn.setEnabled(True)
         self.__btn_export_all.setEnabled(True)
@@ -143,65 +163,48 @@ class GCS(QMainWindow):
         self.__btn_heat_map.setEnabled(True)
         self.__log.info('Connected {}'.format(id))
 
-    def __disconnect_handler(self, id):
-        mav_model = self._mav_models[id]
-        del self._mav_models[id]
-        if mav_model == self._mav_model:
-            self._mav_model = None
+    def __disconnect_handler(self, idx):
+        mav_model = MAVModel.get_model(idx=idx)
+        mav_model.stop()
+        self.disconnect_signal.emit(idx)
 
-        self.disconnect_signal.emit(id)
-
-    def disconnect_slot(self, id):
+    def disconnect_slot(self, idx):
         '''
         Handle GUI updates in main thread by connecting pyqt signal to the
         remaining disconnection work
         '''
-        if len(self._mav_models) == 0:
+        if len(MAVModel.current_models) == 0:
             self.system_settings_widget.disconnected()
             self.__mission_status_btn.setEnabled(False)
             self.__btn_export_all.setEnabled(False)
             self.__btn_precision.setEnabled(False)
             self.__btn_heat_map.setEnabled(False)
         self.update_connections_label()
-        self.__log.info('Disconnected {}'.format(id))
+        self.__log.info('Disconnected {}'.format(idx))
 
     def update_connections_label(self):
-        num_connections = len(self._mav_models)
+        num_connections = len(MAVModel.current_models)
         label = "System: No Connection"
         if num_connections == 1:
             label = "System: 1 Connection"
         elif num_connections > 1:
-            label = "System: {} Connections".format(num_connections)
+            label = f"System: {num_connections} Connections"
         self._system_connection_tab.update_text(label)
 
-    def __change_model(self, id: int):
+    def __change_model(self, idx: int):
         '''
         Changing the selected _mav_model
         '''
-        self._mav_model = self._mav_models[id]
+        MAVModel.active_model = idx
         self.system_settings_widget.connection_made()
 
     def __change_model_by_index(self, index: int):
         '''
         Changing the selected _mav_model by index
         '''
-        if index < 0 or index > len(self._mav_models):
-            return
-        try:
-            self.__change_model(list(self._mav_models.keys())[index])
-        except:
-            print('Failed to change Model to {}'.format(index))
-            self.__use_default_model()
-
-    def __use_default_model(self):
-        '''
-        Using the first model as the default if possible
-        '''
-        try:
-            if len(self._mav_models) > 0:
-                self.__change_model(list(self._mav_models.keys())[0])
-        except:
-            self._mav_model = None
+        if index not in MAVModel.current_models:
+            raise ValueError('Unknown model index')
+        MAVModel.active_model = index
 
     def mainloop(self, n=0):
         '''
@@ -234,11 +237,11 @@ class GCS(QMainWindow):
             button.config(state='disabled')
         self.user_popups.show_warning("No Heartbeats Received")
 
-    def __handle_new_estimate(self, id):
+    def __handle_new_estimate(self, idx):
         '''
         Internal callback to handle when a new estimate is received
         '''
-        mav_model = self._mav_models[id]
+        mav_model = MAVModel.get_model(idx=idx)
         freq_list = mav_model.EST_mgr.getFrequencies()
         for frequency in freq_list:
             params, stale, res = mav_model.EST_mgr.getEstimate(frequency)
@@ -246,7 +249,7 @@ class GCS(QMainWindow):
             zone, let = mav_model.EST_mgr.getUTMZone()
             coord = utm.to_latlon(params[0], params[1], zone, let)
 
-            num_pings = mav_model.EST_mgr.getnum_pings(frequency)
+            num_pings = mav_model.EST_mgr.getNumPings(frequency)
 
             if self.map_display is not None:
                 self.map_display.plot_estimate(coord, frequency)
@@ -258,11 +261,11 @@ class GCS(QMainWindow):
                 self.map_options.est_distance(coord, stale, res)
 
 
-    def __handle_new_ping(self, id):
+    def __handle_new_ping(self, idx):
         '''
         Internal callback to handle when a new ping is received
         '''
-        mav_model = self._mav_models[id]
+        mav_model = MAVModel.get_model(idx=idx)
         freq_list = mav_model.EST_mgr.getFrequencies()
         for frequency in freq_list:
             last = mav_model.EST_mgr.getPings(frequency)[-1].tolist()
@@ -274,11 +277,11 @@ class GCS(QMainWindow):
             if self.map_display is not None:
                 self.map_display.plot_ping(coord, power)
 
-    def __handle_vehicle_info(self, id):
+    def __handle_vehicle_info(self, idx):
         '''
         Internal Callback for Vehicle Info
         '''
-        mav_model = self._mav_models[id]
+        mav_model = MAVModel.get_model(idx=idx)
         if mav_model == None:
             return
         last = list(mav_model.state['VCL_track'])[-1]
@@ -287,13 +290,13 @@ class GCS(QMainWindow):
         mav_model.EST_mgr.addVehicleLocation(coord)
 
         if self.map_display is not None:
-            self.map_display.plot_vehicle(id, coord)
+            self.map_display.plot_vehicle(idx, coord)
 
-    def __handle_new_cone(self, id):
+    def __handle_new_cone(self, idx):
         '''
         Internal callback to handle new cone info
         '''
-        mav_model = self._mav_models[id]
+        mav_model = MAVModel.get_model(idx=idx)
         if mav_model == None:
             return
 
@@ -303,25 +306,29 @@ class GCS(QMainWindow):
         if self.map_display is not None:
             self.map_display.plot_cone(cone)
 
-    def __handle_remote_exception(self, id):
+    def __handle_remote_exception(self, idx):
         '''
         Internal callback for an exception message
         '''
-        mav_model = self._mav_models[id]
-        self.user_popups.show_warning('An exception has occured!\n%s\n%s' % (
+        mav_model = MAVModel.get_model(idx=idx)
+        UserPopups.show_warning('An exception has occured!\n%s\n%s' % (
             mav_model.lastException[0], mav_model.lastException[1]))
 
     def __start_stop_mission(self):
         # State machine for start recording -> stop recording
-        if self._mav_model == None:
+        try:
+            mav_model = MAVModel.get_model()
+        except NoActiveModel:
             return
+
+        self.__log.info('Start/Stop Recording pressed')
 
         if self.__mission_status_btn.text() == 'Start Recording':
             self.__mission_status_btn.setText('Stop Recording')
-            self._mav_model.startMission(timeout=self.default_timeout)
+            mav_model.startMission(timeout=self.default_timeout)
         else:
             self.__mission_status_btn.setText('Start Recording')
-            self._mav_model.stopMission(timeout=self.default_timeout)
+            mav_model.stopMission(timeout=self.default_timeout)
 
     def __update_status(self): # TODO: this isn't getting used and doesn't seem to work???
         '''
@@ -337,11 +344,11 @@ class GCS(QMainWindow):
         sw_status = self._mav_model.STS_sw_status
 
         sdr_map = {
-            self._mav_model.SDR_INIT_STATES.find_devices: ('SDR: Searching for devices', 'yellow'),
-            self._mav_model.SDR_INIT_STATES.wait_recycle: ('SDR: Recycling!', 'yellow'),
-            self._mav_model.SDR_INIT_STATES.usrp_probe: ('SDR: Initializing SDR', 'yellow'),
-            self._mav_model.SDR_INIT_STATES.rdy: ('SDR: Ready', 'green'),
-            self._mav_model.SDR_INIT_STATES.fail: ('SDR: Failed!', 'red')
+            SDR_INIT_STATES.find_devices: ('SDR: Searching for devices', 'yellow'),
+            SDR_INIT_STATES.wait_recycle: ('SDR: Recycling!', 'yellow'),
+            SDR_INIT_STATES.usrp_probe: ('SDR: Initializing SDR', 'yellow'),
+            SDR_INIT_STATES.rdy: ('SDR: Ready', 'green'),
+            SDR_INIT_STATES.fail: ('SDR: Failed!', 'red')
         }
 
         try:
@@ -352,12 +359,12 @@ class GCS(QMainWindow):
                 text='SDR: NULL', bg='red')
 
         dir_map = {
-            self._mav_model.OUTPUT_DIR_STATES.get_output_dir: ('DIR: Searching', 'yellow'),
-            self._mav_model.OUTPUT_DIR_STATES.check_output_dir: ('DIR: Checking for mount', 'yellow'),
-            self._mav_model.OUTPUT_DIR_STATES.check_space: ('DIR: Checking for space', 'yellow'),
-            self._mav_model.OUTPUT_DIR_STATES.wait_recycle: ('DIR: Recycling!', 'yellow'),
-            self._mav_model.OUTPUT_DIR_STATES.rdy: ('DIR: Ready', 'green'),
-            self._mav_model.OUTPUT_DIR_STATES.fail: ('DIR: Failed!', 'red'),
+            OUTPUT_DIR_STATES.get_output_dir: ('DIR: Searching', 'yellow'),
+            OUTPUT_DIR_STATES.check_output_dir: ('DIR: Checking for mount', 'yellow'),
+            OUTPUT_DIR_STATES.check_space: ('DIR: Checking for space', 'yellow'),
+            OUTPUT_DIR_STATES.wait_recycle: ('DIR: Recycling!', 'yellow'),
+            OUTPUT_DIR_STATES.rdy: ('DIR: Ready', 'green'),
+            OUTPUT_DIR_STATES.fail: ('DIR: Failed!', 'red'),
         }
 
         try:
@@ -367,11 +374,11 @@ class GCS(QMainWindow):
             self.dir_status_label.config(text='DIR: NULL', bg='red')
 
         gps_map = {
-            self._mav_model.GPS_STATES.get_tty: {'text': 'GPS: Getting TTY Device', 'bg': 'yellow'},
-            self._mav_model.GPS_STATES.get_msg: {'text': 'GPS: Waiting for message', 'bg': 'yellow'},
-            self._mav_model.GPS_STATES.wait_recycle: {'text': 'GPS: Recycling', 'bg': 'yellow'},
-            self._mav_model.GPS_STATES.rdy: {'text': 'GPS: Ready', 'bg': 'green'},
-            self._mav_model.GPS_STATES.fail: {
+            EXTS_STATES.get_tty: {'text': 'GPS: Getting TTY Device', 'bg': 'yellow'},
+            EXTS_STATES.get_msg: {'text': 'GPS: Waiting for message', 'bg': 'yellow'},
+            EXTS_STATES.wait_recycle: {'text': 'GPS: Recycling', 'bg': 'yellow'},
+            EXTS_STATES.rdy: {'text': 'GPS: Ready', 'bg': 'green'},
+            EXTS_STATES.fail: {
                 'text': 'GPS: Failed!', 'bg': 'red'}
         }
 
@@ -381,13 +388,13 @@ class GCS(QMainWindow):
             self.gps_status_label.config(text='GPS: NULL', bg='red')
 
         sys_map = {
-            self._mav_model.RCT_STATES.init: {'text': 'SYS: Initializing', 'bg': 'yellow'},
-            self._mav_model.RCT_STATES.wait_init: {'text': 'SYS: Initializing', 'bg': 'yellow'},
-            self._mav_model.RCT_STATES.wait_start: {'text': 'SYS: Ready for start', 'bg': 'green'},
-            self._mav_model.RCT_STATES.start: {'text': 'SYS: Starting', 'bg': 'blue'},
-            self._mav_model.RCT_STATES.wait_end: {'text': 'SYS: Running', 'bg': 'blue'},
-            self._mav_model.RCT_STATES.finish: {'text': 'SYS: Stopping', 'bg': 'blue'},
-            self._mav_model.RCT_STATES.fail: {'text': 'SYS: Failed!', 'bg': 'red'},
+            RCT_STATES.init: {'text': 'SYS: Initializing', 'bg': 'yellow'},
+            RCT_STATES.wait_init: {'text': 'SYS: Initializing', 'bg': 'yellow'},
+            RCT_STATES.wait_start: {'text': 'SYS: Ready for start', 'bg': 'green'},
+            RCT_STATES.start: {'text': 'SYS: Starting', 'bg': 'blue'},
+            RCT_STATES.wait_end: {'text': 'SYS: Running', 'bg': 'blue'},
+            RCT_STATES.finish: {'text': 'SYS: Stopping', 'bg': 'blue'},
+            RCT_STATES.fail: {'text': 'SYS: Failed!', 'bg': 'red'},
         }
 
         try:
@@ -407,19 +414,22 @@ class GCS(QMainWindow):
         Exports pings, vehcle path, and settings as json file
         '''
         final = {}
-
+        try:
+            mav_model = MAVModel.get_model()
+        except NoActiveModel:
+            pass
         if self.map_display is not None:
-            vehicle_path = self._mav_model.EST_mgr.getVehiclePath()
+            vehicle_path = mav_model.EST_mgr.getVehiclePath()
             ping_dict = {}
             vehicle_dict = {}
             ind_ping = 0
             ind_path = 0
-            freq_list = self._mav_model.EST_mgr.getFrequencies()
+            freq_list = mav_model.EST_mgr.getFrequencies()
             for frequency in freq_list:
-                pings = self._mav_model.EST_mgr.getPings(frequency)
+                pings = mav_model.EST_mgr.getPings(frequency)
                 for ping_array in pings:
                     ping_list = ping_array.tolist()
-                    zone, let = self._mav_model.EST_mgr.getUTMZone()
+                    zone, let = mav_model.EST_mgr.getUTMZone()
                     u = (ping_list[0], ping_list[1], zone, let)
                     coord = utm.to_latlon(*u)
                     amp = ping_list[3]
@@ -449,24 +459,24 @@ class GCS(QMainWindow):
 
             final['System Settings'] = option_dict
 
-        if self._mav_model is not None:
-            var_dict = self._mav_model.state
-            new_var_dict = {}
 
-            for key in var_dict.keys():
-                if ((key == 'STS_sdr_status') or (key == 'STS_dir_status') or
-                    (key == 'STS_gps_status') or (key == 'STS_sys_status')):
-                    temp = {}
-                    temp['name'] = var_dict[key].name
-                    temp['value'] = var_dict[key].value
-                    new_var_dict[key] = temp
-                elif(key == 'VCL_track'):
-                    pass
-                else:
-                    new_var_dict[key] = var_dict[key]
+        var_dict = mav_model.state
+        new_var_dict = {}
+
+        for key in var_dict.keys():
+            if ((key == 'STS_sdr_status') or (key == 'STS_dir_status') or
+                (key == 'STS_gps_status') or (key == 'STS_sys_status')):
+                temp = {}
+                temp['name'] = var_dict[key].name
+                temp['value'] = var_dict[key].value
+                new_var_dict[key] = temp
+            elif(key == 'VCL_track'):
+                pass
+            else:
+                new_var_dict[key] = var_dict[key]
 
 
-            final['States'] = new_var_dict
+        final['States'] = new_var_dict
 
         with open('data.json', 'w') as outfile:
             json.dump(final, outfile)
@@ -495,11 +505,7 @@ class GCS(QMainWindow):
                     (lat2, lon2)
                 )
 
-        for id in self._mav_models:
-            mav_model = self._mav_models[id]
-            mav_model.stop()
-        self._mav_models = {}
-        self._mav_model = None
+        MAVModel.close_all()
         if self._transport is not None and self._transport.isOpen():
             self._transport.close()
         self._transport = None
@@ -509,18 +515,17 @@ class GCS(QMainWindow):
         '''
         Internal callback to connect GCS to drone
         '''
-        connection_dialog = ConnectionDialog(self.port_val, self)
+        current_spec = get_instance().connection_spec
+        connection_dialog = ConnectionDialog(transport_spec=current_spec)
         connection_dialog.exec_()
 
-        if connection_dialog.port_val is None or \
-            (connection_dialog.port_val == self.port_val and \
-            len(self._mav_models) > 1):
+        if connection_dialog.transport_spec is None or \
+            (connection_dialog.transport_spec == current_spec and \
+            len(MAVModel.current_models) > 1):
             return
 
-        self.port_val = connection_dialog.port_val
-        if self.config.connection_mode == ConnectionMode.DRONE:
-            self.addr_val = connection_dialog.addr_val
-        self.__start_transport()
+        self.__start_transport(connection_dialog.transport_spec)
+        get_instance().connection_spec = connection_dialog.transport_spec
 
     def __handle_config_input(self):
         '''
@@ -541,28 +546,28 @@ class GCS(QMainWindow):
         '''
         Internal helper to make GUI widgets
         '''
-        holder = QGridLayout()
-        centr_widget = QFrame()
+        holder = QtWidgets.QGridLayout()
+        centr_widget = QtWidgets.QFrame()
         self.setCentralWidget(centr_widget)
 
         self.setWindowTitle('RCT GCS')
-        frm_side_control = QScrollArea()
+        frm_side_control = QtWidgets.QScrollArea()
 
-        content = QWidget()
+        content = QtWidgets.QWidget()
         frm_side_control.setWidget(content)
         frm_side_control.setWidgetResizable(True)
 
         #wlay is the layout that holds all tabs
-        wlay = QVBoxLayout(content)
+        wlay = QtWidgets.QVBoxLayout(content)
 
         # SYSTEM TAB
         self._system_connection_tab = CollapseFrame(title='System: No Connection')
         self._system_connection_tab.resize(self.sb_width, 400)
-        lay_sys = QVBoxLayout()
-        btn_setup = QPushButton("Connection Settings")
+        lay_sys = QtWidgets.QVBoxLayout()
+        btn_setup = QtWidgets.QPushButton("Connection Settings")
         btn_setup.resize(self.sb_width, 100)
         btn_setup.clicked.connect(self.__handle_connect_input)
-        self.model_select = QComboBox()
+        self.model_select = QtWidgets.QComboBox()
         self.model_select.resize(self.sb_width, 100)
         self.model_select.currentIndexChanged.connect(self.__change_model_by_index)
         self.model_select.hide()
@@ -583,7 +588,7 @@ class GCS(QMainWindow):
         # SYSTEM SETTINGS
         self.system_settings_widget = SystemSettingsControl(self)
         self.system_settings_widget.resize(self.sb_width, 400)
-        scroll_area = QScrollArea()
+        scroll_area = QtWidgets.QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setWidget(self.system_settings_widget)
 
@@ -593,11 +598,11 @@ class GCS(QMainWindow):
         # CONFIG TAB
         self._config_tab = CollapseFrame(title='Configuration Settings')
         self._config_tab.resize(self.sb_width, 400)
-        lay_config = QVBoxLayout()
-        btn_config = QPushButton("Edit Configuration Settings")
+        lay_config = QtWidgets.QVBoxLayout()
+        btn_config = QtWidgets.QPushButton("Edit Configuration Settings")
         btn_config.resize(self.sb_width, 100)
         btn_config.clicked.connect(self.__handle_config_input)
-        self.config_select = QComboBox()
+        self.config_select = QtWidgets.QComboBox()
         self.config_select.resize(self.sb_width, 100)
         self.config_select.hide()
         lay_config.addWidget(btn_config)
@@ -606,19 +611,19 @@ class GCS(QMainWindow):
         self._config_tab.set_content_layout(lay_config)
 
         # START PAYLOAD RECORDING
-        self.__mission_status_btn = QPushButton(self.__mission_status_text)
+        self.__mission_status_btn = QtWidgets.QPushButton(self.__mission_status_text)
         self.__mission_status_btn.setEnabled(False)
         self.__mission_status_btn.clicked.connect(self.__start_stop_mission)
 
-        self.__btn_export_all = QPushButton('Export Info')
+        self.__btn_export_all = QtWidgets.QPushButton('Export Info')
         self.__btn_export_all.setEnabled(False)
         self.__btn_export_all.clicked.connect(self.export_all)
 
-        self.__btn_precision = QPushButton('Do Precision')
+        self.__btn_precision = QtWidgets.QPushButton('Do Precision')
         self.__btn_precision.setEnabled(False)
         self.__btn_precision.clicked.connect(self.__do_precision)
 
-        self.__btn_heat_map = QPushButton('Display Heatmap')
+        self.__btn_heat_map = QtWidgets.QPushButton('Display Heatmap')
         self.__btn_heat_map.setEnabled(False)
         self.__btn_heat_map.clicked.connect(self.__do_display_heatmap)
 
@@ -636,8 +641,8 @@ class GCS(QMainWindow):
         wlay.addStretch()
         content.resize(self.sb_width, 400)
         frm_side_control.setMinimumWidth(self.sb_width)
-        holder.addWidget(frm_side_control, 0, 0, alignment=Qt.AlignLeft)
-        holder.addWidget(self.map_options, 0, 4, alignment=Qt.AlignTop)
+        holder.addWidget(frm_side_control, 0, 0, alignment=QtCore.Qt.AlignLeft)
+        holder.addWidget(self.map_options, 0, 4, alignment=QtCore.Qt.AlignTop)
         centr_widget.setLayout(holder)
         self.resize(1800, 1100)
         self.show()
@@ -674,7 +679,6 @@ class UpgradeDisplay(CollapseFrame):
         self.file_name = None
 
         self.__create_widget()
-        self.user_pops = UserPopups()
 
     def update(self):
         self.update_gui_option_vars()
@@ -683,19 +687,19 @@ class UpgradeDisplay(CollapseFrame):
         '''
         Inner function to create internal widgets
         '''
-        self.__inner_frame = QGridLayout()
+        self.__inner_frame = QtWidgets.QGridLayout()
 
-        file_lbl = QLabel('Selected File:')
+        file_lbl = QtWidgets.QLabel('Selected File:')
         self.__inner_frame.addWidget(file_lbl, 1, 0)
 
-        self.file_name = QLineEdit()
+        self.file_name = QtWidgets.QLineEdit()
         self.__inner_frame.addWidget(self.file_name, 1, 1)
 
-        browse_file_btn = QPushButton('Browse for Upgrade File')
+        browse_file_btn = QtWidgets.QPushButton('Browse for Upgrade File')
         browse_file_btn.clicked.connect(self.file_dialog)
         self.__inner_frame.addWidget(browse_file_btn, 2, 0)
 
-        upgrade_btn = QPushButton('Upgrade')
+        upgrade_btn = QtWidgets.QPushButton('Upgrade')
         upgrade_btn.clicked.connect(self.send_upgrade_file)
         self.__inner_frame.addWidget(upgrade_btn, 3, 0)
 
@@ -706,7 +710,7 @@ class UpgradeDisplay(CollapseFrame):
         '''
         Opens a dialog to allow the user to indicate a file
         '''
-        file_name = QFileDialog.getOpenFileName()
+        file_name = QtWidgets.QFileDialog.getOpenFileName()
         if file_name is None:
             return
         self.file_name.setText(file_name[0])
@@ -751,12 +755,12 @@ class StatusDisplay(CollapseFrame):
         '''
         Inner funciton to create internal widgets
         '''
-        self.__inner_frame = QGridLayout()
+        self.__inner_frame = QtWidgets.QGridLayout()
 
-        lbl_overall_status = QLabel('Status:')
+        lbl_overall_status = QtWidgets.QLabel('Status:')
         self.__inner_frame.addWidget(lbl_overall_status, 1, 0)
 
-        entr_overall_status = QLabel('')
+        entr_overall_status = QtWidgets.QLabel('')
         self.__inner_frame.addWidget(entr_overall_status, 1, 1)
 
         self.component_status_widget = ComponentStatusDisplay(root=self.__root)
@@ -772,7 +776,8 @@ class StatusDisplay(CollapseFrame):
         self.set_content_layout(self.__inner_frame)
 
     def update_gui_option_vars(self, scope=0):
-        var_dict = self.__root._mav_model.state
+        mav_model = MAVModel.get_model()
+        var_dict = mav_model.state
 
         sdr_status = var_dict["STS_sdr_status"]
         dir_status = var_dict["STS_dir_status"]
@@ -780,24 +785,24 @@ class StatusDisplay(CollapseFrame):
         sys_status = var_dict["STS_sys_status"]
         sw_status = var_dict["STS_sw_status"]
 
-        if sys_status == rctCore.RCT_STATES.finish:
+        if sys_status == RCT_STATES.finish:
             self.status_label.setText('Stopping')
             self.status_label.setStyleSheet("background-color: red")
-        elif sdr_status == rctCore.SDR_INIT_STATES.fail or \
-            dir_status == rctCore.OUTPUT_DIR_STATES.fail or \
-            gps_status == rctCore.EXTS_STATES.fail or \
-            sys_status == rctCore.RCT_STATES.fail or \
+        elif sdr_status == SDR_INIT_STATES.fail or \
+            dir_status == OUTPUT_DIR_STATES.fail or \
+            gps_status == EXTS_STATES.fail or \
+            sys_status == RCT_STATES.fail or \
             (sw_status != 0 and sw_status != 1):
             self.status_label.setText('Failed')
             self.status_label.setStyleSheet("background-color: red")
-        elif sys_status == rctCore.RCT_STATES.start or \
-            sys_status == rctCore.RCT_STATES.wait_end:
+        elif sys_status == RCT_STATES.start or \
+            sys_status == RCT_STATES.wait_end:
             self.status_label.setText('Running')
             self.status_label.setStyleSheet("background-color: green")
-        elif sdr_status == rctCore.SDR_INIT_STATES.rdy and \
-            dir_status == rctCore.OUTPUT_DIR_STATES.rdy and \
-            gps_status == rctCore.EXTS_STATES.rdy and \
-            sys_status == rctCore.RCT_STATES.wait_start and sw_status == 1:
+        elif sdr_status == SDR_INIT_STATES.rdy and \
+            dir_status == OUTPUT_DIR_STATES.rdy and \
+            gps_status == EXTS_STATES.rdy and \
+            sys_status == RCT_STATES.wait_start and sw_status == 1:
             self.status_label.setText('Idle')
             self.status_label.setStyleSheet("background-color: yellow")
         else:
@@ -818,7 +823,6 @@ class ComponentStatusDisplay(CollapseFrame):
             root: The application root
         '''
         CollapseFrame.__init__(self, 'Component Statuses')
-        self.user_pops = UserPopups()
         self.sdr_map = {
             "SDR_INIT_STATES.find_devices": {'text': 'SDR: Searching for devices', 'bg':'yellow'},
             "SDR_INIT_STATES.wait_recycle": {'text':'SDR: Recycling!', 'bg':'yellow'},
@@ -879,36 +883,36 @@ class ComponentStatusDisplay(CollapseFrame):
         '''
         Inner Function to create internal widgets
         '''
-        self.inner_frame = QGridLayout()
+        self.inner_frame = QtWidgets.QGridLayout()
 
-        lbl_sdr_status = QLabel('SDR Status')
+        lbl_sdr_status = QtWidgets.QLabel('SDR Status')
         self.inner_frame.addWidget(lbl_sdr_status, 1, 0)
 
-        lbl_dir_status = QLabel('Storage Status')
+        lbl_dir_status = QtWidgets.QLabel('Storage Status')
         self.inner_frame.addWidget(lbl_dir_status, 2, 0)
 
-        lbl_gps_status = QLabel('GPS Status')
+        lbl_gps_status = QtWidgets.QLabel('GPS Status')
         self.inner_frame.addWidget(lbl_gps_status, 3, 0)
 
-        lbl_sys_status = QLabel('System Status')
+        lbl_sys_status = QtWidgets.QLabel('System Status')
         self.inner_frame.addWidget(lbl_sys_status, 4, 0)
 
-        lbl_sw_status = QLabel('Software Status')
+        lbl_sw_status = QtWidgets.QLabel('Software Status')
         self.inner_frame.addWidget(lbl_sw_status, 5, 0)
 
-        entr_sdr_status = QLabel('')
+        entr_sdr_status = QtWidgets.QLabel('')
         self.inner_frame.addWidget(entr_sdr_status, 1, 1)
 
-        entr_dir_status = QLabel('')
+        entr_dir_status = QtWidgets.QLabel('')
         self.inner_frame.addWidget(entr_dir_status, 2, 1)
 
-        entr_gps_status = QLabel('')
+        entr_gps_status = QtWidgets.QLabel('')
         self.inner_frame.addWidget(entr_gps_status, 3, 1)
 
-        entr_sys_status = QLabel('')
+        entr_sys_status = QtWidgets.QLabel('')
         self.inner_frame.addWidget(entr_sys_status, 4, 1)
 
-        entr_sw_status = QLabel('')
+        entr_sw_status = QtWidgets.QLabel('')
         self.inner_frame.addWidget(entr_sw_status, 5, 1)
 
         self.status_labels["STS_sdr_status"] = entr_sdr_status
@@ -919,7 +923,8 @@ class ComponentStatusDisplay(CollapseFrame):
         self.set_content_layout(self.inner_frame)
 
     def update_gui_option_vars(self, scope=0):
-        var_dict = self.__root._mav_model.state
+        mav_model = MAVModel.get_model()
+        var_dict = mav_model.state
         for var_name, var_value in var_dict.items():
             try:
                 if var_name in self.comp_dict:
@@ -949,57 +954,56 @@ class MapControl(CollapseFrame):
         self.__lat_entry = None
         self.__lon_entry = None
         self.__zoom_entry = None
-        self.user_pops = UserPopups()
         self.__create_widgets()
 
     def __create_widgets(self):
         '''
         Internal function to create widgets
         '''
-        control_panel_holder = QScrollArea()
-        content = QWidget()
+        control_panel_holder = QtWidgets.QScrollArea()
+        content = QtWidgets.QWidget()
 
         control_panel_holder.setWidget(content)
         control_panel_holder.setWidgetResizable(True)
 
-        control_panel = QVBoxLayout(content)
+        control_panel = QtWidgets.QVBoxLayout(content)
         control_panel.addStretch()
 
-        self.__map_frame = QWidget()
+        self.__map_frame = QtWidgets.QWidget()
         self.__map_frame.resize(800, 500)
         self.__holder.addWidget(self.__map_frame, 0, 0, 1, 3)
-        btn_load_map = QPushButton('Load Map')
+        btn_load_map = QtWidgets.QPushButton('Load Map')
         btn_load_map.clicked.connect(self.__load_map_file)
         control_panel.addWidget(btn_load_map)
 
-        frm_load_web_map = QLabel('Load WebMap')
+        frm_load_web_map = QtWidgets.QLabel('Load WebMap')
         control_panel.addWidget(frm_load_web_map)
-        lay_load_web_map = QGridLayout()
-        lay_load_web_map_holder = QVBoxLayout()
+        lay_load_web_map = QtWidgets.QGridLayout()
+        lay_load_web_map_holder = QtWidgets.QVBoxLayout()
         lay_load_web_map_holder.addStretch()
 
 
-        lbl_p1 = QLabel('Lat/Long NW Point')
+        lbl_p1 = QtWidgets.QLabel('Lat/Long NW Point')
         lay_load_web_map.addWidget(lbl_p1, 0, 0)
 
-        self.__p1_lat_entry = QLineEdit()
+        self.__p1_lat_entry = QtWidgets.QLineEdit()
         lay_load_web_map.addWidget(self.__p1_lat_entry, 0, 1)
-        self.__p1_lon_entry = QLineEdit()
+        self.__p1_lon_entry = QtWidgets.QLineEdit()
         lay_load_web_map.addWidget(self.__p1_lon_entry, 0, 2)
 
-        lbl_p2 = QLabel('Lat/Long SE Point')
+        lbl_p2 = QtWidgets.QLabel('Lat/Long SE Point')
         lay_load_web_map.addWidget(lbl_p2, 1, 0)
 
-        self.__p2_lat_entry = QLineEdit()
+        self.__p2_lat_entry = QtWidgets.QLineEdit()
         lay_load_web_map.addWidget(self.__p2_lat_entry, 1, 1)
-        self.__p2_lon_entry = QLineEdit()
+        self.__p2_lon_entry = QtWidgets.QLineEdit()
         lay_load_web_map.addWidget(self.__p2_lon_entry, 1, 2)
 
-        btn_load_web_map = QPushButton('Load from Web')
+        btn_load_web_map = QtWidgets.QPushButton('Load from Web')
         btn_load_web_map.clicked.connect(self.__load_web_map)
         lay_load_web_map.addWidget(btn_load_web_map, 3, 1, 1, 2)
 
-        btn_load_cached_map = QPushButton('Load from Cache')
+        btn_load_cached_map = QtWidgets.QPushButton('Load from Cache')
         btn_load_cached_map.clicked.connect(self.__load_cached_map)
         lay_load_web_map.addWidget(btn_load_cached_map, 4, 1, 1, 2)
 
@@ -1007,24 +1011,6 @@ class MapControl(CollapseFrame):
         control_panel.addLayout(lay_load_web_map)
 
         self.set_content_layout(control_panel)
-
-    def __coords_from_config(self):
-        '''
-        Internal function to pull past coordinates from the config
-        file if they exist
-        '''
-        config_path = get_config_path()
-        config = configparser.ConfigParser()
-        config.read(config_path)
-        try:
-            lat1 = config['LastCoords']['lat1']
-            lon1 = config['LastCoords']['lon1']
-            lat2 = config['LastCoords']['lat2']
-            lon2 = config['LastCoords']['lon2']
-            return lat1, lon1, lat2, lon2
-        except KeyError:
-            self.user_pops.show_warning("Could not read config path", config_path)
-            return None, None, None, None
 
     def __init_lat_lon(self):
         lat1 = self.__p1_lat_entry.text()

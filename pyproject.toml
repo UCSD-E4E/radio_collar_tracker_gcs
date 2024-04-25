@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "rctgcs"
+name = "RctGcs"
 version = "0.1.0"
 description = ""
 authors = ["Nathan Hui <nthui@eng.ucsd.edu>"]
@@ -28,6 +28,8 @@ coverage = "^7.2.1"
 pylint = "^2.16.2"
 wheel = "^0.38.4"
 PyAutoGUI = "^0.9.53"
+pytest-qt = "^4.2.0"
+pyqt5-stubs = "^5.15.6.0"
 
 [tool.poetry.scripts]
 RCTGcs = 'RctGcs.rctGCS:main'

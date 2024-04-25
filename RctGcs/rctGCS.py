@@ -75,10 +75,9 @@ from RctGcs.config import (application_directories, get_config_path,
                            get_instance)
 from RctGcs.ui.display import GCS
 from RctGcs.ui.popups import UserPopups
+from RctGcs.utils import fix_conda_path
 
-if 'CONDA_PREFIX' in os.environ:
-    sys.path.insert(0, Path(sys.executable).parent.joinpath("Library", "python", "plugins").as_posix())
-    sys.path.insert(0, Path(sys.executable).parent.joinpath("Library", "python").as_posix())
+fix_conda_path()
 from qgis.core import *
 from qgis.gui import *
 from qgis.utils import *
@@ -104,8 +103,7 @@ def configSetup() -> Path:
 
 
 def main():
-    start_timestamp = dt.datetime.now()
-    log_file = start_timestamp.strftime('%Y.%m.%d.%H.%M.%S_gcs.log')
+    log_file = 'gcs.log'
     log_path = Path(application_directories.user_log_dir, log_file)
     log_path.parent.mkdir(exist_ok=True, parents=True)
     logger = logging.getLogger()
@@ -114,7 +112,7 @@ def main():
     ch.setLevel(logging.WARNING)
     formatter = logging.Formatter(
         '%(asctime)s.%(msecs)03d: %(levelname)s:%(name)s: %(message)s', 
-        datefmt='%Y-%M-%d %H:%m:%S')
+        datefmt='%Y-%m-%d %H:%M:%S')
     ch.setFormatter(formatter)
     logger.addHandler(ch)
     ch = logging.FileHandler(log_path)

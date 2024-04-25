@@ -1,20 +1,23 @@
 from pathlib import Path
-from typing import Any, List
+from typing import Any, Dict, List, Optional
 
 from PyQt5.QtCore import QRegExp, Qt, QTimer
 from PyQt5.QtGui import QRegExpValidator
-from PyQt5.QtWidgets import *
-from RCTComms.comms import gcsComms
-from RCTComms.transport import RCTTCPClient, RCTTCPServer
+from PyQt5.QtWidgets import (QButtonGroup, QCheckBox, QGridLayout, QHBoxLayout,
+                             QLabel, QLineEdit, QMessageBox, QPushButton,
+                             QRadioButton, QVBoxLayout, QWizard, QWizardPage)
 
 from RctGcs.config import ConnectionMode, get_config_path, get_instance
+from RctGcs.rctCore import Options
+from RctGcs.ui.option_vars import option_var_table, update_option_var_widgets
 
 
 class UserPopups:
     """
     Creates popup boxes for user display
     """
-    def create_text_box(self, name: str, text: str) -> Any:
+    @classmethod
+    def create_text_box(cls, name: str, text: str) -> Any:
         '''
         Params:
             name: takes a sting that is the name of the text box
@@ -37,7 +40,8 @@ class UserPopups:
         form.addWidget(line,0,1)
         return form, line
 
-    def create_binary_radio_button(self, name: str, labels_list: List[str], condition: bool):
+    @classmethod
+    def create_binary_radio_button(cls, name: str, labels_list: List[str], condition: bool):
         '''
         Creates a binary radio button box. The box will only have two
             options to select and will check according to a boolean condition
@@ -69,7 +73,8 @@ class UserPopups:
         form.addWidget(false_event,0,0,Qt.AlignCenter)
         return form, true_event
 
-    def show_warning(self, text: str, title: str ="Warning"):
+    @classmethod
+    def show_warning(cls, text: str, title: str ="Warning"):
         '''
         Creates warning popups
         Args:
@@ -84,7 +89,8 @@ class UserPopups:
         msg.addButton(QMessageBox.Ok)
         msg.exec_()
 
-    def show_timed_warning(self, text: str, timeout: int, title: str ="Warning"):
+    @classmethod
+    def show_timed_warning(cls, text: str, timeout: int, title: str ="Warning"):
         '''
         Creates timed warning popups
         Args:
@@ -109,14 +115,14 @@ class ExpertSettingsDialog(QWizard):
     A Custom Dialog Widget to facilitate user input for expert
     settings
     '''
-    def __init__(self, parent, option_vars):
+    def __init__(self, parent, option_vars: Dict[Options, Any]):
         '''
         Creates a new ExpertSettingsDialog
         Args:
             parent: the parent widget of the dialog
             optionVars: Dictionary object of option variables
         '''
-        super(ExpertSettingsDialog, self).__init__(parent)
+        super().__init__(parent)
         self.parent = parent
         self.addPage(ExpertSettingsDialogPage(self, option_vars))
         self.setWindowTitle('Expert/Engineering Settings')
@@ -127,20 +133,20 @@ class ExpertSettingsDialogPage(QWizardPage):
     Custom DialogPage widget to facilitate user configured
     expert settings.
     '''
-    def __init__(self, parent=None, option_vars=None):
+    def __init__(self, parent, option_vars: Dict[Options, Any]):
         '''
         Creates a new ExpertSettingsDialogPage object
         Args:
             parent: An ExpertSettingsDialog object
             optionVars: Dictionary object of option variables
         '''
-        super(ExpertSettingsDialogPage, self).__init__(parent)
+        super().__init__(parent)
         self.__parent = parent
         self.option_vars = option_vars
         self.user_pops = UserPopups()
         self.create_widget()
         # Configure member vars here
-        self.__parent.parent.updateGUIOptionVars(0xFF, self.option_vars)
+        update_option_var_widgets()
 
     def create_widget(self):
         '''
@@ -148,63 +154,27 @@ class ExpertSettingsDialogPage(QWizardPage):
         '''
         exp_settings_frame = QGridLayout()
 
-        lbl_ping_width = QLabel('Expected Ping Width(ms)')
-        exp_settings_frame.addWidget(lbl_ping_width, 0, 0)
+        option_list = [
+            Options.DSP_PING_WIDTH,
+            Options.DSP_PING_MIN,
+            Options.DSP_PING_MAX,
+            Options.DSP_PING_SNR,
+            Options.GPS_DEVICE,
+            Options.GPS_BAUD,
+            Options.GPS_MODE,
+            Options.SYS_OUTPUT_DIR,
+            Options.SYS_AUTOSTART,
+        ]
 
-        lbl_min_width_mult = QLabel('Min. Width Multiplier')
-        exp_settings_frame.addWidget(lbl_min_width_mult, 1, 0)
+        for idx, opt in enumerate(option_list):
+            label, widget = option_var_table[opt].make_pair(self)
+            exp_settings_frame.addWidget(label, idx, 0)
+            exp_settings_frame.addWidget(widget, idx, 1)
 
-        lbl_max_width_mult = QLabel('Max. Width Multiplier')
-        exp_settings_frame.addWidget(lbl_max_width_mult, 2, 0)
-
-        lbl_min_ping_snr = QLabel('Min. Ping SNR(dB)')
-        exp_settings_frame.addWidget(lbl_min_ping_snr, 3, 0)
-
-        lbl_gps_port = QLabel('GPS Port')
-        exp_settings_frame.addWidget(lbl_gps_port, 4, 0)
-
-        lbl_gps_baud_rate = QLabel('GPS Baud Rate')
-        exp_settings_frame.addWidget(lbl_gps_baud_rate, 5, 0)
-
-        lbl_output_dir = QLabel('Output Directory')
-        exp_settings_frame.addWidget(lbl_output_dir, 6, 0)
-
-        lbl_gps_mode = QLabel('GPS Mode')
-        exp_settings_frame.addWidget(lbl_gps_mode, 7, 0)
-
-        lbl_sys_auto_start = QLabel("SYS Autostart")
-        exp_settings_frame.addWidget(lbl_sys_auto_start, 8, 0)
-
-        self.option_vars['DSP_pingWidth'] = QLineEdit()
-        exp_settings_frame.addWidget(self.option_vars['DSP_pingWidth'], 0, 1)
-
-        self.option_vars['DSP_pingMin'] = QLineEdit()
-        exp_settings_frame.addWidget(self.option_vars['DSP_pingMin'], 1, 1)
-
-        self.option_vars['DSP_pingMax'] = QLineEdit()
-        exp_settings_frame.addWidget(self.option_vars['DSP_pingMax'], 2, 1)
-
-        self.option_vars['DSP_pingSNR'] = QLineEdit()
-        exp_settings_frame.addWidget(self.option_vars['DSP_pingSNR'], 3, 1)
-
-        self.option_vars['GPS_device'] = QLineEdit()
-        exp_settings_frame.addWidget(self.option_vars['GPS_device'], 4, 1)
-
-        self.option_vars['GPS_baud'] = QLineEdit()
-        exp_settings_frame.addWidget(self.option_vars['GPS_baud'], 5, 1)
-
-        self.option_vars['SYS_outputDir'] = QLineEdit()
-        exp_settings_frame.addWidget(self.option_vars['SYS_outputDir'], 6, 1)
-
-        self.option_vars['GPS_mode'] = QLineEdit()
-        exp_settings_frame.addWidget(self.option_vars['GPS_mode'], 7, 1)
-
-        self.option_vars['SYS_autostart'] = QLineEdit()
-        exp_settings_frame.addWidget(self.option_vars['SYS_autostart'], 8, 1)
 
         btn_submit = QPushButton('submit')
         btn_submit.clicked.connect(self.submit)
-        exp_settings_frame.addWidget(btn_submit, 9, 0, 1, 2)
+        exp_settings_frame.addWidget(btn_submit, len(option_list) + 1, 0, 1, 2)
 
         self.setLayout(exp_settings_frame)
 
@@ -319,45 +289,40 @@ class ConnectionDialog(QWizard):
     '''
     Custom Dialog widget to facilitate connecting to the drone
     '''
-    def __init__(self, port_val, parent):
+    def __init__(self, transport_spec: Optional[str] = None):
         '''
         Creates new ConnectionDialog widget
         Args:
             port_val: the port value used
         '''
         super(ConnectionDialog, self).__init__()
-        self.parent = parent
         self.setWindowTitle('Connect Settings')
-        self.page = ConnectionDialogPage(port_val, self)
-        self.port_val = port_val
-        self.addr_val = None
+        self.page = ConnectionDialogPage(transport_spec=transport_spec)
+        self.transport_spec = None
         self.addPage(self.page)
-        self.resize(640,480)
+        self.resize(320, 120)    # width, height
         self.button(QWizard.FinishButton).clicked.connect(self.submit)
 
     def submit(self):
         '''
         Internal Function to submit user inputted connection settings
         '''
-        self.port_val = int(self.page.port_entry.text())
-        if self.parent.config.connection_mode == ConnectionMode.DRONE:
-            self.addr_val = self.page.addr_entry.text()
+        self.transport_spec = self.page.port_entry.text()
 
 class ConnectionDialogPage(QWizardPage):
     '''
     Custom DialogPage widget - Allows the user to configure
     settings to connect to the drone
     '''
-    def __init__(self, port_val, parent):
+    def __init__(self, transport_spec: Optional[str] = None):
         '''
         Creates a new ConnectionDialogPage
         Args:
             port_val: The port value used
         '''
         super(ConnectionDialogPage, self).__init__()
-        self.__port_entry_val = port_val # default value
+        self.__transport_spec_val = transport_spec # default value
         self.port_entry = None # default value
-        self.__parent = parent
         self.__create_widget()
 
     def __create_widget(self):
@@ -366,40 +331,18 @@ class ConnectionDialogPage(QWizardPage):
         '''
         frm_holder = QVBoxLayout()
         frm_holder.addStretch(1)
-        #-----
-        frm_con_type = QHBoxLayout()
-        frm_con_type.addStretch(1)
 
-        lbl_con_type = QLabel('Connection Type:')
-        frm_con_type.addWidget(lbl_con_type)
-
-        btn_tcp = QCheckBox('TCP')
-        frm_con_type.addWidget(btn_tcp)
-        #-----
         frm_port = QHBoxLayout()
         frm_port.addStretch(1)
 
-        lbl_port = QLabel('Port')
+        lbl_port = QLabel('Connection Specifier')
         frm_port.addWidget(lbl_port)
 
         self.port_entry = QLineEdit()
-        self.port_entry.setText(str(self.__port_entry_val))
+        self.port_entry.setText(self.__transport_spec_val)
         frm_port.addWidget(self.port_entry)
 
-        if self.__parent.parent.config.connection_mode == ConnectionMode.DRONE:
-            frm_addr = QHBoxLayout()
-            frm_addr.addStretch(1)
-
-            lbl_addr = QLabel('Address')
-            frm_addr.addWidget(lbl_addr)
-            self.addr_entry = QLineEdit()
-            self.addr_entry.setText('127.0.0.1')
-            frm_addr.addWidget(self.addr_entry)
-
-            frm_holder.addLayout(frm_addr)
-
         frm_holder.addLayout(frm_port)
-        frm_holder.addLayout(frm_con_type)
         self.setLayout(frm_holder)
 
 class ConfigDialog(QWizard):
