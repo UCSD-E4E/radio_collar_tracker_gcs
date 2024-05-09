@@ -1,31 +1,36 @@
 # RCT GCS
 This is the redevelopment of the Radio Telemetry Tracker Ground Control Station
-from v1.0.  Working branch v1.0a, becomes v2.0 on release
+from v1.0. Working branch v1.0a, becomes v2.0 on release
 
-## Installation on Ubuntu (18.04+) and Windows 10+
+## Installation on Ubuntu (18.04+)
 1.  [Install Miniconda](https://docs.conda.io/en/latest/miniconda.html)
 2.  Download this repository
 3.  Navigate to the `radio_collar_tracker_gcs` project in a python capable terminal
-4.  Run `conda create --name rctGCS --file conda-[os].lock`
+4.  Run `conda create --name rctGCS --file conda-linux.lock`
 5.  Run `conda activate rctGCS`
 6.  Run `poetry install`
+7.  Set the `_CONDA_ROOT` environment variable by echoing it into your `.bashrc` file. Replace `/path/to/miniconda3` with your actual Miniconda installation path:
+    ```bash
+    echo 'export _CONDA_ROOT=/path/to/miniconda3' >> ~/.bashrc
+    ```
+8.  Source your `.bashrc` to apply the changes:
+    ```bash
+    source ~/.bashrc
+    ```
+
+## Installation on Windows 10+
+1.  [Install Miniconda](https://docs.conda.io/en/latest/miniconda.html)
+2.  Navigatte to conda bin (likey at `C:\Users\<user>\anaconda3\condabin`) and run `.\conda init`.
+3.  Run `Set-ExecutionPolicy RemoteSigned`
+4.  Download this repository
+5.  Navigate to the `radio_collar_tracker_gcs` project in a python capable terminal
+6.  Run `conda create --name rctGCS --file conda-win.lock`
+7.  Run `conda activate rctGCS`
+8.  Run `poetry install`
 
 ## Running `rctGCS`
 1.  From the command line, run `conda activate rctGCS`
 2.  Run `RCTGcs`
-    
-## Running the simulator for GCS
-1. Run `rctGCS` with the following commands:
-    - `conda activate rctGCS`
-    - `RCTGcs`
-    This should open up the rctGCS UI
-2. Create a new terminal instance and run the following commands:
-    - `conda activate rctGCS`
-    - `droneSimulator --protocol tcp`
-    - `ipython>>> sim.start()`
-3. From the rctGCS UI, navigate to the "System: No Connection" tab --> "Connect" --> "Done"
-4. Switch back to the `ipython` terminal window
-    - `ipython>>> sim.do_mission()`
 
 # For Developers
 ## Prerequisites:
