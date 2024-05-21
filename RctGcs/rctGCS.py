@@ -125,9 +125,9 @@ def main():
 
     app = QgsApplication([], True)
 
-    prefix_path = configSetup()
+    # prefix_path = configSetup()
 
-    QgsApplication.setPrefixPath(str(prefix_path), True)
+    # QgsApplication.setPrefixPath(str(prefix_path), True)
 
     app.initQgis()
 
